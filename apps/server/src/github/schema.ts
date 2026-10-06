@@ -160,3 +160,29 @@ export const pullRequestFileSchema = z.object({
 })
 
 export const pullRequestFilesPageSchema = z.array(pullRequestFileSchema)
+
+export const pullRequestDraftStateQuery = `
+  query PullRequestDraftState($owner: String!, $name: String!, $number: Int!) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) { id isDraft }
+    }
+  }
+`
+
+export const convertToDraftMutation = `
+  mutation ConvertPullRequestToDraft($pullRequestId: ID!) {
+    convertPullRequestToDraft(input: { pullRequestId: $pullRequestId }) { pullRequest { isDraft } }
+  }
+`
+
+export const markReadyForReviewMutation = `
+  mutation MarkPullRequestReadyForReview($pullRequestId: ID!) {
+    markPullRequestReadyForReview(input: { pullRequestId: $pullRequestId }) { pullRequest { isDraft } }
+  }
+`
+
+export const pullRequestDraftStateResponseSchema = z.object({
+  data: z.object({
+    repository: z.object({ pullRequest: z.object({ id: z.string(), isDraft: z.boolean() }).nullable() }).nullable(),
+  }),
+})

@@ -376,6 +376,12 @@ loaded. Close closes the pull request without merging and leaves the branch. Eit
 board reloads, and a refusal from GitHub (conflicts, required checks or reviews, missing write
 permission) is shown as GitHub words it. Merge is off for drafts and conflicting branches.
 
+A draft means the pull request is being changed. The card's **Back to draft** button (a pencil)
+turns a ready pull request into a draft, and on a draft it becomes **Ready for review**. Neither
+asks, since each undoes the other. Starting a session on a pull request from the board, such as
+**Fix the conflicts**, makes it a draft first. The session marks it ready again once the change
+is validated, as the agent-base workflow does for every change to a ready pull request.
+
 ## Screenshots and videos
 
 A board card with a pull request has an image and a video button at its bottom. The video

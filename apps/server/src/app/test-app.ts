@@ -117,3 +117,19 @@ export const jsonRequest = (method: string, path: string, body: unknown, extraHe
  */
 export const getRequest = (path: string, extraHeaders: Record<string, string> = {}) =>
   new Request(`http://${testHost}${path}`, { headers: { host: testHost, ...extraHeaders } })
+
+/**
+ * A fake GitHub GraphQL API for pull request draft changes: it answers the draft state query
+ * with one pull request and records every query and its variables.
+ * @param isDraft Whether the pull request is a draft now.
+ * @param mutationAnswer What GitHub answers the mutation with, such as a refusal.
+ * @returns The fetcher factory to pass as createGraphqlFetcher, and the calls it received.
+ */
+export const createDraftGithub = (isDraft: boolean, mutationAnswer: unknown = { data: {} }) => {
+  const receivedCalls: { query: string; variables: Record<string, string | number> }[] = []
+  const createGraphqlFetcher: AppDependencies['createGraphqlFetcher'] = () => async (query, variables) => {
+    receivedCalls.push({ query, variables })
+    return query.includes('PullRequestDraftState') ? { data: { repository: { pullRequest: { id: 'PR_kwDraft', isDraft } } } } : mutationAnswer
+  }
+  return { createGraphqlFetcher, receivedCalls }
+}

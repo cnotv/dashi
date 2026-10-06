@@ -94,7 +94,8 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
               {conflictingPullRequest && (
                 <Text size="2">
                   The session checks out <Code>{conflictingPullRequest.headRefName}</Code>, brings in the default branch,
-                  resolves the conflicts, runs the checks and pushes. It asks you when both sides changed the same logic.
+                  resolves the conflicts, runs the checks and pushes. It asks you when both sides changed the same logic. The
+                  pull request goes back to draft until the session marks it ready again.
                 </Text>
               )}
               <StartChoicesFields

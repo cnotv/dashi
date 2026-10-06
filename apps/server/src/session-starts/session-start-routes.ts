@@ -17,6 +17,7 @@ import type {
 } from '@dashi/contracts'
 import { bearerTokenOf, limitTo, readJsonBody } from '../app/http.ts'
 import type { AppEnvironment } from '../app/types.ts'
+import type { DashboardSession } from '../auth/types.ts'
 import { findRepository } from '../repos/load-repositories.ts'
 import { sessionNameFor, sessionPromptFor } from './prompt.ts'
 import { attachmentDeliveryFor, attachmentLimitProblem, attachmentLimits } from './attachments.ts'
@@ -76,7 +77,7 @@ export const createRunnerTokenGuard = (runnerTokens: MachineTokenStore) =>
  * @returns The routes, mounted under /api.
  */
 export const createSessionStartRoutes = (dependencies: SessionStartDependencies) => {
-  const { startStore, routineStore, runnerTokens, vault, repositories, fireRoutine, attachmentRelay, now } = dependencies
+  const { startStore, routineStore, runnerTokens, vault, repositories, fireRoutine, attachmentRelay, markPullRequestDraft, now } = dependencies
   const routes = new Hono<AppEnvironment>()
 
   const repositoryOf = (owner: string, name: string): RepositoryReference | undefined => findRepository(repositories, owner, name)
@@ -98,22 +99,30 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
   })
 
   // The attachments are never stored: a laptop start's wait in memory for its runner, and a
-  // routine's go out with the prompt.
-  const launchStart = async (request: SessionStartRequest, attachments: StartAttachment[]): Promise<LaunchResult> => {
+  // routine's go out with the prompt. A start on a pull request turns it back into a draft first,
+  // so the board shows it as being changed until the session marks it ready again.
+  const launchStart = async (
+    request: SessionStartRequest,
+    attachments: StartAttachment[],
+    session: DashboardSession | null,
+  ): Promise<LaunchResult> => {
     const repository = repositoryOf(request.repository.owner, request.repository.name)
     if (repository === undefined) return { ok: false, status: 404, error: 'Unknown repository' }
     const limitProblem = attachmentLimitProblem(attachments, request.target)
     if (limitProblem !== null) return { ok: false, status: 413, error: limitProblem }
-    if (request.target !== 'cloud-routine') {
+    const routine = request.target === 'cloud-routine' ? routineOf(repository) : null
+    if (request.target === 'cloud-routine' && routine === null) {
+      return { ok: false, status: 412, error: 'Set up a Claude Code routine for this repository first' }
+    }
+    const routineText = sessionPromptFor({ ...request, repository }, attachments)
+    if (routine !== null && routineText.length > routineTextCharacters) {
+      return { ok: false, status: 413, error: `The first message comes to ${routineText.length} characters; a routine takes at most ${routineTextCharacters}` }
+    }
+    if (request.pullRequestNumber !== null) await markPullRequestDraft(session, repository, request.pullRequestNumber)
+    if (routine === null) {
       const queuedStart = startStore.createStart({ ...request, repository })
       attachmentRelay.hold(queuedStart.startId, attachments)
       return { ok: true, start: queuedStart }
-    }
-    const routine = routineOf(repository)
-    if (routine === null) return { ok: false, status: 412, error: 'Set up a Claude Code routine for this repository first' }
-    const routineText = sessionPromptFor({ ...request, repository }, attachments)
-    if (routineText.length > routineTextCharacters) {
-      return { ok: false, status: 413, error: `The first message comes to ${routineText.length} characters; a routine takes at most ${routineTextCharacters}` }
     }
     const start = startStore.createStart({ ...request, repository })
     const fireResult = await fireRoutine(routine.routineId, routine.routineToken, routineText)
@@ -130,7 +139,7 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
 
   routes.post('/session-starts', limitTo(sessionStartBodyBytes), async (context) => {
     const { attachments, ...request } = sessionStartSubmissionSchema.parse(await readJsonBody(context.req.raw))
-    return answerLaunch(context, await launchStart(request, attachments))
+    return answerLaunch(context, await launchStart(request, attachments, context.get('session')))
   })
 
   // What the session was told, so a start that went wrong can be read in full from the dashboard.
@@ -147,7 +156,10 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
     if (failedStart === null) return context.json({ error: 'Unknown start' }, 404)
     if (failedStart.state !== 'failed') return context.json({ error: 'Only a failed start can be retried' }, 409)
     const { repository, issueNumber, pullRequestNumber, workflow, target, permissionMode, note } = failedStart
-    return answerLaunch(context, await launchStart({ repository, issueNumber, pullRequestNumber, workflow, target, permissionMode, note }, []))
+    return answerLaunch(
+      context,
+      await launchStart({ repository, issueNumber, pullRequestNumber, workflow, target, permissionMode, note }, [], context.get('session')),
+    )
   })
 
   // Anthropic offers no way to check a routine's token short of running it, so the test is a

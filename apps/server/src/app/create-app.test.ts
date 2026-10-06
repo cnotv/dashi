@@ -1,6 +1,6 @@
 import { zipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
-import { createTestApp, getRequest, jsonRequest, signedVideoUrl, testHost } from './test-app.ts'
+import { createDraftGithub, createTestApp, getRequest, jsonRequest, signedVideoUrl, testHost } from './test-app.ts'
 
 const sampleToken = 'ghp_exampleTokenValue1234567890abcd'
 const host = testHost
@@ -217,6 +217,41 @@ describe('pull request recordings', () => {
     const response = await app.request(getRequest('/api/repositories/cnotv/generative-art/pulls/7/media/video?sha=0123abcd'))
     expect(response.status).toBe(302)
     expect(response.headers.get('location')).toBe(signedVideoUrl)
+  })
+})
+
+describe('pull request draft', () => {
+  const draftRequest = (draft: boolean) => jsonRequest('POST', '/api/repositories/cnotv/generative-art/pulls/7/draft', { draft })
+
+  it('turns a ready pull request into a draft through its id', async () => {
+    const github = createDraftGithub(false)
+    const { app, vault } = createTestApp({ createGraphqlFetcher: github.createGraphqlFetcher })
+    vault.saveSecret('github-token', sampleToken)
+    expect((await app.request(draftRequest(true))).status).toBe(204)
+    expect(github.receivedCalls.map((call) => call.variables)).toEqual([
+      { owner: 'cnotv', name: 'generative-art', number: 7 },
+      { pullRequestId: 'PR_kwDraft' },
+    ])
+    expect(github.receivedCalls[1]?.query).toContain('convertPullRequestToDraft')
+  })
+
+  it('marks a draft ready for review, and leaves one already in the asked state alone', async () => {
+    const draftGithub = createDraftGithub(true)
+    const draftApp = createTestApp({ createGraphqlFetcher: draftGithub.createGraphqlFetcher })
+    draftApp.vault.saveSecret('github-token', sampleToken)
+    expect((await draftApp.app.request(draftRequest(false))).status).toBe(204)
+    expect(draftGithub.receivedCalls[1]?.query).toContain('markPullRequestReadyForReview')
+    expect((await draftApp.app.request(draftRequest(true))).status).toBe(204)
+    expect(draftGithub.receivedCalls).toHaveLength(3)
+  })
+
+  it('passes GitHub\'s refusal on with the access the App needs', async () => {
+    const github = createDraftGithub(false, { errors: [{ message: 'Resource not accessible by integration' }] })
+    const { app, vault } = createTestApp({ createGraphqlFetcher: github.createGraphqlFetcher })
+    vault.saveSecret('github-token', sampleToken)
+    const response = await app.request(draftRequest(true))
+    expect(response.status).toBe(403)
+    expect(await response.text()).toContain('Resource not accessible by integration')
   })
 })
 

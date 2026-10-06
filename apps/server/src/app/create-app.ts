@@ -9,7 +9,7 @@ import { authCookieNamesFor, createAuthRoutes, publicApiPaths } from '../auth/au
 import { fetchPullRequestBodyHtml, fetchRepositoryBoard } from '../github/board.ts'
 import { mediaUrlFromBodyHtml } from '../github/media.ts'
 import { createIssue } from '../github/issues.ts'
-import { closePullRequest, mergePullRequest } from '../github/pull-request-actions.ts'
+import { closePullRequest, mergePullRequest, setPullRequestDraft } from '../github/pull-request-actions.ts'
 import { fetchPullRequestFiles } from '../github/pull-request-files.ts'
 import type { PullRequestActionResult } from '../github/types.ts'
 import { hasStoredRecording, readStoredMedia, storePreviewFiles } from '../media/media-store.ts'
@@ -23,6 +23,7 @@ import { createMachineRoutes, machineApiPathPrefixes } from '../machines/machine
 import { createPairingRelay } from '../machines/pairing-relay.ts'
 import { createAttachmentRelay } from '../session-starts/attachments.ts'
 import { createRunnerRoutes, createSessionStartRoutes, runnerApiPathPrefix } from '../session-starts/session-start-routes.ts'
+import type { PullRequestDraftMarker } from '../session-starts/types.ts'
 import { isAllowedHostHeader, isSameOriginRequest } from '../runtime/settings.ts'
 import { createRedactor } from '../secrets/redact.ts'
 import type { DashboardSession } from '../auth/types.ts'
@@ -35,6 +36,7 @@ const rotateBodySchema = z.object({ nextKey: z.string().min(1) })
 const mediaParamsSchema = z.object({ number: z.coerce.number().int().positive(), kind: z.enum(['image', 'video', 'before']) })
 const commitShaSchema = z.string().regex(/^[0-9a-f]{7,40}$/)
 const pullRequestNumberSchema = z.coerce.number().int().positive()
+const draftBodySchema = z.object({ draft: z.boolean() })
 const mergeBodySchema = z.object({ title: z.string().trim().min(1).max(256), headSha: z.string().regex(/^[0-9a-f]{40}$/) })
 const newIssueBodySchema = z.object({ title: z.string().trim().min(1).max(256), body: z.string().max(60000).default('') })
 
@@ -119,9 +121,16 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnvironment> =
   app.route('/api/auth', createAuthRoutes(auth))
   app.route('/api', createIngestRoutes(activity))
   app.route('/api', createActivityRoutes(activity, findPullRequest))
+  const markPullRequestDraft: PullRequestDraftMarker = async (session, repository, pullRequestNumber) => {
+    const githubToken = session?.githubToken ?? vault.readSecretValue('github-token')
+    if (githubToken === null) return
+    const result = await setPullRequestDraft(dependencies.createGraphqlFetcher(githubToken), repository, pullRequestNumber, true)
+    if (result.ok) forgetBoardsOf(repository)
+  }
   const sessionStartDependencies = {
     ...dependencies.sessionStarts,
     attachmentRelay: createAttachmentRelay(dependencies.now),
+    markPullRequestDraft,
     vault,
     repositories,
     now: dependencies.now,
@@ -297,6 +306,17 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnvironment> =
       title,
       headSha,
     })
+    return answerPullRequestAction(context, repository, result)
+  })
+
+  app.post('/api/repositories/:owner/:name/pulls/:number/draft', async (context) => {
+    const repository = findRepository(repositories, context.req.param('owner'), context.req.param('name'))
+    const parsedNumber = pullRequestNumberSchema.safeParse(context.req.param('number'))
+    if (repository === undefined || !parsedNumber.success) return context.json({ error: 'Unknown pull request' }, 404)
+    const { draft } = draftBodySchema.parse(await readJsonBody(context.req.raw))
+    const githubToken = githubTokenOf(context.get('session'))
+    if (githubToken === null) return context.json(missingTokenError, 412)
+    const result = await setPullRequestDraft(dependencies.createGraphqlFetcher(githubToken), repository, parsedNumber.data, draft)
     return answerPullRequestAction(context, repository, result)
   })
 

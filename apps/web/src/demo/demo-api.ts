@@ -104,6 +104,9 @@ export const createDemoApi = (): DashboardApi => {
     closePullRequest: async (_repository, pullRequest) => {
       demoMemory.pullRequestOutcomes = new Map([...demoMemory.pullRequestOutcomes, [pullRequest.number, 'closed']])
     },
+    setPullRequestDraft: async (_repository, pullRequest, isDraft) => {
+      demoMemory.pullRequestOutcomes = new Map([...demoMemory.pullRequestOutcomes, [pullRequest.number, isDraft ? 'draft' : 'ready']])
+    },
     readPullRequestFiles: async () => samplePullRequestFiles,
     readNetlifyStatus: async (repository) =>
       demoMemory.netlifyRepositoryKeys.has(repositoryKey(repository)) ? demoNetlifySite(repository) : { state: 'inactive' },

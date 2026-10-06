@@ -1,5 +1,6 @@
 import type { z } from 'zod'
 import type { RepositoryReference, SessionStart, SessionStartRequest, StartAttachment } from '@dashi/contracts'
+import type { DashboardSession } from '../auth/types.ts'
 import type { MachineTokenStore } from '../machine-tokens/types.ts'
 import type { Vault } from '../secrets/types.ts'
 import type { runnerReportSchema } from './schema.ts'
@@ -45,8 +46,12 @@ export interface AttachmentRelay {
   take: (startId: string) => StartAttachment[]
 }
 
+// Turns a pull request into a draft with the reader's own GitHub access; a refusal is left at that.
+export type PullRequestDraftMarker = (session: DashboardSession | null, repository: RepositoryReference, pullRequestNumber: number) => Promise<void>
+
 export interface SessionStartDependencies extends SessionStartServices {
   attachmentRelay: AttachmentRelay
+  markPullRequestDraft: PullRequestDraftMarker
   vault: Vault
   repositories: RepositoryReference[]
   now: () => number

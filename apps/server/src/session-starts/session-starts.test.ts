@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { createTestApp, getRequest, jsonRequest } from '../app/test-app.ts'
+import { createDraftGithub, createTestApp, getRequest, jsonRequest } from '../app/test-app.ts'
 import { sessionNameFor, sessionPromptFor } from './prompt.ts'
 
 const repository = { owner: 'cnotv', name: 'generative-art' }
@@ -20,6 +20,32 @@ const startIdOf = async (response: Response): Promise<string> => z.object({ star
 
 const runnerRequest = (path: string, token: string, body: unknown = {}) =>
   jsonRequest('POST', `/api/runner${path}`, body, { authorization: `Bearer ${token}` })
+
+describe('a start on a pull request', () => {
+  const githubToken = 'ghp_exampleTokenValue1234567890abcd'
+
+  it('turns the pull request back into a draft before the session starts on it', async () => {
+    const github = createDraftGithub(false)
+    const { app, vault } = createTestApp({ createGraphqlFetcher: github.createGraphqlFetcher })
+    vault.saveSecret('github-token', githubToken)
+    const response = await app.request(jsonRequest('POST', '/api/session-starts', startBody({ workflow: 'conflicts', pullRequestNumber: 43 })))
+    expect(response.status).toBe(201)
+    expect(github.receivedCalls.map((call) => call.variables)).toEqual([
+      { owner: 'cnotv', name: 'generative-art', number: 43 },
+      { pullRequestId: 'PR_kwDraft' },
+    ])
+  })
+
+  it('still starts when GitHub refuses, and leaves an issue start\'s pull request alone', async () => {
+    const github = createDraftGithub(false, { errors: [{ message: 'Resource not accessible by integration' }] })
+    const { app, vault } = createTestApp({ createGraphqlFetcher: github.createGraphqlFetcher })
+    vault.saveSecret('github-token', githubToken)
+    expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ pullRequestNumber: 43 })))).status).toBe(201)
+    const callsBefore = github.receivedCalls.length
+    expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody()))).status).toBe(201)
+    expect(github.receivedCalls).toHaveLength(callsBefore)
+  })
+})
 
 describe('sessionPromptFor', () => {
   it('names the workflow for the router, links the issue and adds the note', () => {

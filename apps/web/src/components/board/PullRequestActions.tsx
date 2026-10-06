@@ -1,4 +1,4 @@
-import { CheckCircledIcon, CrossCircledIcon } from '@radix-ui/react-icons'
+import { CheckCircledIcon, CrossCircledIcon, Pencil2Icon, PaperPlaneIcon } from '@radix-ui/react-icons'
 import { AlertDialog, Button, Flex, IconButton, Tooltip } from '@radix-ui/themes'
 import { useState } from 'react'
 import type { PullRequestSummary, RepositoryReference } from '@dashi/contracts'
@@ -14,15 +14,16 @@ interface PullRequestActionsProps {
 // The reason merging is off, or null when GitHub may be asked; GitHub still has the last word on
 // checks and reviews, and its refusal is shown as it gives it.
 const mergeBlockerOf = (pullRequest: PullRequestSummary): string | null => {
-  if (pullRequest.isDraft) return 'A draft cannot be merged; mark it ready on GitHub first'
+  if (pullRequest.isDraft) return 'A draft cannot be merged; mark it ready for review first'
   if (pullRequest.mergeable === 'CONFLICTING') return 'It has merge conflicts'
   if (pullRequest.headSha === null) return 'Its head commit is not known yet; refresh the board'
   return null
 }
 
 /**
- * The Merge and Close icons at the end of a board card's icon row. Each asks for confirmation, because
- * both act on GitHub at once and neither is undone from here; afterwards the board reloads.
+ * The draft, Merge and Close icons at the end of a board card's icon row. Back to draft and Ready
+ * for review act at once, since each undoes the other; Merge and Close ask for confirmation,
+ * because neither is undone from here. Afterwards the board reloads.
  */
 export const PullRequestActions = ({ repository, pullRequest, onChanged }: PullRequestActionsProps) => {
   const toast = useToast()
@@ -44,6 +45,23 @@ export const PullRequestActions = ({ repository, pullRequest, onChanged }: PullR
 
   return (
     <Flex gap="2" align="center" ml="auto">
+      <Tooltip content={pullRequest.isDraft ? 'Ready for review: the change is done' : 'Back to draft: a change is being made'}>
+        <IconButton
+          size="1"
+          variant="ghost"
+          color="gray"
+          disabled={isWorking}
+          aria-label={pullRequest.isDraft ? 'Ready for review' : 'Back to draft'}
+          onClick={() =>
+            void run(
+              () => dashboardApi.setPullRequestDraft(repository, pullRequest, !pullRequest.isDraft),
+              pullRequest.isDraft ? `#${pullRequest.number} is ready for review` : `#${pullRequest.number} is a draft again`,
+            )
+          }
+        >
+          {pullRequest.isDraft ? <PaperPlaneIcon /> : <Pencil2Icon />}
+        </IconButton>
+      </Tooltip>
       <AlertDialog.Root>
         <Tooltip content={mergeBlocker ?? 'Squash and merge on GitHub'}>
           <span>
