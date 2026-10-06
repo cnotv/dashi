@@ -127,6 +127,7 @@ export interface DashboardApi {
   pullRequestMediaUrl: (repository: RepositoryReference, pullRequest: PullRequestSummary, kind: PreviewMediaKind) => string
   mergePullRequest: (repository: RepositoryReference, pullRequest: PullRequestSummary) => Promise<void>
   closePullRequest: (repository: RepositoryReference, pullRequest: PullRequestSummary) => Promise<void>
+  setPullRequestDraft: (repository: RepositoryReference, pullRequest: PullRequestSummary, isDraft: boolean) => Promise<void>
   readPullRequestFiles: (repository: RepositoryReference, pullRequest: PullRequestSummary) => Promise<PullRequestFiles>
   readNetlifyStatus: (repository: RepositoryReference) => Promise<NetlifyStatus>
   enableNetlify: (repository: RepositoryReference) => Promise<NetlifyStatus>
@@ -191,7 +192,7 @@ export interface RuntimeConfiguration {
   apiBaseUrl: string
 }
 
-export type DemoPullRequestOutcome = 'merged' | 'closed'
+export type DemoPullRequestOutcome = 'merged' | 'closed' | 'draft' | 'ready'
 
 export type DiffLineKind = 'hunk' | 'added' | 'removed' | 'context' | 'note'
 

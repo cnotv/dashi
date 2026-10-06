@@ -193,7 +193,11 @@ export const applyDemoPullRequestOutcomes = (
     .flatMap((column) => column.cards)
     .flatMap((card): BoardCard[] => {
       const outcome = card.pullRequest ? outcomes.get(card.pullRequest.number) : undefined
-      if (outcome === undefined) return [card]
+      if (outcome === undefined || card.pullRequest === null) return [card]
+      if (outcome === 'draft' || outcome === 'ready') {
+        const isDraft = outcome === 'draft'
+        return [{ ...card, pullRequest: { ...card.pullRequest, isDraft }, status: isDraft ? 'draft' : 'ready-for-review' }]
+      }
       if (outcome === 'merged') {
         return card.issues.map((issue) => ({
           issues: [{ ...issue, closedAt: now, updatedAt: now }],
