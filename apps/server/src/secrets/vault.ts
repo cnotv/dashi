@@ -292,14 +292,17 @@ export const createVault = (database: DatabaseSync, options: VaultOptions): Vaul
 
   const addSecretEntry = (name: string, label: string, value: string): string => {
     const trimmedValue = trimmedValueOf(value)
-    const entryId = entryRowsOf(name).length === 0 ? firstEntryId : randomBytes(4).toString('hex')
-    writeEntry(rowNameOf(name, entryId), label.trim() || firstEntryLabel, trimmedValue, null)
+    const entryCount = entryRowsOf(name).length
+    const entryId = entryCount === 0 ? firstEntryId : randomBytes(4).toString('hex')
+    // Two tokens both called Default could not be told apart, so an unnamed later one is numbered.
+    const fallbackLabel = entryCount === 0 ? firstEntryLabel : `Token ${entryCount + 1}`
+    writeEntry(rowNameOf(name, entryId), label.trim() || fallbackLabel, trimmedValue, null)
     return entryId
   }
 
   const updateSecretEntry = (name: string, entryId: string, change: { label?: string; value?: string }): void => {
     const entryRow = requireEntryRow(name, entryId)
-    const label = change.label === undefined ? entryRow.label : change.label.trim() || firstEntryLabel
+    const label = change.label?.trim() || entryRow.label
     const value = change.value === undefined ? decryptValue(requireActiveKey(), entryRow, entryRow.name) : trimmedValueOf(change.value)
     writeEntry(entryRow.name, label, value, entryRow.createdAt)
   }

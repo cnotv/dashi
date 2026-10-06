@@ -92,7 +92,7 @@ export const createDemoApi = (): DashboardApi => {
     addSecretEntry: async (name, label, value) => {
       const entries = entriesOf(name)
       const entryId = entries.length === 0 ? 'default' : `demo-${entries.length + 1}`
-      const entry = { entryId, label: label.trim() || 'Default', lastFour: value.trim().slice(-4), isInUse: entries.length === 0, updatedAt: new Date().toISOString() }
+      const entry = { entryId, label: label.trim() || (entries.length === 0 ? 'Default' : `Token ${entries.length + 1}`), lastFour: value.trim().slice(-4), isInUse: entries.length === 0, updatedAt: new Date().toISOString() }
       replaceEntries(name, [...entries, entry])
       return { entryId }
     },
@@ -103,7 +103,7 @@ export const createDemoApi = (): DashboardApi => {
           entry.entryId === entryId
             ? {
                 ...entry,
-                label: change.label === undefined ? entry.label : change.label.trim() || 'Default',
+                label: change.label?.trim() || entry.label,
                 lastFour: change.value === undefined ? entry.lastFour : change.value.trim().slice(-4),
                 updatedAt: new Date().toISOString(),
               }

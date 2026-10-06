@@ -119,6 +119,15 @@ describe('environment vault', () => {
     expect(() => vault.useSecretEntry('github-token', workId)).toThrow('Unknown token')
   })
 
+  it('numbers a token added without a name, and keeps the name when an edit leaves it empty', () => {
+    const { database } = createDatabaseFile()
+    const vault = createVault(database, { mode: 'environment', environmentKey: generateKeyMaterial() })
+    vault.addSecretEntry('github-token', '', 'ghp_firstToken0001')
+    const secondId = vault.addSecretEntry('github-token', ' ', 'ghp_secondToken0002')
+    vault.updateSecretEntry('github-token', secondId, { label: '' })
+    expect(vault.listSecrets(definitions)[0]?.entries.map((entry) => entry.label)).toEqual(['Default', 'Token 2'])
+  })
+
   it('keeps every token readable after the key is rotated', () => {
     const { database } = createDatabaseFile()
     const vault = createVault(database, { mode: 'environment', environmentKey: generateKeyMaterial() })
