@@ -1,18 +1,17 @@
-import { Badge, Button, Card, Code, Flex, Table, Text } from '@radix-ui/themes'
+import { Card, Flex, Table, Text } from '@radix-ui/themes'
 import type { SecretEntrySummary, SecretSummary } from '@dashi/contracts'
 import { ConnectAgentsPanel } from '@/components/credentials/ConnectAgentsPanel'
+import { CredentialTokens } from '@/components/credentials/CredentialTokens'
 import { MachineSetupPanel } from '@/components/credentials/MachineSetupPanel'
 import { RoutinePanel } from '@/components/credentials/RoutinePanel'
 import { RunnerPanel } from '@/components/credentials/RunnerPanel'
-import { SecretDialog } from '@/components/credentials/SecretDialog'
 import { VaultPanel } from '@/components/credentials/VaultPanel'
 import { useToast } from '@/hooks/useToast'
 import { useVault } from '@/hooks/useVault'
 
 /**
  * The Credentials page: the vault and the stored credentials. A credential can hold several
- * tokens, each with a name; the one marked In use is the one the dashboard reads, and Use this
- * moves the mark.
+ * named tokens; the selected one is the one the dashboard reads.
  */
 export const CredentialsView = () => {
   const toast = useToast()
@@ -47,6 +46,10 @@ export const CredentialsView = () => {
       )}
 
       <Card size="1">
+        <Text as="p" size="2" color="gray" mx="3" mt="2">
+          Each credential can hold several tokens. Dashi uses the selected one: select another to switch, or add a token and tick
+          Use this token now.
+        </Text>
         <Table.Root variant="ghost" size="2">
           <Table.Header>
             <Table.Row>
@@ -66,64 +69,15 @@ export const CredentialsView = () => {
                   </Text>
                 </Table.RowHeaderCell>
                 <Table.Cell>
-                  <Flex direction="column" gap="2" align="start">
-                    {secret.entries.length === 0 && (
-                      <Badge variant="outline" color="gray" radius="full">
-                        Not set
-                      </Badge>
-                    )}
-                    {secret.entries.map((entry) => (
-                      <Flex key={entry.entryId} gap="2" align="center" wrap="wrap">
-                        <Text size="2" weight="medium">
-                          {entry.label}
-                        </Text>
-                        <Code variant="soft" color="gray">
-                          ••••{entry.lastFour}
-                        </Code>
-                        {entry.isInUse ? (
-                          <Badge color="green" radius="full">
-                            In use
-                          </Badge>
-                        ) : (
-                          <Button
-                            size="1"
-                            variant="soft"
-                            disabled={!isUnlocked}
-                            onClick={() =>
-                              void run(() => vault.useSecretEntry(secret.name, entry.entryId), `${secret.label}: now using ${entry.label}`)
-                            }
-                          >
-                            Use this
-                          </Button>
-                        )}
-                        <SecretDialog
-                          secret={secret}
-                          entry={entry}
-                          disabled={!isUnlocked}
-                          onSave={(label, value) =>
-                            vault.updateSecretEntry(secret.name, entry.entryId, value.trim() === '' ? { label } : { label, value })
-                          }
-                        />
-                        <Button size="1" variant="soft" color="gray" disabled={!isUnlocked} onClick={() => void testEntry(secret, entry)}>
-                          Test
-                        </Button>
-                        <Button
-                          size="1"
-                          variant="ghost"
-                          color="red"
-                          onClick={() => void run(() => vault.deleteSecretEntry(secret.name, entry.entryId), `${secret.label}: ${entry.label} removed`)}
-                        >
-                          Remove
-                        </Button>
-                      </Flex>
-                    ))}
-                    <SecretDialog
-                      secret={secret}
-                      entry={null}
-                      disabled={!isUnlocked}
-                      onSave={(label, value) => vault.addSecretEntry(secret.name, label, value)}
-                    />
-                  </Flex>
+                  <CredentialTokens
+                    secret={secret}
+                    isUnlocked={isUnlocked}
+                    onAdd={(newEntry) => vault.addSecretEntry(secret.name, newEntry)}
+                    onUpdate={(entryId, change) => vault.updateSecretEntry(secret.name, entryId, change)}
+                    onUse={(entry) => void run(() => vault.useSecretEntry(secret.name, entry.entryId), `${secret.label}: Dashi now uses ${entry.label}`)}
+                    onTest={(entry) => void testEntry(secret, entry)}
+                    onRemove={(entry) => void run(() => vault.deleteSecretEntry(secret.name, entry.entryId), `${secret.label}: ${entry.label} removed`)}
+                  />
                 </Table.Cell>
               </Table.Row>
             ))}

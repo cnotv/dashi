@@ -89,11 +89,18 @@ export const createDemoApi = (): DashboardApi => {
     unlockVault: async () => demoVaultState,
     lockVault: async () => demoVaultState,
     listSecrets: async () => demoMemory.secrets,
-    addSecretEntry: async (name, label, value) => {
+    addSecretEntry: async (name, { label, value, useNow }) => {
       const entries = entriesOf(name)
-      const entryId = entries.length === 0 ? 'default' : `demo-${entries.length + 1}`
-      const entry = { entryId, label: label.trim() || (entries.length === 0 ? 'Default' : `Token ${entries.length + 1}`), lastFour: value.trim().slice(-4), isInUse: entries.length === 0, updatedAt: new Date().toISOString() }
-      replaceEntries(name, [...entries, entry])
+      const isFirst = entries.length === 0
+      const entryId = isFirst ? 'default' : crypto.randomUUID().slice(0, 8)
+      const entry = {
+        entryId,
+        label: label.trim() || (isFirst ? 'Default' : `Token ${entries.length + 1}`),
+        lastFour: value.trim().slice(-4),
+        isInUse: isFirst || useNow,
+        updatedAt: new Date().toISOString(),
+      }
+      replaceEntries(name, [...entries.map((kept) => ({ ...kept, isInUse: kept.isInUse && !entry.isInUse })), entry])
       return { entryId }
     },
     updateSecretEntry: async (name, entryId, change) =>

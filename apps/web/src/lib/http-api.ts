@@ -49,7 +49,7 @@ export const createHttpApi = (apiBaseUrl: string): DashboardApi => {
     unlockVault: (passphrase) => sendJson('POST', '/api/vault/unlock', { passphrase }),
     lockVault: () => sendJson('POST', '/api/vault/lock'),
     listSecrets: () => requestJson('/api/secrets'),
-    addSecretEntry: (name, label, value) => sendJson('POST', `${secretPath(name)}/entries`, { label, value }),
+    addSecretEntry: (name, newEntry) => sendJson('POST', `${secretPath(name)}/entries`, newEntry),
     updateSecretEntry: (name, entryId, change) => sendJson('PATCH', secretEntryPath(name, entryId), change),
     useSecretEntry: (name, entryId) => sendJson('POST', `${secretEntryPath(name, entryId)}/use`),
     deleteSecretEntry: (name, entryId) => sendJson('DELETE', secretEntryPath(name, entryId)),

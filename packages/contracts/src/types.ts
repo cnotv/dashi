@@ -153,6 +153,13 @@ export interface CreatedSecretEntry {
   entryId: string
 }
 
+export interface NewSecretEntry {
+  label: string
+  value: string
+  // The first token of a credential is in use whatever this says.
+  useNow: boolean
+}
+
 export interface SecretEntryChange {
   label?: string
   value?: string

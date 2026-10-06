@@ -24,6 +24,7 @@ import type {
   SecretSummary,
   SecretEntryChange,
   CreatedSecretEntry,
+  NewSecretEntry,
   SessionState,
   SecretTestResult,
   SessionsOverview,
@@ -121,7 +122,7 @@ export interface DashboardApi {
   unlockVault: (passphrase: string) => Promise<VaultState>
   lockVault: () => Promise<VaultState>
   listSecrets: () => Promise<SecretSummary[]>
-  addSecretEntry: (name: string, label: string, value: string) => Promise<CreatedSecretEntry>
+  addSecretEntry: (name: string, newEntry: NewSecretEntry) => Promise<CreatedSecretEntry>
   updateSecretEntry: (name: string, entryId: string, change: SecretEntryChange) => Promise<void>
   useSecretEntry: (name: string, entryId: string) => Promise<void>
   deleteSecretEntry: (name: string, entryId: string) => Promise<void>

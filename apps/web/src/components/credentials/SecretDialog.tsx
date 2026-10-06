@@ -1,7 +1,7 @@
-import { ExternalLinkIcon } from '@radix-ui/react-icons'
-import { Button, Dialog, Flex, Link, Text, TextField } from '@radix-ui/themes'
+import { ExternalLinkIcon, PlusIcon } from '@radix-ui/react-icons'
+import { Button, Checkbox, Dialog, Flex, Link, Text, TextField } from '@radix-ui/themes'
 import { useState, type FormEvent } from 'react'
-import type { SecretEntrySummary, SecretSummary } from '@dashi/contracts'
+import type { NewSecretEntry, SecretEntrySummary, SecretSummary } from '@dashi/contracts'
 import { useToast } from '@/hooks/useToast'
 
 interface SecretDialogProps {
@@ -9,12 +9,14 @@ interface SecretDialogProps {
   // The token to rename or replace, or null to add one.
   entry: SecretEntrySummary | null
   disabled: boolean
-  onSave: (label: string, value: string) => Promise<void>
+  // Editing ignores useNow: the radio group switches tokens.
+  onSave: (newEntry: NewSecretEntry) => Promise<void>
 }
 
 /**
  * The dialog that adds a token to a credential, or renames or replaces one; the value is cleared
- * as soon as it is sent, and left empty when editing keeps the stored one.
+ * as soon as it is sent, and left empty when editing keeps the stored one. A token added next to
+ * others is used straight away unless Use this token now is unticked.
  */
 export const SecretDialog = ({ secret, entry, disabled, onSave }: SecretDialogProps) => {
   const toast = useToast()
@@ -22,17 +24,19 @@ export const SecretDialog = ({ secret, entry, disabled, onSave }: SecretDialogPr
   const [isOpen, setIsOpen] = useState(false)
   const [tokenLabel, setTokenLabel] = useState('')
   const [secretValue, setSecretValue] = useState('')
+  const [shouldUseNow, setShouldUseNow] = useState(true)
 
   const open = (nextOpen: boolean): void => {
     setIsOpen(nextOpen)
     setTokenLabel(entry?.label ?? (secret.entries.length === 0 ? 'Default' : ''))
     setSecretValue('')
+    setShouldUseNow(true)
   }
 
   const save = async (submitEvent: FormEvent): Promise<void> => {
     submitEvent.preventDefault()
     try {
-      await onSave(tokenLabel, secretValue)
+      await onSave({ label: tokenLabel, value: secretValue, useNow: shouldUseNow })
       toast.notifySuccess(`${secret.label} ${isAdding ? 'added' : 'saved'}`)
       setIsOpen(false)
     } catch (saveError) {
@@ -43,14 +47,19 @@ export const SecretDialog = ({ secret, entry, disabled, onSave }: SecretDialogPr
   }
 
   const isFirstToken = isAdding && secret.entries.length === 0
-  const triggerLabel = isAdding ? (isFirstToken ? 'Add' : 'Add another') : 'Edit'
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={open}>
       <Dialog.Trigger>
-        <Button size="1" variant={isFirstToken ? 'solid' : 'soft'} color={isFirstToken ? undefined : 'gray'} disabled={disabled}>
-          {triggerLabel}
-        </Button>
+        {isAdding ? (
+          <Button size="1" variant={isFirstToken ? 'solid' : 'soft'} disabled={disabled}>
+            <PlusIcon /> Add token
+          </Button>
+        ) : (
+          <Button size="1" variant="soft" color="gray" disabled={disabled}>
+            Edit
+          </Button>
+        )}
       </Dialog.Trigger>
       <Dialog.Content maxWidth="460px">
         <Dialog.Title>{entry === null ? `New ${secret.label}` : `${secret.label}: ${entry.label}`}</Dialog.Title>
@@ -91,6 +100,14 @@ export const SecretDialog = ({ secret, entry, disabled, onSave }: SecretDialogPr
                 onChange={(changeEvent) => setSecretValue(changeEvent.target.value)}
               />
             </label>
+            {isAdding && !isFirstToken && (
+              <Text as="label" size="2">
+                <Flex gap="2" align="center">
+                  <Checkbox checked={shouldUseNow} onCheckedChange={(checked) => setShouldUseNow(checked === true)} />
+                  Use this token now
+                </Flex>
+              </Text>
+            )}
           </Flex>
           <Flex gap="3" mt="5" justify="end">
             <Dialog.Close>

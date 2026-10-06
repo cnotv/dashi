@@ -40,6 +40,8 @@ describe('secrets routes', () => {
     expect(vault.listSecrets(secretDefinitions)[0]?.entries[1]?.label).toBe('Client')
     expect((await app.request(jsonRequest('DELETE', `/api/secrets/github-token/entries/${entryId}`, {}))).status).toBe(204)
     expect(vault.readSecretValue('github-token')).toBe(sampleToken)
+    await app.request(jsonRequest('POST', '/api/secrets/github-token/entries', { label: 'Client', value: 'ghp_clientToken000000000000000000000003', useNow: true }))
+    expect(vault.readSecretValue('github-token')).toBe('ghp_clientToken000000000000000000000003')
   })
 
   it('refuses unknown credential names and tokens', async () => {

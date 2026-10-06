@@ -13,7 +13,10 @@ export const sampleSecrets: SecretSummary[] = [
     label: 'GitHub token',
     description: 'Reads issues, pull requests, check runs and workflow artifacts when nobody is signed in with GitHub.',
     tokenPageUrl: 'https://github.com/settings/personal-access-tokens/new',
-    entries: [{ entryId: 'default', label: 'Default', lastFour: 'demo', isInUse: true, updatedAt: '2026-09-28T00:00:00Z' }],
+    entries: [
+      { entryId: 'default', label: 'Personal', lastFour: 'demo', isInUse: true, updatedAt: '2026-09-28T00:00:00Z' },
+      { entryId: 'work', label: 'Work', lastFour: 'w0rk', isInUse: false, updatedAt: '2026-09-30T00:00:00Z' },
+    ],
   },
   {
     name: 'anthropic-api-key',

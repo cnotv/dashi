@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createDemoApi } from './demo-api'
 import { sampleBoardColumns } from './sample-board'
+import { sampleSecrets } from './sample-data'
 
 describe('createDemoApi', () => {
   it('serves a board for whichever repository is asked for', async () => {
@@ -36,8 +37,8 @@ describe('createDemoApi', () => {
   it('keeps several tokens per credential in memory, showing only their last four characters', async () => {
     const demoApi = createDemoApi()
     const entriesOf = async () => (await demoApi.listSecrets()).find((secret) => secret.name === 'openrouter-api-key')?.entries ?? []
-    await demoApi.addSecretEntry('openrouter-api-key', 'Personal', 'sk-or-example-9876')
-    const { entryId: workId } = await demoApi.addSecretEntry('openrouter-api-key', 'Work', 'sk-or-example-5432')
+    await demoApi.addSecretEntry('openrouter-api-key', { label: 'Personal', value: 'sk-or-example-9876', useNow: false })
+    const { entryId: workId } = await demoApi.addSecretEntry('openrouter-api-key', { label: 'Work', value: 'sk-or-example-5432', useNow: false })
     expect((await entriesOf()).map((entry) => [entry.label, entry.lastFour, entry.isInUse])).toEqual([
       ['Personal', '9876', true],
       ['Work', '5432', false],
@@ -46,6 +47,11 @@ describe('createDemoApi', () => {
     await demoApi.useSecretEntry('openrouter-api-key', workId)
     await demoApi.deleteSecretEntry('openrouter-api-key', workId)
     expect((await entriesOf()).map((entry) => [entry.label, entry.isInUse])).toEqual([['Personal', true]])
+    await demoApi.addSecretEntry('openrouter-api-key', { label: 'Client', value: 'sk-or-example-1111', useNow: true })
+    expect((await entriesOf()).map((entry) => [entry.label, entry.isInUse])).toEqual([
+      ['Personal', false],
+      ['Client', true],
+    ])
   })
 
   it('is signed in as a demo user with no GitHub sign-in to offer', async () => {
@@ -60,7 +66,8 @@ describe('createDemoApi', () => {
     const firstApi = createDemoApi()
     await firstApi.deleteSecretEntry('github-token', 'default')
     const secondApi = createDemoApi()
-    expect((await secondApi.listSecrets()).find((secret) => secret.name === 'github-token')?.entries).toHaveLength(1)
+    const githubEntriesOf = (secrets: typeof sampleSecrets) => secrets.find((secret) => secret.name === 'github-token')?.entries
+    expect(githubEntriesOf(await secondApi.listSecrets())).toEqual(githubEntriesOf(sampleSecrets))
   })
 
   it('shows running sessions inside the window it was asked for', async () => {
