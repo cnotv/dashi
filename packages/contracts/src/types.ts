@@ -131,14 +131,38 @@ export interface SecretDefinition {
   tokenPageUrl: string
 }
 
+// One stored token of a credential; a credential can hold several, and the one in use is the one
+// the dashboard reads.
+export interface SecretEntrySummary {
+  entryId: string
+  label: string
+  lastFour: string
+  isInUse: boolean
+  updatedAt: string
+}
+
 export interface SecretSummary {
   name: string
   label: string
   description: string
   tokenPageUrl: string
-  isSet: boolean
-  lastFour: string | null
-  updatedAt: string | null
+  entries: SecretEntrySummary[]
+}
+
+export interface CreatedSecretEntry {
+  entryId: string
+}
+
+export interface NewSecretEntry {
+  label: string
+  value: string
+  // The first token of a credential is in use whatever this says.
+  useNow: boolean
+}
+
+export interface SecretEntryChange {
+  label?: string
+  value?: string
 }
 
 export interface SecretTestResult {

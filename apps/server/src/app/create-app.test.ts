@@ -1,6 +1,8 @@
 import { zipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
 import { createDraftGithub, createTestApp, getRequest, jsonRequest, signedVideoUrl, testHost } from './test-app.ts'
+import { z } from 'zod'
+import { secretDefinitions } from '../secrets/definitions.ts'
 
 const sampleToken = 'ghp_exampleTokenValue1234567890abcd'
 const host = testHost
@@ -8,24 +10,44 @@ const host = testHost
 describe('secrets routes', () => {
   it('stores a secret and never returns its value from any route', async () => {
     const { app } = createTestApp()
-    const saveResponse = await app.request(jsonRequest('PUT', '/api/secrets/github-token', { value: sampleToken }))
-    expect(saveResponse.status).toBe(204)
+    const saveResponse = await app.request(jsonRequest('POST', '/api/secrets/github-token/entries', { label: 'Personal', value: sampleToken }))
+    expect(saveResponse.status).toBe(201)
 
     const responseBodies = await Promise.all(
       ['/api/secrets', '/api/vault', '/api/repositories', '/api/repositories/cnotv/generative-art/board'].map(async (path) =>
         (await app.request(getRequest(path))).text(),
       ),
     )
-    const testBody = await (await app.request(jsonRequest('POST', '/api/secrets/github-token/test', {}))).text()
+    const testBody = await (await app.request(jsonRequest('POST', '/api/secrets/github-token/entries/default/test', {}))).text()
     ;[...responseBodies, testBody].forEach((responseBody) => expect(responseBody).not.toContain(sampleToken))
     expect(JSON.parse(responseBodies[0] ?? '[]')).toContainEqual(
-      expect.objectContaining({ name: 'github-token', isSet: true, lastFour: 'abcd' }),
+      expect.objectContaining({
+        name: 'github-token',
+        entries: [expect.objectContaining({ entryId: 'default', label: 'Personal', lastFour: 'abcd', isInUse: true })],
+      }),
     )
   })
 
-  it('refuses unknown secret names', async () => {
+  it('adds a second token, switches to it, renames and removes it', async () => {
+    const { app, vault } = createTestApp()
+    await app.request(jsonRequest('POST', '/api/secrets/github-token/entries', { label: 'Personal', value: sampleToken }))
+    const created = await app.request(jsonRequest('POST', '/api/secrets/github-token/entries', { label: 'Work', value: 'ghp_workToken0000000000000000000000000002' }))
+    const { entryId } = z.object({ entryId: z.string() }).parse(await created.json())
+    expect(vault.readSecretValue('github-token')).toBe(sampleToken)
+    expect((await app.request(jsonRequest('POST', `/api/secrets/github-token/entries/${entryId}/use`, {}))).status).toBe(204)
+    expect(vault.readSecretValue('github-token')).toBe('ghp_workToken0000000000000000000000000002')
+    expect((await app.request(jsonRequest('PATCH', `/api/secrets/github-token/entries/${entryId}`, { label: 'Client' }))).status).toBe(204)
+    expect(vault.listSecrets(secretDefinitions)[0]?.entries[1]?.label).toBe('Client')
+    expect((await app.request(jsonRequest('DELETE', `/api/secrets/github-token/entries/${entryId}`, {}))).status).toBe(204)
+    expect(vault.readSecretValue('github-token')).toBe(sampleToken)
+    await app.request(jsonRequest('POST', '/api/secrets/github-token/entries', { label: 'Client', value: 'ghp_clientToken000000000000000000000003', useNow: true }))
+    expect(vault.readSecretValue('github-token')).toBe('ghp_clientToken000000000000000000000003')
+  })
+
+  it('refuses unknown credential names and tokens', async () => {
     const { app } = createTestApp()
-    expect((await app.request(jsonRequest('PUT', '/api/secrets/anything', { value: 'x' }))).status).toBe(404)
+    expect((await app.request(jsonRequest('POST', '/api/secrets/anything/entries', { value: 'x' }))).status).toBe(404)
+    expect((await app.request(jsonRequest('POST', '/api/secrets/github-token/entries/nope/test', {}))).status).toBe(404)
   })
 
   it('redacts a secret value that appears in an error message', async () => {

@@ -22,6 +22,9 @@ import type {
   ServedScriptInfo,
   SessionStartDetails,
   SecretSummary,
+  SecretEntryChange,
+  CreatedSecretEntry,
+  NewSecretEntry,
   SessionState,
   SecretTestResult,
   SessionsOverview,
@@ -119,9 +122,11 @@ export interface DashboardApi {
   unlockVault: (passphrase: string) => Promise<VaultState>
   lockVault: () => Promise<VaultState>
   listSecrets: () => Promise<SecretSummary[]>
-  saveSecret: (name: string, value: string) => Promise<void>
-  deleteSecret: (name: string) => Promise<void>
-  testSecret: (name: string) => Promise<SecretTestResult>
+  addSecretEntry: (name: string, newEntry: NewSecretEntry) => Promise<CreatedSecretEntry>
+  updateSecretEntry: (name: string, entryId: string, change: SecretEntryChange) => Promise<void>
+  useSecretEntry: (name: string, entryId: string) => Promise<void>
+  deleteSecretEntry: (name: string, entryId: string) => Promise<void>
+  testSecretEntry: (name: string, entryId: string) => Promise<SecretTestResult>
   listRepositories: () => Promise<RepositoryReference[]>
   readBoard: (repository: RepositoryReference, refresh: boolean) => Promise<Board>
   pullRequestMediaUrl: (repository: RepositoryReference, pullRequest: PullRequestSummary, kind: PreviewMediaKind) => string
