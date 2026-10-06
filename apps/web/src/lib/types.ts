@@ -222,3 +222,12 @@ export interface ChatSubject {
   badgeLabel: string
   badgeColor: RadixColor
 }
+
+export type DataSourceId = 'claude-code-hooks' | 'codex-notify' | 'claude-code-otel' | 'github-graphql' | 'claude-code-routines' | 'laptop-runner'
+
+export interface DataSource {
+  label: string
+  // What this source sends or answers, and the Dashi route that receives it.
+  description: string
+  docsUrl: string
+}

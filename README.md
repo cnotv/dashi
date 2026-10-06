@@ -161,6 +161,22 @@ next message; waiting for you means it stopped to ask, such as for a permission.
 adds up tokens across all repositories, then by repository, pull request or branch, day and
 model. It counts tokens only; subscription sessions have no per-token price to show.
 
+### Where the data comes from
+
+Each section names its sources in gray tags that link to the docs below; hover a tag for what it
+sends.
+
+| Source | What Dashi gets from it | Received at | Shown in |
+| --- | --- | --- | --- |
+| [Claude Code hooks](https://code.claude.com/docs/en/hooks) | `SessionStart`, `UserPromptSubmit`, `Notification`, `Stop` and `SessionEnd`, with the session id, git remote, branch, folder and first prompt | `POST /api/events` | Session rows, states, timeline; the branch that Usage groups by |
+| [Codex `notify`](https://developers.openai.com/codex/config-advanced) | `agent-turn-complete`, with the thread id and first input message | `POST /api/events` | Codex session rows and states |
+| [Claude Code OpenTelemetry](https://code.claude.com/docs/en/monitoring-usage) | The `claude_code.token.usage` counter, per session, model and token type, over OTLP/HTTP JSON | `POST /api/telemetry/v1/metrics` | Every token count, on Sessions and Usage |
+| [GitHub GraphQL API](https://docs.github.com/en/graphql) | Issues and pull requests, for the board | Fetched by the server | The pull request of a branch on Usage, read from boards already fetched |
+| [Claude Code routines](https://code.claude.com/docs/en/routines) | A session started on claude.ai | Called by the server | Cloud starts in Started from the board |
+| [Laptop runner](#the-laptop-runner) | Starts run on your machine, and an open chat's transcript from `~/.claude/projects` | Polls `/api/runner/*` | Laptop starts, and the session chat |
+
+Codex sends no token metrics, so Codex sessions show n/a for tokens and are not in Usage.
+
 Both are fed by the machines running Claude Code, not read from them. The quick way to connect
 one is the `dashi` CLI, below; the steps after it do the same by hand.
 

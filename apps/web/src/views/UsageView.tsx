@@ -1,6 +1,7 @@
-import { Callout, Flex, Grid, SegmentedControl, Text } from '@radix-ui/themes'
+import { Callout, Flex, Grid, SegmentedControl } from '@radix-ui/themes'
 import { useSearchParams } from 'react-router'
 import type { UsageReport } from '@dashi/contracts'
+import { SourceTags } from '@/components/charts/SourceTags'
 import { StatTile } from '@/components/charts/StatTile'
 import { UsageBarList, type UsageBarRow } from '@/components/usage/UsageBarList'
 import { UsageByDayChart } from '@/components/usage/UsageByDayChart'
@@ -56,9 +57,10 @@ export const UsageView = () => {
             </SegmentedControl.Item>
           ))}
         </SegmentedControl.Root>
-        <Text size="1" color="gray">
-          Every repository together. Counted from Claude Code's token metrics; subscription sessions have no per-token price.
-        </Text>
+        <SourceTags
+          sourceIds={['claude-code-otel']}
+          note="Every repository together, Claude Code sessions only: Codex sends no token metrics. Subscription sessions have no per-token price."
+        />
       </Flex>
 
       {errorMessage && (

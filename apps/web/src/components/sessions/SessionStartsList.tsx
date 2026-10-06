@@ -1,6 +1,7 @@
 import { ChatBubbleIcon, ExternalLinkIcon, InfoCircledIcon } from '@radix-ui/react-icons'
 import { Badge, Card, Flex, Heading, IconButton, Link, Table, Text, Tooltip } from '@radix-ui/themes'
 import type { SessionStart } from '@dashi/contracts'
+import { SourceTags } from '@/components/charts/SourceTags'
 import { sessionStartStateColors, sessionStartStateLabels, startTargetLabels } from '@/lib/presentation'
 import { canChatWithStart } from '@/lib/session-chat'
 import { startsSince } from '@/lib/session-starts'
@@ -71,9 +72,12 @@ export const SessionStartsList = ({ starts, windowHours, windowStartedAt, onOpen
   return (
     <Card size="2">
       <Flex direction="column" gap="3">
-        <Heading as="h2" size="3" weight="medium">
-          Started from the board
-        </Heading>
+        <Flex direction="column" gap="1">
+          <Heading as="h2" size="3" weight="medium">
+            Started from the board
+          </Heading>
+          <SourceTags sourceIds={['laptop-runner', 'claude-code-routines']} note="Each start's badge says which one ran it" />
+        </Flex>
         {startsShown.length === 0 ? (
           <Text size="2" color="gray">
             No starts in the last {windowLabelOf(windowHours)}.
