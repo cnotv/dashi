@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { SecretSummary, VaultState } from '@dashi/contracts'
+import type { SecretEntryChange, SecretSummary, VaultState } from '@dashi/contracts'
 import { dashboardApi } from '@/lib/api'
 
 const readVaultSnapshot = () => Promise.all([dashboardApi.readVault(), dashboardApi.listSecrets()])
@@ -33,8 +33,11 @@ export const useVault = (onError: (error: unknown) => void) => {
     setUp: (passphrase: string) => runAndRefresh(() => dashboardApi.setUpVault(passphrase)),
     unlock: (passphrase: string) => runAndRefresh(() => dashboardApi.unlockVault(passphrase)),
     lock: () => runAndRefresh(() => dashboardApi.lockVault()),
-    saveSecret: (name: string, value: string) => runAndRefresh(() => dashboardApi.saveSecret(name, value)),
-    deleteSecret: (name: string) => runAndRefresh(() => dashboardApi.deleteSecret(name)),
-    testSecret: dashboardApi.testSecret,
+    addSecretEntry: (name: string, label: string, value: string) => runAndRefresh(() => dashboardApi.addSecretEntry(name, label, value)),
+    updateSecretEntry: (name: string, entryId: string, change: SecretEntryChange) =>
+      runAndRefresh(() => dashboardApi.updateSecretEntry(name, entryId, change)),
+    useSecretEntry: (name: string, entryId: string) => runAndRefresh(() => dashboardApi.useSecretEntry(name, entryId)),
+    deleteSecretEntry: (name: string, entryId: string) => runAndRefresh(() => dashboardApi.deleteSecretEntry(name, entryId)),
+    testSecretEntry: dashboardApi.testSecretEntry,
   }
 }

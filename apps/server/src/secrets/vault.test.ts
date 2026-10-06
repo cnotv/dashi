@@ -69,10 +69,64 @@ describe('environment vault', () => {
     const vault = createVault(database, { mode: 'environment', environmentKey: generateKeyMaterial() })
     vault.saveSecret('github-token', sampleToken)
     expect(vault.listSecrets(definitions)).toEqual([
-      expect.objectContaining({ name: 'github-token', isSet: true, lastFour: 'abcd' }),
-      expect.objectContaining({ name: 'openrouter-api-key', isSet: false, lastFour: null }),
+      expect.objectContaining({
+        name: 'github-token',
+        entries: [expect.objectContaining({ entryId: 'default', label: 'Default', lastFour: 'abcd', isInUse: true })],
+      }),
+      expect.objectContaining({ name: 'openrouter-api-key', entries: [] }),
     ])
     expect(JSON.stringify(vault.listSecrets(definitions))).not.toContain(sampleToken)
+  })
+
+  it('adds the label column to a vault made before tokens had names', () => {
+    const { database } = createDatabaseFile()
+    database.exec(`CREATE TABLE secrets (
+      name TEXT PRIMARY KEY, last_four TEXT NOT NULL, ciphertext TEXT NOT NULL, initialization_vector TEXT NOT NULL,
+      authentication_tag TEXT NOT NULL, key_version INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    )`)
+    const vault = createVault(database, { mode: 'environment', environmentKey: generateKeyMaterial() })
+    vault.saveSecret('github-token', sampleToken)
+    expect(vault.listSecrets(definitions)[0]?.entries).toEqual([expect.objectContaining({ label: 'Default', isInUse: true })])
+  })
+
+  it('keeps several tokens per credential and reads the one in use', () => {
+    const { database } = createDatabaseFile()
+    const vault = createVault(database, { mode: 'environment', environmentKey: generateKeyMaterial() })
+    const personalId = vault.addSecretEntry('github-token', 'Personal', 'ghp_personalToken0001')
+    const workId = vault.addSecretEntry('github-token', 'Work', 'ghp_workToken0002')
+    expect(personalId).toBe('default')
+    expect(vault.readSecretValue('github-token')).toBe('ghp_personalToken0001')
+    vault.useSecretEntry('github-token', workId)
+    expect(vault.readSecretValue('github-token')).toBe('ghp_workToken0002')
+    expect(vault.listSecrets(definitions)[0]?.entries.map((entry) => [entry.label, entry.isInUse])).toEqual([
+      ['Personal', false],
+      ['Work', true],
+    ])
+    expect(vault.readAllSecretValues().toSorted()).toEqual(['ghp_personalToken0001', 'ghp_workToken0002'])
+  })
+
+  it('renames and replaces a token, and hands "in use" to the oldest when the one in use is removed', () => {
+    const { database } = createDatabaseFile()
+    const vault = createVault(database, { mode: 'environment', environmentKey: generateKeyMaterial() })
+    vault.addSecretEntry('github-token', 'Personal', 'ghp_personalToken0001')
+    const workId = vault.addSecretEntry('github-token', 'Work', 'ghp_workToken0002')
+    vault.useSecretEntry('github-token', workId)
+    vault.updateSecretEntry('github-token', workId, { label: 'Client', value: 'ghp_clientToken0003' })
+    expect(vault.readSecretValue('github-token')).toBe('ghp_clientToken0003')
+    expect(vault.listSecrets(definitions)[0]?.entries[1]).toEqual(expect.objectContaining({ label: 'Client', lastFour: '0003' }))
+    vault.deleteSecretEntry('github-token', workId)
+    expect(vault.readSecretValue('github-token')).toBe('ghp_personalToken0001')
+    expect(() => vault.useSecretEntry('github-token', workId)).toThrow('Unknown token')
+  })
+
+  it('keeps every token readable after the key is rotated', () => {
+    const { database } = createDatabaseFile()
+    const vault = createVault(database, { mode: 'environment', environmentKey: generateKeyMaterial() })
+    vault.addSecretEntry('github-token', 'Personal', 'ghp_personalToken0001')
+    const workId = vault.addSecretEntry('github-token', 'Work', 'ghp_workToken0002')
+    vault.rotate(generateKeyMaterial().toString('base64'))
+    expect(vault.readSecretEntryValue('github-token', workId)).toBe('ghp_workToken0002')
+    expect(vault.readSecretValue('github-token')).toBe('ghp_personalToken0001')
   })
 
   it('stays locked when restarted with a different key', () => {

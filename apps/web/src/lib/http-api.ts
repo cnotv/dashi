@@ -34,6 +34,7 @@ export const createHttpApi = (apiBaseUrl: string): DashboardApi => {
   const repositoryPath = (repository: { owner: string; name: string }): string =>
     `/api/repositories/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}`
   const secretPath = (name: string): string => `/api/secrets/${encodeURIComponent(name)}`
+  const secretEntryPath = (name: string, entryId: string): string => `${secretPath(name)}/entries/${encodeURIComponent(entryId)}`
   const chatPathOf = (target: ChatTarget): string =>
     target.kind === 'session'
       ? `/api/sessions/${encodeURIComponent(target.sessionId)}/chat`
@@ -48,9 +49,11 @@ export const createHttpApi = (apiBaseUrl: string): DashboardApi => {
     unlockVault: (passphrase) => sendJson('POST', '/api/vault/unlock', { passphrase }),
     lockVault: () => sendJson('POST', '/api/vault/lock'),
     listSecrets: () => requestJson('/api/secrets'),
-    saveSecret: (name, value) => sendJson('PUT', secretPath(name), { value }),
-    deleteSecret: (name) => sendJson('DELETE', secretPath(name)),
-    testSecret: (name) => sendJson('POST', `${secretPath(name)}/test`),
+    addSecretEntry: (name, label, value) => sendJson('POST', `${secretPath(name)}/entries`, { label, value }),
+    updateSecretEntry: (name, entryId, change) => sendJson('PATCH', secretEntryPath(name, entryId), change),
+    useSecretEntry: (name, entryId) => sendJson('POST', `${secretEntryPath(name, entryId)}/use`),
+    deleteSecretEntry: (name, entryId) => sendJson('DELETE', secretEntryPath(name, entryId)),
+    testSecretEntry: (name, entryId) => sendJson('POST', `${secretEntryPath(name, entryId)}/test`),
     listRepositories: () => requestJson('/api/repositories'),
     readBoard: (repository, refresh) => requestJson(`${repositoryPath(repository)}/board${refresh ? '?refresh=1' : ''}`),
     readSessions: (hours) => requestJson(`/api/sessions?hours=${hours}`),

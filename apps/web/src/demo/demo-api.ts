@@ -6,6 +6,7 @@ import type {
   MachineTokenSummary,
   NetlifyStatus,
   RepositoryReference,
+  SecretEntrySummary,
   SecretSummary,
   SessionStart,
   SessionState,
@@ -72,8 +73,11 @@ export const createDemoApi = (): DashboardApi => {
   }
   const chatMessagesOf = (chatKey: string): ChatMessage[] => demoMemory.chatMessages.get(chatKey) ?? sampleChatMessages
 
-  const replaceSecret = (name: string, update: Partial<SecretSummary>): void => {
-    demoMemory.secrets = demoMemory.secrets.map((secret) => (secret.name === name ? { ...secret, ...update } : secret))
+  const entriesOf = (name: string): SecretEntrySummary[] => demoMemory.secrets.find((secret) => secret.name === name)?.entries ?? []
+  // As on the server, the oldest token takes over when the one in use is removed.
+  const replaceEntries = (name: string, entries: SecretEntrySummary[]): void => {
+    const keptEntries = entries.length === 0 || entries.some((entry) => entry.isInUse) ? entries : entries.map((entry, index) => ({ ...entry, isInUse: index === 0 }))
+    demoMemory.secrets = demoMemory.secrets.map((secret) => (secret.name === name ? { ...secret, entries: keptEntries } : secret))
   }
 
   return {
@@ -85,10 +89,31 @@ export const createDemoApi = (): DashboardApi => {
     unlockVault: async () => demoVaultState,
     lockVault: async () => demoVaultState,
     listSecrets: async () => demoMemory.secrets,
-    saveSecret: async (name, value) =>
-      replaceSecret(name, { isSet: true, lastFour: value.trim().slice(-4), updatedAt: new Date().toISOString() }),
-    deleteSecret: async (name) => replaceSecret(name, { isSet: false, lastFour: null, updatedAt: null }),
-    testSecret: async () => ({ ok: true, status: null, message: 'Demo mode: nothing was sent' }),
+    addSecretEntry: async (name, label, value) => {
+      const entries = entriesOf(name)
+      const entryId = entries.length === 0 ? 'default' : `demo-${entries.length + 1}`
+      const entry = { entryId, label: label.trim() || 'Default', lastFour: value.trim().slice(-4), isInUse: entries.length === 0, updatedAt: new Date().toISOString() }
+      replaceEntries(name, [...entries, entry])
+      return { entryId }
+    },
+    updateSecretEntry: async (name, entryId, change) =>
+      replaceEntries(
+        name,
+        entriesOf(name).map((entry) =>
+          entry.entryId === entryId
+            ? {
+                ...entry,
+                label: change.label === undefined ? entry.label : change.label.trim() || 'Default',
+                lastFour: change.value === undefined ? entry.lastFour : change.value.trim().slice(-4),
+                updatedAt: new Date().toISOString(),
+              }
+            : entry,
+        ),
+      ),
+    useSecretEntry: async (name, entryId) =>
+      replaceEntries(name, entriesOf(name).map((entry) => ({ ...entry, isInUse: entry.entryId === entryId }))),
+    deleteSecretEntry: async (name, entryId) => replaceEntries(name, entriesOf(name).filter((entry) => entry.entryId !== entryId)),
+    testSecretEntry: async () => ({ ok: true, status: null, message: 'Demo mode: nothing was sent' }),
     listRepositories: async () => sampleRepositories,
     readBoard: async (repository) => ({
       repository,

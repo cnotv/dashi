@@ -133,9 +133,15 @@ subscription, and so is a Netlify personal access token for the board's Netlify 
 
 Each credential's dialog links to the page where that token or key is created.
 
+A credential can hold several tokens, each with a name, such as a personal and a work GitHub
+token. The one marked **In use** is the one the dashboard reads; **Use this** moves the mark to
+another. Each token can be tested, renamed or replaced (**Edit**), and removed. Removing the token
+in use hands the mark to the oldest one left. A token stored before credentials could hold several
+shows up as **Default**.
+
 Values are encrypted with AES-256-GCM before they reach the SQLite database, each bound to its
-own name. The browser can add, replace, test and remove a value, but never reads one back; it
-sees the last four characters only. The key comes from one of two places:
+own name. The browser can add, rename, replace, test and remove a token, but never reads one back;
+it sees the last four characters only. The key comes from one of two places:
 
 | Mode        | How                                                                                         | When to use                                                            |
 | ----------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |

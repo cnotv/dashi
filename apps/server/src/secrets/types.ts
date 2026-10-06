@@ -8,6 +8,7 @@ export interface EncryptedValue {
 
 export interface StoredSecretRow extends EncryptedValue {
   name: string
+  label: string | null
   lastFour: string
   keyVersion: number
   createdAt: string
@@ -41,6 +42,11 @@ export interface Vault {
   saveSecret: (name: string, value: string) => void
   deleteSecret: (name: string) => void
   readSecretValue: (name: string) => string | null
+  addSecretEntry: (name: string, label: string, value: string) => string
+  updateSecretEntry: (name: string, entryId: string, change: { label?: string; value?: string }) => void
+  useSecretEntry: (name: string, entryId: string) => void
+  deleteSecretEntry: (name: string, entryId: string) => void
+  readSecretEntryValue: (name: string, entryId: string) => string | null
   readAllSecretValues: () => string[]
 }
 

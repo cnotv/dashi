@@ -1,5 +1,6 @@
+import { randomBytes } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
-import type { SecretDefinition, SecretSummary, VaultState } from '@dashi/contracts'
+import type { SecretDefinition, SecretEntrySummary, SecretSummary, VaultState } from '@dashi/contracts'
 import {
   decryptValue,
   deriveKeyFromPassphrase,
@@ -14,6 +15,11 @@ import type { EncryptedValue, StoredSecretRow, Vault, VaultOptions } from './typ
 const verifierPlaintext = 'agent-dashboard-vault-verifier'
 const verifierAssociatedData = 'vault-verifier'
 const minimumPassphraseLength = 12
+// A credential's first token is stored under the credential's own name, as every token was before
+// a credential could hold several; later ones get a suffix after this separator.
+const entrySeparator = '#'
+const firstEntryId = 'default'
+const firstEntryLabel = 'Default'
 
 const createSchema = (database: DatabaseSync): void => {
   database.exec(`
@@ -29,7 +35,21 @@ const createSchema = (database: DatabaseSync): void => {
       updated_at TEXT NOT NULL
     );
   `)
+  const columnNames = database
+    .prepare('PRAGMA table_info(secrets)')
+    .all()
+    .map((column) => String(column.name))
+  if (!columnNames.includes('label')) database.exec('ALTER TABLE secrets ADD COLUMN label TEXT')
 }
+
+const rowNameOf = (name: string, entryId: string): string => (entryId === firstEntryId ? name : `${name}${entrySeparator}${entryId}`)
+
+const entryIdOf = (name: string, rowName: string): string | null => {
+  if (rowName === name) return firstEntryId
+  return rowName.startsWith(`${name}${entrySeparator}`) ? rowName.slice(name.length + entrySeparator.length) : null
+}
+
+const inUseMetaKey = (name: string): string => `in-use:${name}`
 
 const readMeta = (database: DatabaseSync, key: string): string | null => {
   const metaRow = database.prepare('SELECT value FROM vault_meta WHERE key = ?').get(key)
@@ -64,7 +84,7 @@ const readKeyVersion = (database: DatabaseSync): number => Number(readMeta(datab
 const readSecretRows = (database: DatabaseSync): StoredSecretRow[] =>
   database
     .prepare(
-      `SELECT name, last_four AS lastFour, ciphertext, initialization_vector AS initializationVector,
+      `SELECT name, label, last_four AS lastFour, ciphertext, initialization_vector AS initializationVector,
               authentication_tag AS authenticationTag, key_version AS keyVersion,
               created_at AS createdAt, updated_at AS updatedAt
        FROM secrets ORDER BY name`,
@@ -72,6 +92,7 @@ const readSecretRows = (database: DatabaseSync): StoredSecretRow[] =>
     .all()
     .map((row) => ({
       name: String(row.name),
+      label: typeof row.label === 'string' ? row.label : null,
       lastFour: String(row.lastFour),
       ciphertext: String(row.ciphertext),
       initializationVector: String(row.initializationVector),
@@ -84,15 +105,16 @@ const readSecretRows = (database: DatabaseSync): StoredSecretRow[] =>
 const writeSecretRow = (database: DatabaseSync, row: StoredSecretRow): void => {
   database
     .prepare(
-      `INSERT INTO secrets (name, last_four, ciphertext, initialization_vector, authentication_tag, key_version, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO secrets (name, label, last_four, ciphertext, initialization_vector, authentication_tag, key_version, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(name) DO UPDATE SET
-         last_four = excluded.last_four, ciphertext = excluded.ciphertext,
+         label = excluded.label, last_four = excluded.last_four, ciphertext = excluded.ciphertext,
          initialization_vector = excluded.initialization_vector, authentication_tag = excluded.authentication_tag,
          key_version = excluded.key_version, updated_at = excluded.updated_at`,
     )
     .run(
       row.name,
+      row.label,
       row.lastFour,
       row.ciphertext,
       row.initializationVector,
@@ -212,42 +234,109 @@ export const createVault = (database: DatabaseSync, options: VaultOptions): Vaul
     vaultMemory.activeKey = nextKey
   }
 
-  const listSecrets = (definitions: SecretDefinition[]): SecretSummary[] => {
-    const rowsByName = new Map(readSecretRows(database).map((row) => [row.name, row]))
-    return definitions.map((definition) => {
-      const storedRow = rowsByName.get(definition.name)
-      return {
-        ...definition,
-        isSet: storedRow !== undefined,
-        lastFour: storedRow?.lastFour ?? null,
-        updatedAt: storedRow?.updatedAt ?? null,
-      }
-    })
+  // A credential's tokens, oldest first; the one in use is the one its pointer names, or the oldest
+  // when the pointer is missing or names a token that was removed.
+  const entryRowsOf = (name: string): { entryId: string; row: StoredSecretRow }[] =>
+    readSecretRows(database)
+      .flatMap((row) => {
+        const entryId = entryIdOf(name, row.name)
+        return entryId === null ? [] : [{ entryId, row }]
+      })
+      .toSorted((first, second) => first.row.createdAt.localeCompare(second.row.createdAt) || first.row.name.localeCompare(second.row.name))
+
+  const inUseRowOf = (name: string): StoredSecretRow | null => {
+    const entryRows = entryRowsOf(name)
+    const pointedRowName = readMeta(database, inUseMetaKey(name))
+    return (entryRows.find((entryRow) => entryRow.row.name === pointedRowName) ?? entryRows[0])?.row ?? null
   }
 
-  const saveSecret = (name: string, value: string): void => {
-    const activeKey = requireActiveKey()
+  const requireEntryRow = (name: string, entryId: string): StoredSecretRow => {
+    const entryRow = entryRowsOf(name).find((candidate) => candidate.entryId === entryId)
+    if (entryRow === undefined) throw new Error('Unknown token')
+    return entryRow.row
+  }
+
+  const trimmedValueOf = (value: string): string => {
     const trimmedValue = value.trim()
     if (trimmedValue.length === 0) throw new Error('The value is empty')
-    const existingRow = readSecretRows(database).find((row) => row.name === name)
+    return trimmedValue
+  }
+
+  const writeEntry = (rowName: string, label: string | null, value: string, createdAt: string | null): void => {
     const savedAt = new Date().toISOString()
     writeSecretRow(database, {
-      name,
-      lastFour: lastFourCharacters(trimmedValue),
-      ...encryptValue(activeKey, trimmedValue, name),
+      name: rowName,
+      label,
+      lastFour: lastFourCharacters(value),
+      ...encryptValue(requireActiveKey(), value, rowName),
       keyVersion: readKeyVersion(database),
-      createdAt: existingRow?.createdAt ?? savedAt,
+      createdAt: createdAt ?? savedAt,
       updatedAt: savedAt,
     })
   }
 
+  const listSecrets = (definitions: SecretDefinition[]): SecretSummary[] =>
+    definitions.map((definition) => {
+      const inUseRow = inUseRowOf(definition.name)
+      const entries = entryRowsOf(definition.name).map(
+        ({ entryId, row }): SecretEntrySummary => ({
+          entryId,
+          label: row.label ?? firstEntryLabel,
+          lastFour: row.lastFour,
+          isInUse: row.name === inUseRow?.name,
+          updatedAt: row.updatedAt,
+        }),
+      )
+      return { ...definition, entries }
+    })
+
+  const addSecretEntry = (name: string, label: string, value: string): string => {
+    const trimmedValue = trimmedValueOf(value)
+    const entryId = entryRowsOf(name).length === 0 ? firstEntryId : randomBytes(4).toString('hex')
+    writeEntry(rowNameOf(name, entryId), label.trim() || firstEntryLabel, trimmedValue, null)
+    return entryId
+  }
+
+  const updateSecretEntry = (name: string, entryId: string, change: { label?: string; value?: string }): void => {
+    const entryRow = requireEntryRow(name, entryId)
+    const label = change.label === undefined ? entryRow.label : change.label.trim() || firstEntryLabel
+    const value = change.value === undefined ? decryptValue(requireActiveKey(), entryRow, entryRow.name) : trimmedValueOf(change.value)
+    writeEntry(entryRow.name, label, value, entryRow.createdAt)
+  }
+
+  const useSecretEntry = (name: string, entryId: string): void => {
+    writeMeta(database, inUseMetaKey(name), requireEntryRow(name, entryId).name)
+  }
+
+  const deleteSecretEntry = (name: string, entryId: string): void => {
+    database.prepare('DELETE FROM secrets WHERE name = ?').run(requireEntryRow(name, entryId).name)
+  }
+
+  const readSecretEntryValue = (name: string, entryId: string): string | null => {
+    const entryRow = entryRowsOf(name).find((candidate) => candidate.entryId === entryId)?.row
+    return entryRow === undefined ? null : decryptValue(requireActiveKey(), entryRow, entryRow.name)
+  }
+
+  // A credential that holds one value, such as a routine's token: saving replaces the token in use.
+  const saveSecret = (name: string, value: string): void => {
+    const inUseRow = inUseRowOf(name)
+    if (inUseRow === null) {
+      addSecretEntry(name, firstEntryLabel, value)
+      return
+    }
+    writeEntry(inUseRow.name, inUseRow.label, trimmedValueOf(value), inUseRow.createdAt)
+  }
+
   const deleteSecret = (name: string): void => {
-    database.prepare('DELETE FROM secrets WHERE name = ?').run(name)
+    runInTransaction(database, () => {
+      entryRowsOf(name).forEach(({ row }) => database.prepare('DELETE FROM secrets WHERE name = ?').run(row.name))
+      database.prepare('DELETE FROM vault_meta WHERE key = ?').run(inUseMetaKey(name))
+    })
   }
 
   const readSecretValue = (name: string): string | null => {
-    const storedRow = readSecretRows(database).find((row) => row.name === name)
-    return storedRow === undefined ? null : decryptValue(requireActiveKey(), storedRow, name)
+    const inUseRow = inUseRowOf(name)
+    return inUseRow === null ? null : decryptValue(requireActiveKey(), inUseRow, inUseRow.name)
   }
 
   const readAllSecretValues = (): string[] =>
@@ -255,5 +344,21 @@ export const createVault = (database: DatabaseSync, options: VaultOptions): Vaul
       ? []
       : readSecretRows(database).map((row) => decryptValue(requireActiveKey(), row, row.name))
 
-  return { readState, initialise, unlock, lock, rotate, listSecrets, saveSecret, deleteSecret, readSecretValue, readAllSecretValues }
+  return {
+    readState,
+    initialise,
+    unlock,
+    lock,
+    rotate,
+    listSecrets,
+    saveSecret,
+    deleteSecret,
+    readSecretValue,
+    addSecretEntry,
+    updateSecretEntry,
+    useSecretEntry,
+    deleteSecretEntry,
+    readSecretEntryValue,
+    readAllSecretValues,
+  }
 }

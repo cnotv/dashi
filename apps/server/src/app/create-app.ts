@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { secureHeaders } from 'hono/secure-headers'
 import { z } from 'zod'
-import type { Board, CreatedIssue, NetlifyStatus } from '@dashi/contracts'
+import type { Board, CreatedIssue, CreatedSecretEntry, NetlifyStatus } from '@dashi/contracts'
 import { createActivityRoutes, createIngestRoutes, ingestApiPaths } from '../activity/activity-routes.ts'
 import type { PullRequestFinder } from '../activity/aggregate.ts'
 import { authCookieNamesFor, createAuthRoutes, publicApiPaths } from '../auth/auth-routes.ts'
@@ -31,7 +31,10 @@ import { readJsonBody } from './http.ts'
 import type { AppDependencies, AppEnvironment } from './types.ts'
 
 const passphraseBodySchema = z.object({ passphrase: z.string().min(1) })
-const secretBodySchema = z.object({ value: z.string().min(1).max(4096) })
+const secretValueSchema = z.string().min(1).max(4096)
+const secretLabelSchema = z.string().trim().max(60)
+const secretEntryBodySchema = z.object({ label: secretLabelSchema.default(''), value: secretValueSchema })
+const secretEntryChangeSchema = z.object({ label: secretLabelSchema.optional(), value: secretValueSchema.optional() })
 const rotateBodySchema = z.object({ nextKey: z.string().min(1) })
 const mediaParamsSchema = z.object({ number: z.coerce.number().int().positive(), kind: z.enum(['image', 'video', 'before']) })
 const commitShaSchema = z.string().regex(/^[0-9a-f]{7,40}$/)
@@ -190,26 +193,50 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnvironment> =
     context.json(vault.listSecrets(secretDefinitions.map(({ name, label, description, tokenPageUrl }) => ({ name, label, description, tokenPageUrl })))),
   )
 
-  app.put('/api/secrets/:name', async (context) => {
-    const secretName = context.req.param('name')
-    if (findDefinition(secretName) === undefined) return context.json({ error: 'Unknown secret' }, 404)
-    const { value } = secretBodySchema.parse(await readJsonBody(context.req.raw))
-    vault.saveSecret(secretName, value)
-    boardCache.clear()
+  // A credential holds several tokens; the one in use is the one the dashboard reads.
+  const secretEntryPath = '/api/secrets/:name/entries/:entryId'
+  const knownCredentialOf = (context: Context<AppEnvironment>) => findDefinition(context.req.param('name') ?? '')
+  const unknownCredential = { error: 'Unknown credential' }
+  const forgetAfterSecretChange = (): void => boardCache.clear()
+
+  app.post('/api/secrets/:name/entries', async (context) => {
+    const definition = knownCredentialOf(context)
+    if (definition === undefined) return context.json(unknownCredential, 404)
+    const { label, value } = secretEntryBodySchema.parse(await readJsonBody(context.req.raw))
+    const entryId = vault.addSecretEntry(definition.name, label, value)
+    forgetAfterSecretChange()
+    return context.json<CreatedSecretEntry>({ entryId }, 201)
+  })
+
+  app.patch(secretEntryPath, async (context) => {
+    const definition = knownCredentialOf(context)
+    if (definition === undefined) return context.json(unknownCredential, 404)
+    vault.updateSecretEntry(definition.name, context.req.param('entryId'), secretEntryChangeSchema.parse(await readJsonBody(context.req.raw)))
+    forgetAfterSecretChange()
     return context.body(null, 204)
   })
 
-  app.delete('/api/secrets/:name', (context) => {
-    vault.deleteSecret(context.req.param('name'))
-    boardCache.clear()
+  app.post(`${secretEntryPath}/use`, (context) => {
+    const definition = knownCredentialOf(context)
+    if (definition === undefined) return context.json(unknownCredential, 404)
+    vault.useSecretEntry(definition.name, context.req.param('entryId'))
+    forgetAfterSecretChange()
     return context.body(null, 204)
   })
 
-  app.post('/api/secrets/:name/test', async (context) => {
-    const definition = findDefinition(context.req.param('name'))
-    if (definition === undefined) return context.json({ error: 'Unknown secret' }, 404)
-    const secretValue = vault.readSecretValue(definition.name)
-    if (secretValue === null) return context.json({ ok: false, status: null, message: 'Not set' })
+  app.delete(secretEntryPath, (context) => {
+    const definition = knownCredentialOf(context)
+    if (definition === undefined) return context.json(unknownCredential, 404)
+    vault.deleteSecretEntry(definition.name, context.req.param('entryId'))
+    forgetAfterSecretChange()
+    return context.body(null, 204)
+  })
+
+  app.post(`${secretEntryPath}/test`, async (context) => {
+    const definition = knownCredentialOf(context)
+    if (definition === undefined) return context.json(unknownCredential, 404)
+    const secretValue = vault.readSecretEntryValue(definition.name, context.req.param('entryId'))
+    if (secretValue === null) return context.json({ error: 'Unknown token' }, 404)
     return context.json(await dependencies.testSecret(definition, secretValue))
   })
 
