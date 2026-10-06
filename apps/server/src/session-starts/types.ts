@@ -15,6 +15,7 @@ export interface ClaimedStart {
 export interface SessionStartStore {
   createStart: (request: SessionStartRequest) => SessionStart
   listRecentStarts: () => SessionStart[]
+  listStartsSince: (since: string) => SessionStart[]
   readStart: (startId: string) => SessionStart | null
   claimNextLaptopStart: (runnerLabel: string) => SessionStart | null
   recordRunnerReport: (startId: string, runnerLabel: string, report: RunnerReport) => SessionStart | null

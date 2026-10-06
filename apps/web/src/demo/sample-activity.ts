@@ -216,6 +216,25 @@ export const sampleUsageReport = (days: number, now: number): UsageReport => {
       { model: 'claude-opus-demo', tokens: scaled(0.72) },
       { model: 'claude-haiku-demo', tokens: scaled(0.28) },
     ],
+    byMachine: [
+      { sourceKey: 'demo-laptop', label: 'Laptop', note: null, sessionCount: 17, tokens: scaled(0.7) },
+      { sourceKey: 'demo-runner', label: 'Mac mini', note: null, sessionCount: 6, tokens: scaled(0.3) },
+    ],
+    byAccount: [
+      { sourceKey: 'me@example.com', label: 'me@example.com', note: null, sessionCount: 19, tokens: scaled(0.86) },
+      { sourceKey: '', label: 'No signed-in account', note: 'API key, Bedrock or Vertex', sessionCount: 4, tokens: scaled(0.14) },
+    ],
+    byLaunch: [
+      { sourceKey: 'Terminal', label: 'Terminal', note: null, sessionCount: 11, tokens: scaled(0.46) },
+      { sourceKey: 'Board, laptop runner', label: 'Board, laptop runner', note: null, sessionCount: 6, tokens: scaled(0.3) },
+      { sourceKey: 'Board, Claude cloud', label: 'Board, Claude cloud', note: null, sessionCount: 3, tokens: scaled(0.14) },
+      { sourceKey: 'VS Code', label: 'VS Code', note: null, sessionCount: 2, tokens: scaled(0.07) },
+      { sourceKey: 'Not reported', label: 'Not reported', note: 'Reconnect the machine with dashi connect', sessionCount: 1, tokens: scaled(0.03) },
+    ],
+    byAgent: [
+      { sourceKey: 'claude', label: 'Claude Code', note: null, sessionCount: 23, tokens: scaled(1) },
+      { sourceKey: 'codex', label: 'Codex', note: 'No token metrics', sessionCount: 2, tokens: tokensOf(0, 0, 0, 0) },
+    ],
   }
 }
 

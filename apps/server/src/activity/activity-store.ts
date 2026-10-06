@@ -39,6 +39,11 @@ const createSchema = (database: DatabaseSync): void => {
   addedColumns
     .filter((column) => !sessionColumns.includes(column))
     .forEach((column) => database.exec(`ALTER TABLE agent_sessions ADD COLUMN ${column} TEXT`))
+  const sampleColumns = database.prepare('PRAGMA table_info(token_usage_samples)').all().map((column) => String(column.name))
+  const addedSampleColumns = ['machine_token_id', 'account', 'launch_hint']
+  addedSampleColumns
+    .filter((column) => !sampleColumns.includes(column))
+    .forEach((column) => database.exec(`ALTER TABLE token_usage_samples ADD COLUMN ${column} TEXT`))
 }
 
 const agentSessionStates: AgentSessionState[] = ['working', 'waiting', 'idle', 'ended', 'inactive']
@@ -99,7 +104,8 @@ export const createActivityStore = (database: DatabaseSync): ActivityStore => {
     'INSERT INTO token_usage_series (series_key, tokens) VALUES (?, ?) ON CONFLICT(series_key) DO UPDATE SET tokens = excluded.tokens',
   )
   const insertSample = database.prepare(
-    'INSERT INTO token_usage_samples (session_id, model, token_type, tokens, recorded_at) VALUES (?, ?, ?, ?, ?)',
+    `INSERT INTO token_usage_samples (session_id, model, token_type, tokens, recorded_at, machine_token_id, account, launch_hint)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   )
 
   const newTokensOf = (point: TokenUsagePoint): number => {
@@ -127,14 +133,23 @@ export const createActivityStore = (database: DatabaseSync): ActivityStore => {
       )
       insertEvent.run(event.sessionId, event.state, event.occurredAt)
     },
-    recordTokenUsage: (points) => {
+    recordTokenUsage: (points, machineTokenId) => {
       database.exec('BEGIN')
       try {
         points
           .map((point) => ({ point, newTokens: newTokensOf(point) }))
           .filter(({ newTokens }) => newTokens > 0)
           .forEach(({ point, newTokens }) =>
-            insertSample.run(point.sessionId, point.model, point.tokenType, newTokens, point.observedAt),
+            insertSample.run(
+              point.sessionId,
+              point.model,
+              point.tokenType,
+              newTokens,
+              point.observedAt,
+              machineTokenId,
+              point.account,
+              point.launchHint,
+            ),
           )
         database.exec('COMMIT')
       } catch (error) {
@@ -156,7 +171,7 @@ export const createActivityStore = (database: DatabaseSync): ActivityStore => {
         ),
     readTokenSamplesSince: (since) =>
       database
-        .prepare('SELECT * FROM token_usage_samples WHERE recorded_at >= ?')
+        .prepare('SELECT * FROM token_usage_samples WHERE recorded_at >= ? ORDER BY rowid')
         .all(since)
         .map(
           (row): StoredTokenSample => ({
@@ -165,6 +180,9 @@ export const createActivityStore = (database: DatabaseSync): ActivityStore => {
             tokenType: toTokenType(readText(row, 'token_type')),
             tokens: Number(row.tokens ?? 0),
             recordedAt: readText(row, 'recorded_at'),
+            machineTokenId: readOptionalText(row, 'machine_token_id'),
+            account: readOptionalText(row, 'account'),
+            launchHint: readOptionalText(row, 'launch_hint'),
           }),
         ),
   }

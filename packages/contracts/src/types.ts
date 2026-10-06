@@ -253,6 +253,16 @@ export interface UsageByModel {
   tokens: TokenTotals
 }
 
+// Tokens grouped by where they were spent: a machine, an account, how the session was launched, or its agent.
+export interface UsageBySource {
+  sourceKey: string
+  label: string
+  // Why a row is partial or unknown, such as an agent that sends no token metrics.
+  note: string | null
+  sessionCount: number
+  tokens: TokenTotals
+}
+
 export interface UsageReport {
   windowStartedAt: string
   generatedAt: string
@@ -262,6 +272,10 @@ export interface UsageReport {
   byWork: UsageByWork[]
   byDay: UsageByDay[]
   byModel: UsageByModel[]
+  byMachine: UsageBySource[]
+  byAccount: UsageBySource[]
+  byLaunch: UsageBySource[]
+  byAgent: UsageBySource[]
 }
 
 export interface MachineTokenSummary {

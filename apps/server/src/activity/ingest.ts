@@ -98,6 +98,17 @@ const attributeValue = (attributes: OtlpKeyValue[], key: string): string | null 
   return null
 }
 
+const accountFrom = (attributes: OtlpKeyValue[]): string | null => {
+  const organizationId = attributeValue(attributes, 'organization.id')
+  return attributeValue(attributes, 'user.email') ?? (organizationId === null ? null : `org:${organizationId}`)
+}
+
+// A cloud session is told apart first: it runs in Claude's cloud whatever entrypoint started it.
+const launchHintFrom = (attributes: OtlpKeyValue[]): string | null => {
+  const cloudSessionId = attributeValue(attributes, 'ccr.session.id')
+  return cloudSessionId === null ? attributeValue(attributes, 'app.entrypoint') : `cloud:${cloudSessionId}`
+}
+
 const isTokenType = (value: string | null): value is TokenType => tokenTypes.some((tokenType) => tokenType === value)
 
 const nanosecondsToIso = (value: string | number | undefined, fallback: string): string => {
@@ -133,6 +144,8 @@ export const tokenUsagePointsFrom = (request: OtlpMetricsRequest, receivedAt: st
                 isCumulative,
                 seriesStart: nanosecondsToIso(dataPoint.startTimeUnixNano, receivedAt),
                 observedAt: nanosecondsToIso(dataPoint.timeUnixNano, receivedAt),
+                account: accountFrom(attributes),
+                launchHint: launchHintFrom(attributes),
               },
             ]
           })

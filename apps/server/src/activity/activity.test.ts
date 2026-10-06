@@ -3,19 +3,30 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { createTestApp, getRequest, jsonRequest } from '../app/test-app.ts'
 import { createActivityStore } from './activity-store.ts'
-import { buildTimeline, effectiveState, inactiveAfterMilliseconds } from './aggregate.ts'
+import { buildTimeline, buildUsageReport, effectiveState, inactiveAfterMilliseconds, startFolderNameOf } from './aggregate.ts'
+import { startFolderNameFor } from '../../../runner/src/runner.ts'
 import { agentEventFrom, repositoryFromRemote, tokenUsagePointsFrom } from './ingest.ts'
-import type { StoredSession, TokenUsagePoint } from './types.ts'
+import type { StoredSession, StoredTokenSample, TokenUsagePoint } from './types.ts'
 
 const createdTokenSchema = z.object({ token: z.string(), summary: z.object({ tokenId: z.string() }) })
 
 const at = (minutes: number): string => new Date(Date.UTC(2026, 8, 29, 12, minutes)).toISOString()
 const atMilliseconds = (minutes: number): number => Date.parse(at(minutes))
 
-const tokenMetrics = (sessionId: string, points: Array<{ type: string; value: number }>, temporality = 1) => ({
+const tokenMetrics = (
+  sessionId: string,
+  points: Array<{ type: string; value: number }>,
+  temporality = 1,
+  resourceAttributes: Record<string, string> = {},
+) => ({
   resourceMetrics: [
     {
-      resource: { attributes: [{ key: 'service.name', value: { stringValue: 'claude-code' } }] },
+      resource: {
+        attributes: [
+          { key: 'service.name', value: { stringValue: 'claude-code' } },
+          ...Object.entries(resourceAttributes).map(([key, stringValue]) => ({ key, value: { stringValue } })),
+        ],
+      },
       scopeMetrics: [
         {
           metrics: [
@@ -121,6 +132,20 @@ describe('tokenUsagePointsFrom', () => {
       expect.objectContaining({ sessionId: 's1', tokenType: 'output', value: 40, isCumulative: false }),
     ])
   })
+
+  it('reads the account and how the session was launched, preferring a cloud session over the entrypoint', () => {
+    const pointOf = (resourceAttributes: Record<string, string>) =>
+      tokenUsagePointsFrom(tokenMetrics('s1', [{ type: 'input', value: 1 }], 1, resourceAttributes), at(9))[0]
+    expect(pointOf({ 'user.email': 'me@example.com', 'organization.id': 'org-1', 'app.entrypoint': 'cli' })).toMatchObject({
+      account: 'me@example.com',
+      launchHint: 'cli',
+    })
+    expect(pointOf({ 'organization.id': 'org-1', 'ccr.session.id': 'cse_01abc', 'app.entrypoint': 'cli' })).toMatchObject({
+      account: 'org:org-1',
+      launchHint: 'cloud:cse_01abc',
+    })
+    expect(pointOf({})).toMatchObject({ account: null, launchHint: null })
+  })
 })
 
 describe('activity store', () => {
@@ -132,15 +157,17 @@ describe('activity store', () => {
     isCumulative,
     seriesStart: at(0),
     observedAt: at(1),
+    account: null,
+    launchHint: null,
   })
 
   it('adds delta reports and takes only the growth of cumulative ones', () => {
     const store = createActivityStore(new DatabaseSync(':memory:'))
-    store.recordTokenUsage([point(100, false)])
-    store.recordTokenUsage([point(50, false)])
-    store.recordTokenUsage([point(300, true)])
-    store.recordTokenUsage([point(340, true)])
-    store.recordTokenUsage([point(340, true)])
+    store.recordTokenUsage([point(100, false)], null)
+    store.recordTokenUsage([point(50, false)], null)
+    store.recordTokenUsage([point(300, true)], null)
+    store.recordTokenUsage([point(340, true)], null)
+    store.recordTokenUsage([point(340, true)], null)
     expect(store.readTokenSamplesSince(at(0)).map((sample) => sample.tokens)).toEqual([100, 50, 300, 40])
   })
 
@@ -169,6 +196,123 @@ describe('activity store', () => {
     const store = createActivityStore(database)
     store.recordEvent({ sessionId: 's1', provider: 'claude', repository: null, branch: null, title: 'Old database', folder: 'dashi', state: 'idle', occurredAt: at(0) })
     expect(store.readSessions()[0]).toMatchObject({ title: 'Old database', folder: 'dashi' })
+  })
+
+  it('keeps which machine reported each sample, its account and launch, and adds those columns to an older database', () => {
+    const database = new DatabaseSync(':memory:')
+    database.exec(`CREATE TABLE token_usage_samples (session_id TEXT NOT NULL, model TEXT NOT NULL, token_type TEXT NOT NULL,
+      tokens INTEGER NOT NULL, recorded_at TEXT NOT NULL)`)
+    database.exec(`INSERT INTO token_usage_samples VALUES ('s0', 'claude-opus-5-5', 'input', 5, '${at(0)}')`)
+    const store = createActivityStore(database)
+    store.recordTokenUsage([{ ...point(7, false), account: 'me@example.com', launchHint: 'cli' }], 'machine-1')
+    expect(store.readTokenSamplesSince(at(0))).toEqual([
+      expect.objectContaining({ sessionId: 's0', machineTokenId: null, account: null, launchHint: null }),
+      expect.objectContaining({ tokens: 7, machineTokenId: 'machine-1', account: 'me@example.com', launchHint: 'cli' }),
+    ])
+  })
+})
+
+describe('usage by source', () => {
+  const session = (sessionId: string, overrides: Partial<StoredSession> = {}): StoredSession => ({
+    sessionId,
+    provider: 'claude',
+    repository: { owner: 'cnotv', name: 'dashi' },
+    branch: null,
+    title: null,
+    folder: 'dashi',
+    state: 'idle',
+    startedAt: at(0),
+    lastEventAt: at(10),
+    ...overrides,
+  })
+  const sample = (sessionId: string, tokens: number, overrides: Partial<StoredTokenSample> = {}): StoredTokenSample => ({
+    sessionId,
+    model: 'claude-opus-5-5',
+    tokenType: 'output',
+    tokens,
+    recordedAt: at(5),
+    machineTokenId: 'laptop-token',
+    account: 'me@example.com',
+    launchHint: null,
+    ...overrides,
+  })
+  const laptopStartId = '0123abcd-0000-4000-8000-000000000000'
+  const cloudStartId = 'fedc0000-0000-4000-8000-000000000000'
+  const starts = [
+    { startId: laptopStartId, repository: { owner: 'cnotv', name: 'dashi' }, target: 'laptop-headless' as const, sessionUrl: null },
+    { startId: cloudStartId, repository: { owner: 'cnotv', name: 'dashi' }, target: 'cloud-routine' as const, sessionUrl: 'https://claude.ai/code/session_01Routine' },
+  ]
+  const reportOf = (sessions: StoredSession[], samples: StoredTokenSample[]) =>
+    buildUsageReport(sessions, samples, () => null, at(0), atMilliseconds(30), {
+      machineLabelOf: (tokenId) => (tokenId === 'laptop-token' ? 'Laptop' : null),
+      starts,
+    })
+  const rowsOf = (rows: Array<{ label: string; sessionCount: number; tokens: { total: number }; note: string | null }>) =>
+    rows.map((row) => [row.label, row.sessionCount, row.tokens.total, row.note])
+
+  it('splits tokens by the machine that reported them, naming a removed or unknown one', () => {
+    const report = reportOf(
+      [session('a'), session('b'), session('c')],
+      [sample('a', 50), sample('b', 30, { machineTokenId: 'revoked-token' }), sample('c', 20, { machineTokenId: null })],
+    )
+    expect(rowsOf(report.byMachine)).toEqual([
+      ['Laptop', 1, 50, null],
+      ['Removed machine', 1, 30, null],
+      ['Unknown machine', 1, 20, null],
+    ])
+  })
+
+  it('splits tokens by account, naming an organization and a session with no signed-in account', () => {
+    const report = reportOf(
+      [session('a'), session('b'), session('c')],
+      [sample('a', 50), sample('b', 30, { account: 'org:0f1e2d3c-aaaa' }), sample('c', 20, { account: null })],
+    )
+    expect(rowsOf(report.byAccount)).toEqual([
+      ['me@example.com', 1, 50, null],
+      ['Organization 0f1e2d3c', 1, 30, null],
+      ['No signed-in account', 1, 20, 'API key, Bedrock or Vertex'],
+    ])
+  })
+
+  it('tells board starts, cloud sessions and hand-started ones apart', () => {
+    const report = reportOf(
+      [
+        session('laptop', { folder: startFolderNameOf('dashi', laptopStartId) }),
+        session('routine'),
+        session('cloud'),
+        session('terminal'),
+        session('ide'),
+        session('silent'),
+      ],
+      [
+        sample('laptop', 60, { launchHint: 'cli' }),
+        sample('routine', 50, { launchHint: 'cloud:cse_01Routine' }),
+        sample('cloud', 40, { launchHint: 'cloud:cse_01Other' }),
+        sample('terminal', 30, { launchHint: 'cli' }),
+        sample('ide', 20, { launchHint: 'claude-vscode' }),
+        sample('silent', 10),
+      ],
+    )
+    expect(rowsOf(report.byLaunch)).toEqual([
+      ['Board, laptop runner', 1, 60, null],
+      ['Board, Claude cloud', 1, 50, null],
+      ['Claude cloud', 1, 40, null],
+      ['Terminal', 1, 30, null],
+      ['VS Code', 1, 20, null],
+      ['Not reported', 1, 10, 'Reconnect the machine with dashi connect'],
+    ])
+  })
+
+  it('lists Codex sessions in the period with no tokens, since Codex sends no token metrics', () => {
+    const report = reportOf([session('a'), session('codex', { provider: 'codex' })], [sample('a', 50)])
+    expect(rowsOf(report.byAgent)).toEqual([
+      ['Claude Code', 1, 50, null],
+      ['Codex', 1, 0, 'No token metrics'],
+    ])
+  })
+
+  it("names a start's folder the way the runner does", () => {
+    expect(startFolderNameOf('generative-art', laptopStartId)).toBe(startFolderNameFor('generative-art', laptopStartId))
   })
 })
 
@@ -262,6 +406,7 @@ describe('ingest and read routes', () => {
         totals: expect.objectContaining({ total: 1000 }),
         byRepository: [expect.objectContaining({ repository: { owner: 'cnotv', name: 'generative-art' }, sessionCount: 1 })],
         byWork: [expect.objectContaining({ branch: 'feat/12-sessions', issueNumber: 12, pullRequestNumber: null })],
+        byMachine: [expect.objectContaining({ label: 'laptop', sessionCount: 1 })],
       }),
     )
   })

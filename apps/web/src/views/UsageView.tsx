@@ -1,6 +1,6 @@
 import { Callout, Flex, Grid, SegmentedControl } from '@radix-ui/themes'
 import { useSearchParams } from 'react-router'
-import type { UsageReport } from '@dashi/contracts'
+import type { UsageBySource, UsageReport } from '@dashi/contracts'
 import { SourceTags } from '@/components/charts/SourceTags'
 import { StatTile } from '@/components/charts/StatTile'
 import { UsageBarList, type UsageBarRow } from '@/components/usage/UsageBarList'
@@ -37,7 +37,15 @@ const modelRows = (report: UsageReport): UsageBarRow[] =>
     total: usage.tokens.total,
   }))
 
-/** The Usage page: tokens for all repositories, then by day, repository, model and pull request. */
+const sourceRows = (rows: UsageBySource[]): UsageBarRow[] =>
+  rows.map((usage) => ({
+    rowKey: usage.sourceKey,
+    label: usage.label,
+    detail: usage.note === null ? sessionsLabel(usage.sessionCount) : `${sessionsLabel(usage.sessionCount)} · ${usage.note}`,
+    total: usage.tokens.total,
+  }))
+
+/** The Usage page: tokens for all repositories, then by day, where they were spent, repository, model and pull request. */
 export const UsageView = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const periodDays = periodDaysFrom(searchParams.get('days'))
@@ -84,6 +92,12 @@ export const UsageView = () => {
             <StatTile label="Cache write" value={formatCompactCount(report.totals.cacheCreation)} />
           </Grid>
           <UsageByDayChart days={fillMissingDays(report.byDay, report.windowStartedAt, report.generatedAt)} isStale={isStale} />
+          <Grid columns={{ initial: '1', md: '2' }} gap="4">
+            <UsageBarList title="By machine" rows={sourceRows(report.byMachine)} grandTotal={report.totals.total} isStale={isStale} />
+            <UsageBarList title="By account" rows={sourceRows(report.byAccount)} grandTotal={report.totals.total} isStale={isStale} />
+            <UsageBarList title="How it was started" rows={sourceRows(report.byLaunch)} grandTotal={report.totals.total} isStale={isStale} />
+            <UsageBarList title="By agent" rows={sourceRows(report.byAgent)} grandTotal={report.totals.total} isStale={isStale} />
+          </Grid>
           <Grid columns={{ initial: '1', md: '2' }} gap="4">
             <UsageBarList title="By repository" rows={repositoryRows(report)} grandTotal={report.totals.total} isStale={isStale} />
             <UsageBarList title="By model" rows={modelRows(report)} grandTotal={report.totals.total} isStale={isStale} />

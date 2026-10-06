@@ -38,10 +38,10 @@ export const UsageBarList = ({ title, rows, grandTotal, isStale }: UsageBarListP
               {rows.map((row) => (
                 <li key={row.rowKey} className="bar-list-row">
                   <div className="bar-list-label">
-                    <Text as="div" size="2" truncate>
+                    <Text as="div" size="2" truncate title={row.label}>
                       {row.label}
                     </Text>
-                    <Text as="div" size="1" color="gray" truncate>
+                    <Text as="div" size="1" color="gray">
                       {row.detail}
                     </Text>
                   </div>

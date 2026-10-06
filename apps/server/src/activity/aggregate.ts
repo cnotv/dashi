@@ -1,4 +1,5 @@
 import type {
+  AgentProvider,
   AgentSessionState,
   AgentSessionSummary,
   RepositoryReference,
@@ -8,11 +9,12 @@ import type {
   UsageByDay,
   UsageByModel,
   UsageByRepository,
+  UsageBySource,
   UsageByWork,
   UsageReport,
 } from '@dashi/contracts'
 import { issueNumberFromBranch } from '../github/status.ts'
-import type { StoredEvent, StoredSession, StoredTokenSample } from './types.ts'
+import type { StoredEvent, StoredSession, StoredTokenSample, UsageSourceLookups, UsageStart } from './types.ts'
 
 // A session that has said nothing for this long is not running any more, even though it never
 // sent SessionEnd: a closed laptop or a killed terminal never does.
@@ -127,12 +129,85 @@ const byTotalDescending = <Row extends { tokens: TokenTotals }>(first: Row, seco
 export type PullRequestFinder = (repository: RepositoryReference, branch: string) => number | null
 
 /**
+ * Names a laptop start's worktree folder as the runner does, which is how its session is
+ * recognised: the runner is a standalone script and cannot share this, so a test keeps the two equal.
+ * @param repositoryName The repository's name.
+ * @param startId The start's id.
+ * @returns The folder name, such as generative-art-0123abcd.
+ */
+export const startFolderNameOf = (repositoryName: string, startId: string): string => `${repositoryName}-${startId.slice(0, 8)}`
+
+const entrypointLabels: Record<string, string> = {
+  cli: 'Terminal',
+  'claude-vscode': 'VS Code',
+  'claude-in-slack': 'Slack',
+}
+
+const laptopTargets = new Set(['laptop-remote-control', 'laptop-headless', 'laptop-cloud'])
+
+// A cloud session id comes as cse_<id> in the metrics and as session_<id> at the end of the routine's URL.
+const cloudIdOf = (value: string): string => {
+  const lastSegment = value.slice(value.lastIndexOf('/') + 1).replace(/^cloud:/, '')
+  return lastSegment.slice(lastSegment.indexOf('_') + 1)
+}
+
+const sourceRows = (
+  samples: StoredTokenSample[],
+  keyOf: (sample: StoredTokenSample) => string,
+  describeSource: (sourceKey: string) => Pick<UsageBySource, 'label' | 'note'>,
+): UsageBySource[] =>
+  [...groupBy(samples, keyOf).entries()]
+    .map(
+      ([sourceKey, group]): UsageBySource => ({
+        sourceKey,
+        ...describeSource(sourceKey),
+        sessionCount: new Set(group.map((sample) => sample.sessionId)).size,
+        tokens: sumTokens(group),
+      }),
+    )
+    .sort(byTotalDescending)
+
+const machineRowOf =
+  (machineLabelOf: UsageSourceLookups['machineLabelOf']) =>
+  (machineTokenId: string): Pick<UsageBySource, 'label' | 'note'> => ({
+    label: machineTokenId === '' ? 'Unknown machine' : (machineLabelOf(machineTokenId) ?? 'Removed machine'),
+    note: null,
+  })
+
+const accountRowOf = (account: string): Pick<UsageBySource, 'label' | 'note'> => {
+  if (account === '') return { label: 'No signed-in account', note: 'API key, Bedrock or Vertex' }
+  return { label: account.startsWith('org:') ? `Organization ${account.slice(4, 12)}` : account, note: null }
+}
+
+const launchLabelerFor = (starts: UsageStart[]) => {
+  const laptopFolders = new Set(
+    starts.filter((start) => laptopTargets.has(start.target)).map((start) => startFolderNameOf(start.repository.name, start.startId)),
+  )
+  const boardCloudIds = new Set(starts.flatMap((start) => (start.sessionUrl === null ? [] : [cloudIdOf(start.sessionUrl)])))
+  return (session: StoredSession | undefined, launchHint: string | null): string => {
+    const folder = session?.folder ?? null
+    if (folder !== null && laptopFolders.has(folder)) return 'Board, laptop runner'
+    if (launchHint?.startsWith('cloud:')) return boardCloudIds.has(cloudIdOf(launchHint)) ? 'Board, Claude cloud' : 'Claude cloud'
+    if (launchHint === null) return 'Not reported'
+    return entrypointLabels[launchHint] ?? (launchHint.startsWith('sdk-') ? 'Agent SDK' : launchHint)
+  }
+}
+
+const launchRowOf = (label: string): Pick<UsageBySource, 'label' | 'note'> => ({
+  label,
+  note: label === 'Not reported' ? 'Reconnect the machine with dashi connect' : null,
+})
+
+const agentLabels: Record<AgentProvider, string> = { claude: 'Claude Code', codex: 'Codex' }
+
+/**
  * Adds up token usage for all repositories, then by repository, by pull request or branch, by day and by model.
  * @param sessions Every stored session, to place each sample.
  * @param samples The token samples inside the period.
  * @param findPullRequest Finds the open pull request of a branch.
  * @param windowStartedAt Where the period starts.
  * @param now The current time in milliseconds.
+ * @param lookups The machine labels and board starts that name where tokens were spent.
  * @returns The usage report.
  */
 export const buildUsageReport = (
@@ -141,6 +216,7 @@ export const buildUsageReport = (
   findPullRequest: PullRequestFinder,
   windowStartedAt: string,
   now: number,
+  lookups: UsageSourceLookups,
 ): UsageReport => {
   const sessionsById = new Map(sessions.map((session) => [session.sessionId, session]))
   const sessionOf = (sample: StoredTokenSample): StoredSession | undefined => sessionsById.get(sample.sessionId)
@@ -186,6 +262,15 @@ export const buildUsageReport = (
     .map(([model, group]): UsageByModel => ({ model, tokens: sumTokens(group) }))
     .sort(byTotalDescending)
 
+  // Codex sends no token metrics, so its sessions in the period are counted with no tokens.
+  const codexSessionCount = sessions.filter((session) => session.provider === 'codex' && session.lastEventAt >= windowStartedAt).length
+  const codexRows: UsageBySource[] =
+    codexSessionCount === 0
+      ? []
+      : [{ sourceKey: 'codex', label: agentLabels.codex, note: 'No token metrics', sessionCount: codexSessionCount, tokens: emptyTokenTotals() }]
+  const byAgent = [...sourceRows(samples, () => 'claude', () => ({ label: agentLabels.claude, note: null })), ...codexRows]
+  const launchLabelOf = launchLabelerFor(lookups.starts)
+
   return {
     windowStartedAt,
     generatedAt: new Date(now).toISOString(),
@@ -195,5 +280,9 @@ export const buildUsageReport = (
     byWork,
     byDay,
     byModel,
+    byMachine: sourceRows(samples, (sample) => sample.machineTokenId ?? '', machineRowOf(lookups.machineLabelOf)),
+    byAccount: sourceRows(samples, (sample) => sample.account ?? '', accountRowOf),
+    byLaunch: sourceRows(samples, (sample) => launchLabelOf(sessionOf(sample), sample.launchHint), launchRowOf),
+    byAgent,
   }
 }

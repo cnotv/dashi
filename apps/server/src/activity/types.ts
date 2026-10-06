@@ -3,6 +3,7 @@ import type {
   AgentProvider,
   AgentSessionState,
   RepositoryReference,
+  SessionStart,
 } from '@dashi/contracts'
 import type { MachineTokenStore } from '../machine-tokens/types.ts'
 import type { hookPayloadSchema, keyValueSchema, otlpMetricsSchema } from './schema.ts'
@@ -39,6 +40,10 @@ export interface TokenUsagePoint {
   isCumulative: boolean
   seriesStart: string
   observedAt: string
+  // The user's email, else `org:` and the organization id; null when nobody is signed in.
+  account: string | null
+  // `cloud:` and the cloud session id when it runs in Claude's cloud, else the entrypoint, such as cli.
+  launchHint: string | null
 }
 
 export interface StoredSession {
@@ -65,11 +70,14 @@ export interface StoredTokenSample {
   tokenType: TokenType
   tokens: number
   recordedAt: string
+  machineTokenId: string | null
+  account: string | null
+  launchHint: string | null
 }
 
 export interface ActivityStore {
   recordEvent: (event: AgentEvent) => void
-  recordTokenUsage: (points: TokenUsagePoint[]) => void
+  recordTokenUsage: (points: TokenUsagePoint[], machineTokenId: string | null) => void
   readSessions: () => StoredSession[]
   readEventsSince: (since: string) => StoredEvent[]
   readTokenSamplesSince: (since: string) => StoredTokenSample[]
@@ -79,4 +87,12 @@ export interface ActivityDependencies {
   activityStore: ActivityStore
   ingestTokens: MachineTokenStore
   now: () => number
+}
+
+export type UsageStart = Pick<SessionStart, 'startId' | 'repository' | 'target' | 'sessionUrl'>
+
+export interface UsageSourceLookups {
+  // The label of a machine token, or null once it has been revoked.
+  machineLabelOf: (tokenId: string) => string | null
+  starts: UsageStart[]
 }

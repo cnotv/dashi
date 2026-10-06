@@ -29,6 +29,11 @@ const toSessionStart = (row: Record<string, unknown>): SessionStart | null => {
   }
 }
 
+const startsOfRow = (row: Record<string, unknown>): SessionStart[] => {
+  const start = toSessionStart(row)
+  return start === null ? [] : [start]
+}
+
 /**
  * Creates the store of sessions started from the board: queued for a laptop runner, or fired at a routine.
  * @param database The database; its table is created when missing.
@@ -73,10 +78,12 @@ export const createSessionStartStore = (database: DatabaseSync, now: () => numbe
       database
         .prepare('SELECT * FROM session_starts ORDER BY created_at DESC LIMIT ?')
         .all(recentStartCount)
-        .flatMap((row) => {
-          const start = toSessionStart(row)
-          return start === null ? [] : [start]
-        }),
+        .flatMap(startsOfRow),
+    listStartsSince: (since) =>
+      database
+        .prepare('SELECT * FROM session_starts WHERE created_at >= ? ORDER BY created_at DESC')
+        .all(since)
+        .flatMap(startsOfRow),
     readStart,
     // The oldest queued laptop start goes to whichever runner asks first; the state check in
     // the UPDATE keeps two runners asking at once from both getting it.
