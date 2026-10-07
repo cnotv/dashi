@@ -140,6 +140,11 @@ Dashi uses it** lists what Dashi does with it, every API call it makes, the perm
 needs, and links to that API's documentation. The Anthropic, OpenAI and OpenRouter keys are marked
 **Not used yet**: Dashi keeps them but no session reads them, and only Test calls their API.
 
+The machine panels below the credentials, **Set up a machine**, **Connect Claude Code** and
+**Laptop runner**, carry the same **How Dashi uses it** for the tokens they issue: the ingest token
+a machine reports with, the runner token the laptop runner polls with, and the pairing that hands
+both to the dashi CLI.
+
 A credential can hold several tokens, each with a name, such as a personal and a work GitHub
 token. A credential's tokens are a radio group: the selected one, marked **In use**, is the one
 the dashboard reads, and selecting another switches to it. **Add token** adds one, and switches to
