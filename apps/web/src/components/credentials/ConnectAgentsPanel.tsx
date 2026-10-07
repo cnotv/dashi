@@ -1,9 +1,11 @@
 import { Badge, Button, Card, Code, Dialog, Flex, Heading, Table, Text, TextField } from '@radix-ui/themes'
 import { useState, type FormEvent } from 'react'
 import { useMachineTokens } from '@/hooks/useActivity'
+import { machineGuides } from '@/lib/credential-guides'
 import { useToast } from '@/hooks/useToast'
 import { connectSnippet, pluginInstallCommands } from '@/lib/connect-snippet'
 import { dashboardAddress } from '@/lib/runtime-configuration'
+import { CredentialGuideDetails } from './CredentialGuideDetails'
 import { CopyableSnippet } from './CopyableSnippet'
 
 
@@ -117,6 +119,8 @@ export const ConnectAgentsPanel = () => {
             </Dialog.Content>
           </Dialog.Root>
         </Flex>
+
+        <CredentialGuideDetails guide={machineGuides['connect-claude-code']} />
 
         {ingestTokens.length > 0 && (
           <Table.Root variant="ghost" size="2">

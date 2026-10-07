@@ -2,11 +2,13 @@ import { Card, Flex, Heading, SegmentedControl, Text } from '@radix-ui/themes'
 import { useState } from 'react'
 import type { MachinePlatform } from '@dashi/contracts'
 import { usePolledResource } from '@/hooks/usePolledResource'
+import { machineGuides } from '@/lib/credential-guides'
 import { dashboardApi } from '@/lib/api'
 import { cliConnectCommands, platformLabels, platformOfUserAgent } from '@/lib/machine-setup'
 import { dashboardAddress } from '@/lib/runtime-configuration'
 import { CollapsibleSteps } from './CollapsibleSteps'
 import { CopyableSnippet } from './CopyableSnippet'
+import { CredentialGuideDetails } from './CredentialGuideDetails'
 import { ServedScriptSource } from './ServedScriptSource'
 
 // What dashi connect does, said plainly, so it can be checked against the source before it runs.
@@ -63,6 +65,7 @@ export const MachineSetupPanel = () => {
           )}
           <ServedScriptSource scriptName="dashi" scriptInfo={scriptInfo} sourcePath="apps/cli/src/dashi.ts" doesList={cliDoesList} reviewSnippet={null} />
         </CollapsibleSteps>
+        <CredentialGuideDetails guide={machineGuides['machine-setup']} />
       </Flex>
     </Card>
   )

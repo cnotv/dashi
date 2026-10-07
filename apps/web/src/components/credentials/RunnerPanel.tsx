@@ -3,8 +3,10 @@ import { useState, type FormEvent } from 'react'
 import type { MachinePlatform, ServedScriptInfo } from '@dashi/contracts'
 import { useMachineTokens } from '@/hooks/useActivity'
 import { usePolledResource } from '@/hooks/usePolledResource'
+import { CredentialGuideDetails } from './CredentialGuideDetails'
 import { CopyableSnippet } from './CopyableSnippet'
 import { ServedScriptSource } from './ServedScriptSource'
+import { machineGuides } from '@/lib/credential-guides'
 import { useToast } from '@/hooks/useToast'
 import { dashboardApi } from '@/lib/api'
 import { dashboardAddress } from '@/lib/runtime-configuration'
@@ -181,6 +183,8 @@ export const RunnerPanel = () => {
             </Dialog.Content>
           </Dialog.Root>
         </Flex>
+
+        <CredentialGuideDetails guide={machineGuides['laptop-runner']} />
 
         {runnerTokens.length > 0 && (
           <Table.Root variant="ghost" size="2">

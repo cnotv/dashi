@@ -58,7 +58,6 @@ export const CredentialsView = () => {
 
   return (
     <Flex direction="column" gap="5" maxWidth="1000px">
-      <MachineSetupPanel />
       {vault.vaultState && (
         <VaultPanel vaultState={vault.vaultState} onSetUp={vault.setUp} onUnlock={vault.unlock} onLock={vault.lock} />
       )}
@@ -115,6 +114,7 @@ export const CredentialsView = () => {
         </Table.Root>
       </Card>
 
+      <MachineSetupPanel />
       <ConnectAgentsPanel />
       <RunnerPanel />
       <RoutinePanel />
