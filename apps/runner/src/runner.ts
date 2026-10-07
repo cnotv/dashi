@@ -115,6 +115,8 @@ interface LaunchPlan {
   command: string
   args: string[]
   cwd: string
+  // Added to the session's environment; the status hook reports DASHI_START_ID, so Dashi knows the session came from the board.
+  environment: Record<string, string>
 }
 
 interface LaunchOutcome {
@@ -276,8 +278,9 @@ export const tmuxSessionNameFor = (claimed: ClaimedStart): string =>
  * @returns The command, its arguments and folder, and how to run it.
  */
 export const launchPlanFor = (claimed: ClaimedStart, paths: RunnerPaths): LaunchPlan => {
+  const environment = { DASHI_START_ID: claimed.start.startId }
   if (claimed.start.target === 'laptop-cloud') {
-    return { mode: 'capture', command: 'claude', args: ['--cloud', claimed.prompt], cwd: paths.clonePath }
+    return { mode: 'capture', command: 'claude', args: ['--cloud', claimed.prompt], cwd: paths.clonePath, environment }
   }
   if (claimed.start.target === 'laptop-headless') {
     return {
@@ -285,10 +288,12 @@ export const launchPlanFor = (claimed: ClaimedStart, paths: RunnerPaths): Launch
       command: 'claude',
       args: ['-p', claimed.prompt, '--permission-mode', claimed.start.permissionMode, '--output-format', 'json'],
       cwd: paths.worktreePath,
+      environment,
     }
   }
   // Remote Control needs a terminal, so the session gets one from tmux; with more than one
-  // argument tmux runs the command directly, not through a shell.
+  // argument tmux runs the command directly, not through a shell. A tmux server already running
+  // keeps its own environment, so the start id goes in with -e.
   return {
     mode: 'tmux',
     command: 'tmux',
@@ -299,6 +304,8 @@ export const launchPlanFor = (claimed: ClaimedStart, paths: RunnerPaths): Launch
       tmuxSessionNameFor(claimed),
       '-c',
       paths.worktreePath,
+      '-e',
+      `DASHI_START_ID=${claimed.start.startId}`,
       'claude',
       '--remote-control',
       '--name',
@@ -306,6 +313,7 @@ export const launchPlanFor = (claimed: ClaimedStart, paths: RunnerPaths): Launch
       claimed.prompt,
     ],
     cwd: paths.worktreePath,
+    environment,
   }
 }
 
@@ -558,7 +566,12 @@ const prepareWorktree = ({ clonePath, worktreePath }: RunnerPaths): void => {
 
 const launch = (plan: LaunchPlan, claimed: ClaimedStart, paths: RunnerPaths): LaunchOutcome => {
   if (plan.mode === 'capture') {
-    const result = spawnSync(plan.command, plan.args, { cwd: plan.cwd, encoding: 'utf8', timeout: cloudCommandTimeoutMilliseconds })
+    const result = spawnSync(plan.command, plan.args, {
+      cwd: plan.cwd,
+      env: { ...process.env, ...plan.environment },
+      encoding: 'utf8',
+      timeout: cloudCommandTimeoutMilliseconds,
+    })
     const commandOutput = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
     const sessionUrl = cloudSessionUrlFrom(commandOutput)
     if (sessionUrl === null) throw new Error(`claude --cloud printed no session link: ${lastCharacters(commandOutput, 500)}`)
@@ -567,7 +580,12 @@ const launch = (plan: LaunchPlan, claimed: ClaimedStart, paths: RunnerPaths): La
   if (plan.mode === 'detached') {
     mkdirSync(dirname(paths.logPath), { recursive: true })
     const logDescriptor = openSync(paths.logPath, 'a')
-    spawn(plan.command, plan.args, { cwd: plan.cwd, detached: true, stdio: ['ignore', logDescriptor, logDescriptor] }).unref()
+    spawn(plan.command, plan.args, {
+      cwd: plan.cwd,
+      env: { ...process.env, ...plan.environment },
+      detached: true,
+      stdio: ['ignore', logDescriptor, logDescriptor],
+    }).unref()
     return { sessionUrl: null, message: `Running unattended in ${plan.cwd}; its output goes to ${paths.logPath}` }
   }
   const result = spawnSync(plan.command, plan.args, { encoding: 'utf8' })

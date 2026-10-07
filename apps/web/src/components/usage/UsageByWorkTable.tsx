@@ -27,6 +27,17 @@ const GitHubNumberLink = ({ href, value }: { href: string | null; value: number 
 
 const columnHelper = createColumnHelper<typeof sortableTableFeatures, UsageByWork>()
 
+// The largest share first, one per line; a row that never reported reads as such in gray.
+const OriginLabels = ({ labels }: { labels: string[] }) => (
+  <>
+    {labels.map((label) => (
+      <Text key={label} as="div" size="2" color={label === 'Not reported' ? 'gray' : undefined}>
+        {label}
+      </Text>
+    ))}
+  </>
+)
+
 const workColumns = (grandTotal: number) =>
   columnHelper.columns([
     columnHelper.accessor((work) => work.branch ?? '', {
@@ -67,6 +78,18 @@ const workColumns = (grandTotal: number) =>
           value={work.pullRequestNumber}
         />
       ),
+    }),
+    columnHelper.accessor((work) => work.triggeredBy.join(', '), {
+      id: 'triggeredBy',
+      header: 'Triggered by',
+      sortFn: 'alphanumeric',
+      cell: ({ row: { original: work } }) => <OriginLabels labels={work.triggeredBy} />,
+    }),
+    columnHelper.accessor((work) => work.billedThrough.join(', '), {
+      id: 'billedThrough',
+      header: 'Billed through',
+      sortFn: 'alphanumeric',
+      cell: ({ row: { original: work } }) => <OriginLabels labels={work.billedThrough} />,
     }),
     columnHelper.accessor('sessionCount', { header: 'Sessions', sortFn: 'basic' }),
     columnHelper.accessor((work) => work.tokens.output, {

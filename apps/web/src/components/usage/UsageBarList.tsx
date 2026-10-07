@@ -14,20 +14,29 @@ export interface UsageBarRow {
 
 interface UsageBarListProps {
   title: string
+  // What decides the grouping, for a list whose title alone does not say.
+  description?: string
   rows: UsageBarRow[]
   grandTotal: number
   isStale: boolean
 }
 
 /** Horizontal bars of token totals, labelled with the value and its share of the whole. */
-export const UsageBarList = ({ title, rows, grandTotal, isStale }: UsageBarListProps) => {
+export const UsageBarList = ({ title, description, rows, grandTotal, isStale }: UsageBarListProps) => {
   const largestTotal = Math.max(1, ...rows.map((row) => row.total))
   return (
     <Card size="2">
       <Flex direction="column" gap="4" className={isStale ? 'chart-stale' : undefined}>
-        <Text size="2" weight="medium">
-          {title}
-        </Text>
+        <Flex direction="column" gap="1">
+          <Text size="2" weight="medium">
+            {title}
+          </Text>
+          {description && (
+            <Text size="1" color="gray">
+              {description}
+            </Text>
+          )}
+        </Flex>
         {rows.length === 0 ? (
           <Text size="2" color="gray">
             No tokens recorded in this period.

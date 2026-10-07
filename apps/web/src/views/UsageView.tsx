@@ -93,10 +93,34 @@ export const UsageView = () => {
           </Grid>
           <UsageByDayChart days={fillMissingDays(report.byDay, report.windowStartedAt, report.generatedAt)} isStale={isStale} />
           <Grid columns={{ initial: '1', md: '2' }} gap="4">
-            <UsageBarList title="By machine" rows={sourceRows(report.byMachine)} grandTotal={report.totals.total} isStale={isStale} />
-            <UsageBarList title="By account" rows={sourceRows(report.byAccount)} grandTotal={report.totals.total} isStale={isStale} />
-            <UsageBarList title="How it was started" rows={sourceRows(report.byLaunch)} grandTotal={report.totals.total} isStale={isStale} />
-            <UsageBarList title="By agent" rows={sourceRows(report.byAgent)} grandTotal={report.totals.total} isStale={isStale} />
+            <UsageBarList
+              title="Triggered by"
+              description="What started each session: the Dashi board, an app such as CodePilot, an editor, the Agent SDK or a terminal."
+              rows={sourceRows(report.byTrigger)}
+              grandTotal={report.totals.total}
+              isStale={isStale}
+            />
+            <UsageBarList
+              title="Billed through"
+              description="What paid for the tokens: a Claude login (subscription or Console), an API key, OpenRouter or a cloud provider."
+              rows={sourceRows(report.byBilling)}
+              grandTotal={report.totals.total}
+              isStale={isStale}
+            />
+            <UsageBarList
+              title="By machine"
+              description="The connected machine whose Dashi token reported the tokens."
+              rows={sourceRows(report.byMachine)}
+              grandTotal={report.totals.total}
+              isStale={isStale}
+            />
+            <UsageBarList
+              title="By agent"
+              description="Claude Code reports its tokens; Codex sends none, so its sessions are counted without them."
+              rows={sourceRows(report.byAgent)}
+              grandTotal={report.totals.total}
+              isStale={isStale}
+            />
           </Grid>
           <Grid columns={{ initial: '1', md: '2' }} gap="4">
             <UsageBarList title="By repository" rows={repositoryRows(report)} grandTotal={report.totals.total} isStale={isStale} />

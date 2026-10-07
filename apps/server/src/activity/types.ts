@@ -19,7 +19,30 @@ export interface HookHeaders {
   branch: string | undefined
   remote: string | undefined
   cwd: string | undefined
+  launcher: string | undefined
+  terminal: string | undefined
+  app: string | undefined
+  billing: string | undefined
+  apiHost: string | undefined
+  startId: string | undefined
 }
+
+// What started a session and what pays for it, as the status hook reads them from its environment.
+export interface SessionOrigin {
+  // CLAUDE_CODE_ENTRYPOINT, such as cli, sdk-ts or claude-vscode.
+  launcher: string | null
+  // TERM_PROGRAM, such as iTerm.app.
+  terminal: string | null
+  // A macOS bundle id or a process name, such as com.example.CodePilot or iTerm2.
+  launchingApp: string | null
+  billing: SessionBilling | null
+  // The host of ANTHROPIC_BASE_URL, such as openrouter.ai.
+  apiHost: string | null
+  // Set by Dashi's runner on the sessions it starts from the board.
+  startId: string | null
+}
+
+export type SessionBilling = 'api-key' | 'bedrock' | 'vertex' | 'foundry' | 'claude-login' | 'chatgpt-login'
 
 export interface AgentEvent {
   sessionId: string
@@ -29,6 +52,7 @@ export interface AgentEvent {
   branch: string | null
   title: string | null
   folder: string | null
+  origin: SessionOrigin
   occurredAt: string
 }
 
@@ -53,6 +77,7 @@ export interface StoredSession {
   branch: string | null
   title: string | null
   folder: string | null
+  origin: SessionOrigin
   state: AgentSessionState
   startedAt: string
   lastEventAt: string

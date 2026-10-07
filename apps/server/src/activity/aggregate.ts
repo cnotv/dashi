@@ -14,7 +14,8 @@ import type {
   UsageReport,
 } from '@dashi/contracts'
 import { issueNumberFromBranch } from '../github/status.ts'
-import type { StoredEvent, StoredSession, StoredTokenSample, UsageSourceLookups, UsageStart } from './types.ts'
+import { billingLabelOf, originNoteOf, triggerLabelerFor } from './origin.ts'
+import type { StoredEvent, StoredSession, StoredTokenSample, UsageSourceLookups } from './types.ts'
 
 // A session that has said nothing for this long is not running any more, even though it never
 // sent SessionEnd: a closed laptop or a killed terminal never does.
@@ -84,6 +85,7 @@ const stateOrder: Record<AgentSessionState, number> = { working: 0, waiting: 1, 
  * @param samples The token samples inside the window.
  * @param windowStartedAt Where the window starts.
  * @param now The current time in milliseconds.
+ * @param lookups The board starts, to tell the sessions the board started.
  * @returns The sessions, running ones first, and the timeline.
  */
 export const buildSessionsOverview = (
@@ -92,8 +94,10 @@ export const buildSessionsOverview = (
   samples: StoredTokenSample[],
   windowStartedAt: string,
   now: number,
+  lookups: Pick<UsageSourceLookups, 'starts'>,
 ): SessionsOverview => {
   const samplesBySession = groupBy(samples, (sample) => sample.sessionId)
+  const triggerOf = triggerLabelerFor(lookups.starts)
   const summaries = sessions
     .filter((session) => session.lastEventAt >= windowStartedAt)
     .map(
@@ -109,6 +113,8 @@ export const buildSessionsOverview = (
         startedAt: session.startedAt,
         lastEventAt: session.lastEventAt,
         tokens: sumTokens(samplesBySession.get(session.sessionId) ?? []),
+        triggeredBy: triggerOf(session, samplesBySession.get(session.sessionId)?.[0]?.launchHint ?? null),
+        billedThrough: billingLabelOf(session, samplesBySession.get(session.sessionId)?.[0]),
       }),
     )
     .sort((first, second) => stateOrder[first.state] - stateOrder[second.state] || (first.lastEventAt < second.lastEventAt ? 1 : -1))
@@ -128,29 +134,6 @@ const byTotalDescending = <Row extends { tokens: TokenTotals }>(first: Row, seco
 
 export type PullRequestFinder = (repository: RepositoryReference, branch: string) => number | null
 
-/**
- * Names a laptop start's worktree folder as the runner does, which is how its session is
- * recognised: the runner is a standalone script and cannot share this, so a test keeps the two equal.
- * @param repositoryName The repository's name.
- * @param startId The start's id.
- * @returns The folder name, such as generative-art-0123abcd.
- */
-export const startFolderNameOf = (repositoryName: string, startId: string): string => `${repositoryName}-${startId.slice(0, 8)}`
-
-const entrypointLabels: Record<string, string> = {
-  cli: 'Terminal',
-  'claude-vscode': 'VS Code',
-  'claude-in-slack': 'Slack',
-}
-
-const laptopTargets = new Set(['laptop-remote-control', 'laptop-headless', 'laptop-cloud'])
-
-// A cloud session id comes as cse_<id> in the metrics and as session_<id> at the end of the routine's URL.
-const cloudIdOf = (value: string): string => {
-  const lastSegment = value.slice(value.lastIndexOf('/') + 1).replace(/^cloud:/, '')
-  return lastSegment.slice(lastSegment.indexOf('_') + 1)
-}
-
 const sourceRows = (
   samples: StoredTokenSample[],
   keyOf: (sample: StoredTokenSample) => string,
@@ -167,36 +150,19 @@ const sourceRows = (
     )
     .sort(byTotalDescending)
 
+// The distinct labels of a group, the one that spent the most tokens first.
+const labelsByTokens = (group: StoredTokenSample[], labelOf: (sample: StoredTokenSample) => string): string[] =>
+  [...groupBy(group, labelOf).entries()]
+    .map(([label, labelled]) => ({ label, total: sumTokens(labelled).total }))
+    .sort((first, second) => second.total - first.total)
+    .map(({ label }) => label)
+
 const machineRowOf =
   (machineLabelOf: UsageSourceLookups['machineLabelOf']) =>
   (machineTokenId: string): Pick<UsageBySource, 'label' | 'note'> => ({
     label: machineTokenId === '' ? 'Unknown machine' : (machineLabelOf(machineTokenId) ?? 'Removed machine'),
     note: null,
   })
-
-const accountRowOf = (account: string): Pick<UsageBySource, 'label' | 'note'> => {
-  if (account === '') return { label: 'No signed-in account', note: 'API key, Bedrock or Vertex' }
-  return { label: account.startsWith('org:') ? `Organization ${account.slice(4, 12)}` : account, note: null }
-}
-
-const launchLabelerFor = (starts: UsageStart[]) => {
-  const laptopFolders = new Set(
-    starts.filter((start) => laptopTargets.has(start.target)).map((start) => startFolderNameOf(start.repository.name, start.startId)),
-  )
-  const boardCloudIds = new Set(starts.flatMap((start) => (start.sessionUrl === null ? [] : [cloudIdOf(start.sessionUrl)])))
-  return (session: StoredSession | undefined, launchHint: string | null): string => {
-    const folder = session?.folder ?? null
-    if (folder !== null && laptopFolders.has(folder)) return 'Board, laptop runner'
-    if (launchHint?.startsWith('cloud:')) return boardCloudIds.has(cloudIdOf(launchHint)) ? 'Board, Claude cloud' : 'Claude cloud'
-    if (launchHint === null) return 'Not reported'
-    return entrypointLabels[launchHint] ?? (launchHint.startsWith('sdk-') ? 'Agent SDK' : launchHint)
-  }
-}
-
-const launchRowOf = (label: string): Pick<UsageBySource, 'label' | 'note'> => ({
-  label,
-  note: label === 'Not reported' ? 'Reconnect the machine with dashi connect' : null,
-})
 
 const agentLabels: Record<AgentProvider, string> = { claude: 'Claude Code', codex: 'Codex' }
 
@@ -224,6 +190,10 @@ export const buildUsageReport = (
   const firstSessionOf = (group: StoredTokenSample[]): StoredSession | undefined =>
     group[0] === undefined ? undefined : sessionOf(group[0])
 
+  const triggerOf = triggerLabelerFor(lookups.starts)
+  const triggerOfSample = (sample: StoredTokenSample): string => triggerOf(sessionOf(sample), sample.launchHint)
+  const billingOfSample = (sample: StoredTokenSample): string => billingLabelOf(sessionOf(sample), sample)
+
   const byRepository = [...groupBy(samples, (sample) => repositoryKey(sessionOf(sample)?.repository ?? null)).values()]
     .map(
       (group): UsageByRepository => ({
@@ -248,6 +218,8 @@ export const buildUsageReport = (
         branch,
         issueNumber: branch === null ? null : issueNumberFromBranch(branch),
         pullRequestNumber: repository === null || branch === null ? null : findPullRequest(repository, branch),
+        triggeredBy: labelsByTokens(group, triggerOfSample),
+        billedThrough: labelsByTokens(group, billingOfSample),
         tokens: sumTokens(group),
         sessionCount: distinctSessions(group),
       }
@@ -269,7 +241,6 @@ export const buildUsageReport = (
       ? []
       : [{ sourceKey: 'codex', label: agentLabels.codex, note: 'No token metrics', sessionCount: codexSessionCount, tokens: emptyTokenTotals() }]
   const byAgent = [...sourceRows(samples, () => 'claude', () => ({ label: agentLabels.claude, note: null })), ...codexRows]
-  const launchLabelOf = launchLabelerFor(lookups.starts)
 
   return {
     windowStartedAt,
@@ -281,8 +252,8 @@ export const buildUsageReport = (
     byDay,
     byModel,
     byMachine: sourceRows(samples, (sample) => sample.machineTokenId ?? '', machineRowOf(lookups.machineLabelOf)),
-    byAccount: sourceRows(samples, (sample) => sample.account ?? '', accountRowOf),
-    byLaunch: sourceRows(samples, (sample) => launchLabelOf(sessionOf(sample), sample.launchHint), launchRowOf),
+    byTrigger: sourceRows(samples, triggerOfSample, (label) => ({ label, note: originNoteOf(label) })),
+    byBilling: sourceRows(samples, billingOfSample, (label) => ({ label, note: originNoteOf(label) })),
     byAgent,
   }
 }

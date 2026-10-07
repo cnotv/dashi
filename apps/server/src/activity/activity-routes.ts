@@ -44,6 +44,12 @@ export const createIngestRoutes = ({ activityStore, ingestTokens, now }: Activit
         branch: context.req.header('x-agent-branch'),
         remote: context.req.header('x-agent-remote'),
         cwd: context.req.header('x-agent-cwd'),
+        launcher: context.req.header('x-agent-launcher'),
+        terminal: context.req.header('x-agent-terminal'),
+        app: context.req.header('x-agent-app'),
+        billing: context.req.header('x-agent-billing'),
+        apiHost: context.req.header('x-agent-api-host'),
+        startId: context.req.header('x-dashi-start-id'),
       },
       new Date(now()).toISOString(),
     )
@@ -86,6 +92,7 @@ export const createActivityRoutes = (
         activityStore.readTokenSamplesSince(windowStartedAt),
         windowStartedAt,
         now(),
+        { starts: listStartsSince(windowStartedAt) },
       ),
     )
   })

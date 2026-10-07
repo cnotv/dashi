@@ -3,12 +3,15 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { createTestApp, getRequest, jsonRequest } from '../app/test-app.ts'
 import { createActivityStore } from './activity-store.ts'
-import { buildTimeline, buildUsageReport, effectiveState, inactiveAfterMilliseconds, startFolderNameOf } from './aggregate.ts'
+import { buildSessionsOverview, buildTimeline, buildUsageReport, effectiveState, inactiveAfterMilliseconds } from './aggregate.ts'
+import { startFolderNameOf } from './origin.ts'
 import { startFolderNameFor } from '../../../runner/src/runner.ts'
 import { agentEventFrom, repositoryFromRemote, tokenUsagePointsFrom } from './ingest.ts'
-import type { StoredSession, StoredTokenSample, TokenUsagePoint } from './types.ts'
+import type { SessionOrigin, StoredSession, StoredTokenSample, TokenUsagePoint } from './types.ts'
 
 const createdTokenSchema = z.object({ token: z.string(), summary: z.object({ tokenId: z.string() }) })
+
+const emptyOrigin: SessionOrigin = { launcher: null, terminal: null, launchingApp: null, billing: null, apiHost: null, startId: null }
 
 const at = (minutes: number): string => new Date(Date.UTC(2026, 8, 29, 12, minutes)).toISOString()
 const atMilliseconds = (minutes: number): number => Date.parse(at(minutes))
@@ -67,7 +70,18 @@ describe('repositoryFromRemote', () => {
 })
 
 describe('agentEventFrom', () => {
-  const headers = { provider: 'claude', branch: 'feat/12-sessions', remote: 'git@github.com:cnotv/dashi.git', cwd: undefined }
+  const headers = {
+    provider: 'claude',
+    branch: 'feat/12-sessions',
+    remote: 'git@github.com:cnotv/dashi.git',
+    cwd: undefined,
+    launcher: undefined,
+    terminal: undefined,
+    app: undefined,
+    billing: undefined,
+    apiHost: undefined,
+    startId: undefined,
+  }
 
   it('maps Claude hook events to session states', () => {
     const states = ['SessionStart', 'UserPromptSubmit', 'Notification', 'Stop', 'SessionEnd'].map(
@@ -85,8 +99,39 @@ describe('agentEventFrom', () => {
       branch: 'feat/12-sessions',
       title: null,
       folder: null,
+      origin: emptyOrigin,
       occurredAt: at(0),
     })
+  })
+
+  it('keeps what launched the session and what pays for it, dropping values that are not one short line', () => {
+    const event = agentEventFrom(
+      { session_id: 's1', hook_event_name: 'Stop' },
+      {
+        ...headers,
+        launcher: 'sdk-ts',
+        terminal: 'iTerm.app',
+        app: 'com.example.CodePilot',
+        billing: 'api-key',
+        apiHost: 'openrouter.ai',
+        startId: '0123abcd-0000-4000-8000-000000000000',
+      },
+      at(0),
+    )
+    expect(event?.origin).toEqual({
+      launcher: 'sdk-ts',
+      terminal: 'iTerm.app',
+      launchingApp: 'com.example.CodePilot',
+      billing: 'api-key',
+      apiHost: 'openrouter.ai',
+      startId: '0123abcd-0000-4000-8000-000000000000',
+    })
+    const odd = agentEventFrom(
+      { session_id: 's1', hook_event_name: 'Stop' },
+      { ...headers, launcher: '', app: 'x'.repeat(200), billing: 'free-money', startId: 'not-a-start' },
+      at(0),
+    )
+    expect(odd?.origin).toEqual(emptyOrigin)
   })
 
   it("titles a session by its first prompt's first line, and names its folder", () => {
@@ -173,7 +218,7 @@ describe('activity store', () => {
 
   it('keeps the last known repository when a later event has none', () => {
     const store = createActivityStore(new DatabaseSync(':memory:'))
-    const base = { sessionId: 's1', provider: 'claude' as const, occurredAt: at(0) }
+    const base = { sessionId: 's1', provider: 'claude' as const, origin: emptyOrigin, occurredAt: at(0) }
     store.recordEvent({ ...base, state: 'working', repository: { owner: 'cnotv', name: 'x' }, branch: 'feat/1-a', title: null, folder: 'x' })
     store.recordEvent({ ...base, state: 'idle', repository: null, branch: null, title: null, folder: null, occurredAt: at(3) })
     expect(store.readSessions()).toEqual([
@@ -183,7 +228,7 @@ describe('activity store', () => {
 
   it('keeps the first title a session gets', () => {
     const store = createActivityStore(new DatabaseSync(':memory:'))
-    const base = { sessionId: 's1', provider: 'claude' as const, repository: null, branch: null, folder: null }
+    const base = { sessionId: 's1', provider: 'claude' as const, repository: null, branch: null, folder: null, origin: emptyOrigin }
     store.recordEvent({ ...base, state: 'working', title: 'Fix the marbles', occurredAt: at(0) })
     store.recordEvent({ ...base, state: 'working', title: 'yes, go on', occurredAt: at(2) })
     expect(store.readSessions()[0]?.title).toBe('Fix the marbles')
@@ -194,8 +239,17 @@ describe('activity store', () => {
     database.exec(`CREATE TABLE agent_sessions (session_id TEXT PRIMARY KEY, provider TEXT NOT NULL, repository_owner TEXT,
       repository_name TEXT, branch TEXT, state TEXT NOT NULL, started_at TEXT NOT NULL, last_event_at TEXT NOT NULL)`)
     const store = createActivityStore(database)
-    store.recordEvent({ sessionId: 's1', provider: 'claude', repository: null, branch: null, title: 'Old database', folder: 'dashi', state: 'idle', occurredAt: at(0) })
-    expect(store.readSessions()[0]).toMatchObject({ title: 'Old database', folder: 'dashi' })
+    store.recordEvent({ sessionId: 's1', provider: 'claude', repository: null, branch: null, title: 'Old database', folder: 'dashi', origin: emptyOrigin, state: 'idle', occurredAt: at(0) })
+    expect(store.readSessions()[0]).toMatchObject({ title: 'Old database', folder: 'dashi', origin: emptyOrigin })
+  })
+
+  it('keeps the first launch and billing a session reports, so a later event without them changes nothing', () => {
+    const store = createActivityStore(new DatabaseSync(':memory:'))
+    const base = { sessionId: 's1', provider: 'claude' as const, repository: null, branch: null, title: null, folder: null, state: 'working' as const }
+    const reported: SessionOrigin = { ...emptyOrigin, launcher: 'sdk-ts', launchingApp: 'CodePilot', billing: 'api-key' }
+    store.recordEvent({ ...base, origin: reported, occurredAt: at(0) })
+    store.recordEvent({ ...base, origin: emptyOrigin, occurredAt: at(2) })
+    expect(store.readSessions()[0]?.origin).toEqual(reported)
   })
 
   it('keeps which machine reported each sample, its account and launch, and adds those columns to an older database', () => {
@@ -213,7 +267,7 @@ describe('activity store', () => {
 })
 
 describe('usage by source', () => {
-  const session = (sessionId: string, overrides: Partial<StoredSession> = {}): StoredSession => ({
+  const session = (sessionId: string, overrides: Partial<StoredSession> = {}, origin: Partial<SessionOrigin> = {}): StoredSession => ({
     sessionId,
     provider: 'claude',
     repository: { owner: 'cnotv', name: 'dashi' },
@@ -223,6 +277,7 @@ describe('usage by source', () => {
     state: 'idle',
     startedAt: at(0),
     lastEventAt: at(10),
+    origin: { ...emptyOrigin, ...origin },
     ...overrides,
   })
   const sample = (sessionId: string, tokens: number, overrides: Partial<StoredTokenSample> = {}): StoredTokenSample => ({
@@ -242,11 +297,9 @@ describe('usage by source', () => {
     { startId: laptopStartId, repository: { owner: 'cnotv', name: 'dashi' }, target: 'laptop-headless' as const, sessionUrl: null },
     { startId: cloudStartId, repository: { owner: 'cnotv', name: 'dashi' }, target: 'cloud-routine' as const, sessionUrl: 'https://claude.ai/code/session_01Routine' },
   ]
+  const lookups = { machineLabelOf: (tokenId: string) => (tokenId === 'laptop-token' ? 'Laptop' : null), starts }
   const reportOf = (sessions: StoredSession[], samples: StoredTokenSample[]) =>
-    buildUsageReport(sessions, samples, () => null, at(0), atMilliseconds(30), {
-      machineLabelOf: (tokenId) => (tokenId === 'laptop-token' ? 'Laptop' : null),
-      starts,
-    })
+    buildUsageReport(sessions, samples, () => null, at(0), atMilliseconds(30), lookups)
   const rowsOf = (rows: Array<{ label: string; sessionCount: number; tokens: { total: number }; note: string | null }>) =>
     rows.map((row) => [row.label, row.sessionCount, row.tokens.total, row.note])
 
@@ -262,44 +315,90 @@ describe('usage by source', () => {
     ])
   })
 
-  it('splits tokens by account, naming an organization and a session with no signed-in account', () => {
+  it('says what triggered each session: the Dashi board, an app such as CodePilot, an editor, or a terminal', () => {
     const report = reportOf(
-      [session('a'), session('b'), session('c')],
-      [sample('a', 50), sample('b', 30, { account: 'org:0f1e2d3c-aaaa' }), sample('c', 20, { account: null })],
+      [
+        session('board', {}, { startId: laptopStartId, launcher: 'cli' }),
+        session('board-by-folder', { folder: startFolderNameOf('dashi', laptopStartId) }),
+        session('routine'),
+        session('codepilot', {}, { launcher: 'sdk-ts', launchingApp: 'com.example.CodePilot' }),
+        session('vscode', {}, { launcher: 'claude-vscode', launchingApp: 'Code Helper' }),
+        session('iterm', {}, { launcher: 'cli', terminal: 'iTerm.app', launchingApp: 'iTerm2' }),
+        session('sdk', {}, { launcher: 'sdk-py' }),
+        session('old'),
+      ],
+      [
+        sample('board', 90),
+        sample('board-by-folder', 80),
+        sample('routine', 70, { launchHint: 'cloud:cse_01Routine' }),
+        sample('codepilot', 60),
+        sample('vscode', 50),
+        sample('iterm', 40),
+        sample('sdk', 30),
+        sample('old', 10, { machineTokenId: null, account: null }),
+      ],
     )
-    expect(rowsOf(report.byAccount)).toEqual([
-      ['me@example.com', 1, 50, null],
-      ['Organization 0f1e2d3c', 1, 30, null],
-      ['No signed-in account', 1, 20, 'API key, Bedrock or Vertex'],
+    expect(rowsOf(report.byTrigger)).toEqual([
+      ['Dashi board (laptop runner)', 2, 170, null],
+      ['Dashi board (Claude cloud)', 1, 70, null],
+      ['CodePilot', 1, 60, null],
+      ['VS Code', 1, 50, null],
+      ['Terminal (iTerm)', 1, 40, null],
+      ['Agent SDK', 1, 30, null],
+      ['Not reported', 1, 10, 'Recorded before Dashi asked, or the workflow plugin is older than 0.5.0'],
     ])
   })
 
-  it('tells board starts, cloud sessions and hand-started ones apart', () => {
+  it('says what paid for each session: a Claude login, an API key, OpenRouter or a cloud provider', () => {
     const report = reportOf(
       [
-        session('laptop', { folder: startFolderNameOf('dashi', laptopStartId) }),
-        session('routine'),
-        session('cloud'),
-        session('terminal'),
-        session('ide'),
-        session('silent'),
+        session('login', {}, { billing: 'claude-login' }),
+        session('anthropic-key', {}, { billing: 'api-key' }),
+        session('openrouter', {}, { billing: 'api-key', apiHost: 'openrouter.ai' }),
+        session('bedrock', {}, { billing: 'bedrock' }),
+        session('codex', { provider: 'codex' }, { billing: 'api-key' }),
+        session('otel-only'),
+        session('no-account'),
+        session('old'),
       ],
       [
-        sample('laptop', 60, { launchHint: 'cli' }),
-        sample('routine', 50, { launchHint: 'cloud:cse_01Routine' }),
-        sample('cloud', 40, { launchHint: 'cloud:cse_01Other' }),
-        sample('terminal', 30, { launchHint: 'cli' }),
-        sample('ide', 20, { launchHint: 'claude-vscode' }),
-        sample('silent', 10),
+        sample('login', 90),
+        sample('anthropic-key', 80, { account: null }),
+        sample('openrouter', 70, { account: null }),
+        sample('bedrock', 60, { account: null }),
+        sample('codex', 55, { account: null }),
+        sample('otel-only', 50, { account: 'org:0f1e2d3c-aaaa' }),
+        sample('no-account', 40, { account: null }),
+        sample('old', 10, { machineTokenId: null, account: null }),
       ],
     )
-    expect(rowsOf(report.byLaunch)).toEqual([
-      ['Board, laptop runner', 1, 60, null],
-      ['Board, Claude cloud', 1, 50, null],
-      ['Claude cloud', 1, 40, null],
-      ['Terminal', 1, 30, null],
-      ['VS Code', 1, 20, null],
-      ['Not reported', 1, 10, 'Reconnect the machine with dashi connect'],
+    expect(rowsOf(report.byBilling)).toEqual([
+      ['Claude login · me@example.com', 1, 90, null],
+      ['Anthropic API key', 1, 80, null],
+      ['OpenRouter', 1, 70, null],
+      ['Amazon Bedrock', 1, 60, null],
+      ['OpenAI API key', 1, 55, null],
+      ['Claude organization 0f1e2d3c', 1, 50, null],
+      ['No Claude account', 1, 40, 'An API key or a cloud provider'],
+      ['Not reported', 1, 10, 'Recorded before Dashi asked, or the workflow plugin is older than 0.5.0'],
+    ])
+  })
+
+  it('puts what triggered and paid for a branch next to its tokens, and on each session', () => {
+    const sessions = [
+      session('a', { branch: 'feat/epaper-dashboard' }, { launcher: 'sdk-ts', launchingApp: 'CodePilot', billing: 'api-key' }),
+      session('b', { branch: 'feat/epaper-dashboard', lastEventAt: at(9) }, { startId: laptopStartId, billing: 'claude-login' }),
+    ]
+    const samples = [sample('a', 70), sample('b', 30)]
+    expect(reportOf(sessions, samples).byWork[0]).toMatchObject({
+      branch: 'feat/epaper-dashboard',
+      triggeredBy: ['CodePilot', 'Dashi board (laptop runner)'],
+      billedThrough: ['Anthropic API key', 'Claude login · me@example.com'],
+    })
+    const overview = buildSessionsOverview(sessions, [], samples, at(0), atMilliseconds(30), lookups)
+    expect(overview.sessions.map((summary) => [summary.sessionId, summary.triggeredBy, summary.billedThrough])).toEqual([
+      ['a', 'CodePilot', 'Anthropic API key'],
+      ['b', 'Dashi board (laptop runner)', 'Claude login · me@example.com'],
     ])
   })
 
@@ -339,6 +438,7 @@ describe('timeline and states', () => {
       branch: null,
       title: null,
       folder: null,
+      origin: emptyOrigin,
       state: 'working',
       startedAt: at(0),
       lastEventAt: at(0),

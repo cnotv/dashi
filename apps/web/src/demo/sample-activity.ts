@@ -43,6 +43,8 @@ interface SampleSession {
   issueNumber: number | null
   changes: [number, AgentSessionState][]
   tokens: TokenTotals
+  triggeredBy: string
+  billedThrough: string
 }
 
 const sampleSessions: SampleSession[] = [
@@ -55,6 +57,8 @@ const sampleSessions: SampleSession[] = [
     issueNumber: 12,
     changes: [[310, 'idle'], [305, 'working'], [240, 'waiting'], [228, 'working'], [150, 'idle'], [95, 'working']],
     tokens: tokensOf(48_200, 131_900, 3_904_000, 212_400),
+    triggeredBy: 'Dashi board (laptop runner)',
+    billedThrough: 'Claude login · me@example.com',
   },
   {
     sessionId: 'b9f04c11-demo-waiting',
@@ -65,6 +69,8 @@ const sampleSessions: SampleSession[] = [
     issueNumber: 31,
     changes: [[180, 'idle'], [176, 'working'], [120, 'idle'], [70, 'working'], [12, 'waiting']],
     tokens: tokensOf(21_800, 64_300, 1_720_500, 98_100),
+    triggeredBy: 'CodePilot',
+    billedThrough: 'Anthropic API key',
   },
   {
     sessionId: '5e2d8a90-demo-idle',
@@ -75,6 +81,8 @@ const sampleSessions: SampleSession[] = [
     issueNumber: 9,
     changes: [[620, 'idle'], [612, 'working'], [540, 'idle'], [300, 'working'], [262, 'idle']],
     tokens: tokensOf(9_400, 27_600, 684_000, 41_900),
+    triggeredBy: 'Terminal (iTerm)',
+    billedThrough: 'Claude login · me@example.com',
   },
   {
     sessionId: '7ac3f5b8-demo-codex',
@@ -85,6 +93,8 @@ const sampleSessions: SampleSession[] = [
     issueNumber: null,
     changes: [[80, 'idle'], [44, 'idle']],
     tokens: tokensOf(0, 0, 0, 0),
+    triggeredBy: 'Terminal (Ghostty)',
+    billedThrough: 'ChatGPT login',
   },
   {
     sessionId: 'e4410c6f-demo-ended',
@@ -95,6 +105,8 @@ const sampleSessions: SampleSession[] = [
     issueNumber: 7,
     changes: [[1_100, 'idle'], [1_095, 'working'], [1_010, 'idle'], [1_000, 'ended']],
     tokens: tokensOf(6_100, 18_900, 402_300, 30_200),
+    triggeredBy: 'Dashi board (Claude cloud)',
+    billedThrough: 'Claude login · me@example.com',
   },
   {
     sessionId: '0d93b7aa-demo-notes',
@@ -105,6 +117,8 @@ const sampleSessions: SampleSession[] = [
     issueNumber: null,
     changes: [[40, 'working'], [25, 'idle']],
     tokens: tokensOf(2_300, 8_100, 96_000, 6_200),
+    triggeredBy: 'VS Code',
+    billedThrough: 'OpenRouter',
   },
 ]
 
@@ -142,6 +156,8 @@ const summaryOf = (sample: SampleSession, now: number): AgentSessionSummary => {
     startedAt: isoMinutesAgo(now, firstChange?.[0] ?? 0),
     lastEventAt: isoMinutesAgo(now, lastChange?.[0] ?? 0),
     tokens: sample.tokens,
+    triggeredBy: sample.triggeredBy,
+    billedThrough: sample.billedThrough,
   }
 }
 
@@ -204,32 +220,35 @@ export const sampleUsageReport = (days: number, now: number): UsageReport => {
       { repository: null, tokens: scaled(0.05), sessionCount: 2 },
     ],
     byWork: [
-      { repository: firstRepository ?? null, branch: 'feat/12-sessions-and-usage', issueNumber: 12, pullRequestNumber: 14, tokens: scaled(0.38), sessionCount: 6 },
-      { repository: secondRepository ?? null, branch: 'fix/31-retry-webhooks', issueNumber: 31, pullRequestNumber: 33, tokens: scaled(0.21), sessionCount: 4 },
-      { repository: firstRepository ?? null, branch: 'docs/9-deploy-guide', issueNumber: 9, pullRequestNumber: null, tokens: scaled(0.17), sessionCount: 5 },
-      { repository: secondRepository ?? null, branch: 'main', issueNumber: null, pullRequestNumber: null, tokens: scaled(0.1), sessionCount: 2 },
-      { repository: firstRepository ?? null, branch: 'chore/7-bump-dependencies', issueNumber: 7, pullRequestNumber: 8, tokens: scaled(0.09), sessionCount: 4 },
-      { repository: null, branch: null, issueNumber: null, pullRequestNumber: null, tokens: scaled(0.05), sessionCount: 2 },
+      { repository: firstRepository ?? null, branch: 'feat/12-sessions-and-usage', issueNumber: 12, pullRequestNumber: 14, triggeredBy: ['Dashi board (laptop runner)', 'Terminal (iTerm)'], billedThrough: ['Claude login · me@example.com'], tokens: scaled(0.38), sessionCount: 6 },
+      { repository: secondRepository ?? null, branch: 'fix/31-retry-webhooks', issueNumber: 31, pullRequestNumber: 33, triggeredBy: ['CodePilot'], billedThrough: ['Anthropic API key'], tokens: scaled(0.21), sessionCount: 4 },
+      { repository: firstRepository ?? null, branch: 'docs/9-deploy-guide', issueNumber: 9, pullRequestNumber: null, triggeredBy: ['Terminal (iTerm)'], billedThrough: ['Claude login · me@example.com'], tokens: scaled(0.17), sessionCount: 5 },
+      { repository: secondRepository ?? null, branch: 'main', issueNumber: null, pullRequestNumber: null, triggeredBy: ['VS Code'], billedThrough: ['OpenRouter'], tokens: scaled(0.1), sessionCount: 2 },
+      { repository: firstRepository ?? null, branch: 'chore/7-bump-dependencies', issueNumber: 7, pullRequestNumber: 8, triggeredBy: ['Dashi board (Claude cloud)'], billedThrough: ['Claude login · me@example.com'], tokens: scaled(0.09), sessionCount: 4 },
+      { repository: null, branch: null, issueNumber: null, pullRequestNumber: null, triggeredBy: ['Not reported'], billedThrough: ['Not reported'], tokens: scaled(0.05), sessionCount: 2 },
     ],
     byDay,
     byModel: [
       { model: 'claude-opus-demo', tokens: scaled(0.72) },
       { model: 'claude-haiku-demo', tokens: scaled(0.28) },
     ],
+    byTrigger: [
+      { sourceKey: 'Dashi board (laptop runner)', label: 'Dashi board (laptop runner)', note: null, sessionCount: 6, tokens: scaled(0.34) },
+      { sourceKey: 'CodePilot', label: 'CodePilot', note: null, sessionCount: 4, tokens: scaled(0.21) },
+      { sourceKey: 'Terminal (iTerm)', label: 'Terminal (iTerm)', note: null, sessionCount: 7, tokens: scaled(0.21) },
+      { sourceKey: 'VS Code', label: 'VS Code', note: null, sessionCount: 2, tokens: scaled(0.1) },
+      { sourceKey: 'Dashi board (Claude cloud)', label: 'Dashi board (Claude cloud)', note: null, sessionCount: 3, tokens: scaled(0.09) },
+      { sourceKey: 'Not reported', label: 'Not reported', note: 'Recorded before Dashi asked, or the workflow plugin is older than 0.5.0', sessionCount: 1, tokens: scaled(0.05) },
+    ],
+    byBilling: [
+      { sourceKey: 'Claude login · me@example.com', label: 'Claude login · me@example.com', note: null, sessionCount: 16, tokens: scaled(0.64) },
+      { sourceKey: 'Anthropic API key', label: 'Anthropic API key', note: null, sessionCount: 4, tokens: scaled(0.21) },
+      { sourceKey: 'OpenRouter', label: 'OpenRouter', note: null, sessionCount: 2, tokens: scaled(0.1) },
+      { sourceKey: 'Not reported', label: 'Not reported', note: 'Recorded before Dashi asked, or the workflow plugin is older than 0.5.0', sessionCount: 1, tokens: scaled(0.05) },
+    ],
     byMachine: [
       { sourceKey: 'demo-laptop', label: 'Laptop', note: null, sessionCount: 17, tokens: scaled(0.7) },
       { sourceKey: 'demo-runner', label: 'Mac mini', note: null, sessionCount: 6, tokens: scaled(0.3) },
-    ],
-    byAccount: [
-      { sourceKey: 'me@example.com', label: 'me@example.com', note: null, sessionCount: 19, tokens: scaled(0.86) },
-      { sourceKey: '', label: 'No signed-in account', note: 'API key, Bedrock or Vertex', sessionCount: 4, tokens: scaled(0.14) },
-    ],
-    byLaunch: [
-      { sourceKey: 'Terminal', label: 'Terminal', note: null, sessionCount: 11, tokens: scaled(0.46) },
-      { sourceKey: 'Board, laptop runner', label: 'Board, laptop runner', note: null, sessionCount: 6, tokens: scaled(0.3) },
-      { sourceKey: 'Board, Claude cloud', label: 'Board, Claude cloud', note: null, sessionCount: 3, tokens: scaled(0.14) },
-      { sourceKey: 'VS Code', label: 'VS Code', note: null, sessionCount: 2, tokens: scaled(0.07) },
-      { sourceKey: 'Not reported', label: 'Not reported', note: 'Reconnect the machine with dashi connect', sessionCount: 1, tokens: scaled(0.03) },
     ],
     byAgent: [
       { sourceKey: 'claude', label: 'Claude Code', note: null, sessionCount: 23, tokens: scaled(1) },

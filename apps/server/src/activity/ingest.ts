@@ -5,9 +5,11 @@ import type {
   HookPayload,
   OtlpKeyValue,
   OtlpMetricsRequest,
+  SessionOrigin,
   TokenType,
   TokenUsagePoint,
 } from './types.ts'
+import { sessionBillingOf } from './origin.ts'
 
 const tokenUsageMetricName = 'claude_code.token.usage'
 const tokenTypes: TokenType[] = ['input', 'output', 'cacheRead', 'cacheCreation']
@@ -66,6 +68,27 @@ const emptyToNull = (value: string | undefined): string | null => {
   return trimmed === '' || trimmed === 'HEAD' ? null : trimmed
 }
 
+const startIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+const originValueCharacters = 120
+
+// A header from the hook is shown on the page, so only one short printable line is kept.
+const originValueOf = (value: string | undefined): string | null => {
+  const trimmedValue = value?.trim() ?? ''
+  return trimmedValue === '' || trimmedValue.length > originValueCharacters || /[^\x20-\x7e]/.test(trimmedValue) ? null : trimmedValue
+}
+
+const originFrom = (headers: HookHeaders): SessionOrigin => {
+  const startId = originValueOf(headers.startId)
+  return {
+    launcher: originValueOf(headers.launcher),
+    terminal: originValueOf(headers.terminal),
+    launchingApp: originValueOf(headers.app),
+    billing: sessionBillingOf(headers.billing),
+    apiHost: originValueOf(headers.apiHost),
+    startId: startId !== null && startIdPattern.test(startId) ? startId : null,
+  }
+}
+
 /**
  * Turns a Claude Code hook or Codex notification into a session event.
  * @param payload The hook's JSON body.
@@ -86,6 +109,7 @@ export const agentEventFrom = (payload: HookPayload, headers: HookHeaders, occur
     branch: emptyToNull(headers.branch),
     title: titleFrom(provider, payload),
     folder: folderFrom(payload.cwd ?? headers.cwd),
+    origin: originFrom(headers),
     occurredAt,
   }
 }

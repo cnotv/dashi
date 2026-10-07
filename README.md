@@ -179,26 +179,38 @@ Codex sends no token metrics, so Codex sessions show n/a for tokens and are not 
 
 ### Where the tokens were spent
 
-Usage also splits the tokens four ways:
+Usage says what spent the tokens four ways. The table by pull request and branch, and each session
+on the Sessions page, show the same "triggered by" and "billed through" labels.
 
-- **By machine**: the connected machine whose ingest token reported them. A machine whose token
-  was revoked reads as a removed machine.
-- **By account**: the signed-in Claude account (`user.email`), or its organization
-  (`organization.id`), from Claude Code's metric attributes. Tokens with no signed-in account
-  (an API key, Bedrock or Vertex, which the metrics cannot tell apart) are grouped as such.
-- **How it was started**:
-  - **From the board on the laptop runner:** the session runs in the start's worktree folder.
-  - **From the board as a Claude cloud routine:** the session's `ccr.session.id` matches the
-    routine's session.
-  - **Any other Claude cloud session.**
-  - **By hand:** the session's `app.entrypoint` says where, such as Terminal, VS Code or the
-    Agent SDK. `dashi connect` and the snippet turn on `OTEL_METRICS_INCLUDE_ENTRYPOINT` for this.
-    A machine connected before that reads "Not reported" until it is connected again.
-
-  Cloud sessions only report tokens if their environment exports Claude Code's metrics to this
-  dashboard.
-- **By agent**: Claude Code and Codex. Codex sends no token metrics, so its sessions are counted
+- **Triggered by**, in this order:
+  1. **The Dashi board** (laptop runner or Claude cloud): the runner sets `DASHI_START_ID` on the
+     sessions it starts. Older runners are recognised by the start's worktree folder; routines by
+     their cloud session.
+  2. **An app such as CodePilot:** the app that launched Claude Code.
+  3. **An editor** (VS Code, Cursor, Zed).
+  4. **The Agent SDK.**
+  5. **A terminal** (iTerm, Terminal, Warp, Ghostty and others).
+- **Billed through:**
+  - A Claude login, with its email when the metrics carry one (a subscription or a Console
+    account).
+  - An Anthropic API key, or OpenRouter (or another host) through `ANTHROPIC_BASE_URL`.
+  - Amazon Bedrock, Google Vertex AI or Microsoft Foundry.
+  - For Codex: an OpenAI API key or a ChatGPT login.
+- **By machine:** the connected machine whose ingest token reported the tokens.
+- **By agent:** Claude Code and Codex. Codex sends no token metrics, so its sessions are counted
   with no tokens.
+
+Triggered by and billed through come from the workflow plugin's status hook (0.5.0 or later). It
+runs inside every session and reads them from the session's environment:
+- `CLAUDE_CODE_ENTRYPOINT`
+- `TERM_PROGRAM`
+- the launching app (the macOS bundle id it hands down, or the nearest ancestor process that is
+  not a shell)
+- which of `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `CLAUDE_CODE_USE_BEDROCK` and the like are set
+
+It sends kinds and hosts only, never a key's value. Where the hook said nothing, Claude Code's
+metric attributes fill in (`app.entrypoint`, which `dashi connect` turns on, and `user.email`).
+Tokens recorded before Dashi asked read "Not reported"; update the plugin to fill them in from then on.
 
 Both are fed by the machines running Claude Code, not read from them. The quick way to connect
 one is the `dashi` CLI, below; the steps after it do the same by hand.

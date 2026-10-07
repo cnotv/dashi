@@ -44,6 +44,20 @@ export const sessionDetail = (session: AgentSessionSummary): string => {
   return parts.length === 0 ? shortSessionId(session.sessionId) : parts.join(' · ')
 }
 
+const notReported = 'Not reported'
+
+/**
+ * Says what started a session and what paid for it, for the line under its name.
+ * @param session The session.
+ * @returns Such as "via CodePilot · Anthropic API key", or null when neither was reported.
+ */
+export const sessionOriginLine = (session: AgentSessionSummary): string | null => {
+  const trigger = session.triggeredBy === notReported ? null : session.triggeredBy
+  const billing = session.billedThrough === notReported ? null : session.billedThrough
+  if (trigger === null) return billing === null ? null : `paid through ${billing}`
+  return billing === null ? `via ${trigger}` : `via ${trigger} · ${billing}`
+}
+
 const percentOf = (milliseconds: number, windowStart: number, windowLength: number): number =>
   Math.min(100, Math.max(0, ((milliseconds - windowStart) / windowLength) * 100))
 
