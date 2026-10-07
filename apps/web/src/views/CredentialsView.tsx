@@ -1,6 +1,8 @@
-import { Card, Flex, Table, Text } from '@radix-ui/themes'
+import { Badge, Card, Flex, Table, Text } from '@radix-ui/themes'
+import { Fragment } from 'react'
 import type { SecretEntrySummary, SecretSummary } from '@dashi/contracts'
 import { ConnectAgentsPanel } from '@/components/credentials/ConnectAgentsPanel'
+import { CredentialGuideDetails } from '@/components/credentials/CredentialGuideDetails'
 import { CredentialTokens } from '@/components/credentials/CredentialTokens'
 import { MachineSetupPanel } from '@/components/credentials/MachineSetupPanel'
 import { RoutinePanel } from '@/components/credentials/RoutinePanel'
@@ -8,6 +10,22 @@ import { RunnerPanel } from '@/components/credentials/RunnerPanel'
 import { VaultPanel } from '@/components/credentials/VaultPanel'
 import { useToast } from '@/hooks/useToast'
 import { useVault } from '@/hooks/useVault'
+import { credentialGuides } from '@/lib/credential-guides'
+import type { CredentialGuide } from '@/lib/types'
+
+const guideOf = (secret: SecretSummary): CredentialGuide | undefined => credentialGuides[secret.name]
+
+// The guide takes a row of its own across both columns, so it has the page's width even on a phone.
+const GuideRowOf = ({ secret }: { secret: SecretSummary }) => {
+  const guide = guideOf(secret)
+  return guide === undefined ? null : (
+    <Table.Row>
+      <Table.Cell colSpan={2} pt="0">
+        <CredentialGuideDetails guide={guide} />
+      </Table.Cell>
+    </Table.Row>
+  )
+}
 
 /**
  * The Credentials page: the vault and the stored credentials. A credential can hold several
@@ -59,27 +77,39 @@ export const CredentialsView = () => {
           </Table.Header>
           <Table.Body>
             {vault.secrets.map((secret) => (
-              <Table.Row key={secret.name}>
-                <Table.RowHeaderCell>
-                  <Text as="div" size="2" weight="medium">
-                    {secret.label}
-                  </Text>
-                  <Text as="div" size="1" color="gray">
-                    {secret.description}
-                  </Text>
-                </Table.RowHeaderCell>
-                <Table.Cell>
-                  <CredentialTokens
-                    secret={secret}
-                    isUnlocked={isUnlocked}
-                    onAdd={(newEntry) => vault.addSecretEntry(secret.name, newEntry)}
-                    onUpdate={(entryId, change) => vault.updateSecretEntry(secret.name, entryId, change)}
-                    onUse={(entry) => void run(() => vault.useSecretEntry(secret.name, entry.entryId), `${secret.label}: Dashi now uses ${entry.label}`)}
-                    onTest={(entry) => void testEntry(secret, entry)}
-                    onRemove={(entry) => void run(() => vault.deleteSecretEntry(secret.name, entry.entryId), `${secret.label}: ${entry.label} removed`)}
-                  />
-                </Table.Cell>
-              </Table.Row>
+              <Fragment key={secret.name}>
+                <Table.Row className={guideOf(secret) === undefined ? undefined : 'credential-row'}>
+                  <Table.RowHeaderCell>
+                    <Flex direction="column" gap="2" align="start">
+                      <Flex gap="2" align="center" wrap="wrap">
+                        <Text size="2" weight="medium">
+                          {secret.label}
+                        </Text>
+                        {guideOf(secret)?.isUsedByDashi === false && (
+                          <Badge color="gray" variant="soft" radius="full">
+                            Not used yet
+                          </Badge>
+                        )}
+                      </Flex>
+                      <Text as="div" size="1" color="gray">
+                        {secret.description}
+                      </Text>
+                    </Flex>
+                  </Table.RowHeaderCell>
+                  <Table.Cell>
+                    <CredentialTokens
+                      secret={secret}
+                      isUnlocked={isUnlocked}
+                      onAdd={(newEntry) => vault.addSecretEntry(secret.name, newEntry)}
+                      onUpdate={(entryId, change) => vault.updateSecretEntry(secret.name, entryId, change)}
+                      onUse={(entry) => void run(() => vault.useSecretEntry(secret.name, entry.entryId), `${secret.label}: Dashi now uses ${entry.label}`)}
+                      onTest={(entry) => void testEntry(secret, entry)}
+                      onRemove={(entry) => void run(() => vault.deleteSecretEntry(secret.name, entry.entryId), `${secret.label}: ${entry.label} removed`)}
+                    />
+                  </Table.Cell>
+                </Table.Row>
+                <GuideRowOf secret={secret} />
+              </Fragment>
             ))}
           </Table.Body>
         </Table.Root>

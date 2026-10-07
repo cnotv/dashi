@@ -125,13 +125,20 @@ features that use a stored API key, since GitHub access comes from the sign-in.
 ## Credentials
 
 Signed in with GitHub, the board reads GitHub as you. Without sign-in, open **Credentials**
-and add a GitHub token (fine-grained, read access to issues, checks and actions on the
-repositories in `config/repos.json`, and write access to contents and pull requests for Merge
-and Close). API keys for
-Anthropic, OpenAI and OpenRouter are stored the same way, for sessions that are not on a
-subscription, and so is a Netlify personal access token for the board's Netlify button.
+and add a GitHub token: fine-grained, on the repositories in `config/repos.json`. It needs:
+- read and write access to issues, for New issue
+- read and write access to pull requests, for Merge, Close and back to draft
+- write access to contents, for Merge
+- read access to actions, checks and commit statuses
 
-Each credential's dialog links to the page where that token or key is created.
+A Netlify personal access token for the board's Netlify button is stored the same way. So are API
+keys for Anthropic, OpenAI and OpenRouter, kept for sessions that are not on a subscription,
+though no session uses them yet.
+
+Each credential's dialog links to the page where that token or key is created. Under each credential, **How
+Dashi uses it** lists what Dashi does with it, every API call it makes, the permissions the token
+needs, and links to that API's documentation. The Anthropic, OpenAI and OpenRouter keys are marked
+**Not used yet**: Dashi keeps them but no session reads them, and only Test calls their API.
 
 A credential can hold several tokens, each with a name, such as a personal and a work GitHub
 token. A credential's tokens are a radio group: the selected one, marked **In use**, is the one

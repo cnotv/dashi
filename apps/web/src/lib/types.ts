@@ -239,3 +239,18 @@ export interface DataSource {
   description: string
   docsUrl: string
 }
+
+export interface CredentialDocLink {
+  label: string
+  url: string
+}
+
+// What Dashi does with a credential, shown under it on the Credentials page.
+export interface CredentialGuide {
+  isUsedByDashi: boolean
+  usedFor: string
+  // Each API call Dashi makes with it, method and path first.
+  calls: string[]
+  permissions: string[]
+  docs: CredentialDocLink[]
+}
