@@ -96,6 +96,7 @@ export const UsageView = () => {
             <UsageBarList
               title="Triggered by"
               description="What started each session: the Dashi board, an app such as CodePilot, an editor, the Agent SDK or a terminal."
+              sources={<SourceTags sourceIds={['workflow-status-hook', 'laptop-runner', 'claude-code-routines', 'claude-code-otel']} />}
               rows={sourceRows(report.byTrigger)}
               grandTotal={report.totals.total}
               isStale={isStale}
@@ -103,6 +104,7 @@ export const UsageView = () => {
             <UsageBarList
               title="Billed through"
               description="What paid for the tokens: a Claude login (subscription or Console), an API key, OpenRouter or a cloud provider."
+              sources={<SourceTags sourceIds={['workflow-status-hook', 'claude-code-otel']} />}
               rows={sourceRows(report.byBilling)}
               grandTotal={report.totals.total}
               isStale={isStale}
@@ -110,6 +112,7 @@ export const UsageView = () => {
             <UsageBarList
               title="By machine"
               description="The connected machine whose Dashi token reported the tokens."
+              sources={<SourceTags sourceIds={['dashi-machine-token', 'claude-code-otel']} />}
               rows={sourceRows(report.byMachine)}
               grandTotal={report.totals.total}
               isStale={isStale}
@@ -117,6 +120,7 @@ export const UsageView = () => {
             <UsageBarList
               title="By agent"
               description="Claude Code reports its tokens; Codex sends none, so its sessions are counted without them."
+              sources={<SourceTags sourceIds={['claude-code-hooks', 'codex-notify', 'claude-code-otel']} />}
               rows={sourceRows(report.byAgent)}
               grandTotal={report.totals.total}
               isStale={isStale}

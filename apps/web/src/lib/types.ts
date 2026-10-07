@@ -223,7 +223,15 @@ export interface ChatSubject {
   badgeColor: RadixColor
 }
 
-export type DataSourceId = 'claude-code-hooks' | 'codex-notify' | 'claude-code-otel' | 'github-graphql' | 'claude-code-routines' | 'laptop-runner'
+export type DataSourceId =
+  | 'claude-code-hooks'
+  | 'codex-notify'
+  | 'claude-code-otel'
+  | 'github-graphql'
+  | 'claude-code-routines'
+  | 'laptop-runner'
+  | 'workflow-status-hook'
+  | 'dashi-machine-token'
 
 export interface DataSource {
   label: string

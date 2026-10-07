@@ -173,9 +173,11 @@ sends.
 | [Claude Code OpenTelemetry](https://code.claude.com/docs/en/monitoring-usage) | The `claude_code.token.usage` counter, per session, model and token type, over OTLP/HTTP JSON | `POST /api/telemetry/v1/metrics` | Every token count, on Sessions and Usage |
 | [GitHub GraphQL API](https://docs.github.com/en/graphql) | Issues and pull requests, for the board | Fetched by the server | The pull request of a branch on Usage, read from boards already fetched |
 | [Claude Code routines](https://code.claude.com/docs/en/routines) | A session started on claude.ai | Called by the server | Cloud starts in Started from the board |
-| [Laptop runner](#the-laptop-runner) | Starts run on your machine, and an open chat's transcript from `~/.claude/projects` | Polls `/api/runner/*` | Laptop starts, and the session chat |
+| [Laptop runner](#the-laptop-runner) | Starts run on your machine, and an open chat's transcript from `~/.claude/projects` | Polls `/api/runner/*` | Laptop starts, the session chat, and `DASHI_START_ID` on the sessions it starts |
+| [Workflow plugin hook](https://github.com/cnotv/agent-base#what-the-reporter-sends) | What launched each session and what pays for it, as kinds: entrypoint, terminal, launching app, billing kind, API host, Dashi start id | `POST /api/events` headers | Triggered by and Billed through on Usage and Sessions |
+| [Dashi machine token](#set-up-a-machine-with-the-dashi-cli) | Which connected machine sent a report | Every ingest request | By machine on Usage |
 
-Codex sends no token metrics, so Codex sessions show n/a for tokens and are not in Usage.
+Codex sends no token metrics, so Codex sessions show n/a for tokens, and Usage lists them under By agent with no tokens.
 
 ### Where the tokens were spent
 

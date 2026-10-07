@@ -1,4 +1,5 @@
 import { Card, Flex, Text } from '@radix-ui/themes'
+import type { ReactNode } from 'react'
 import { formatCompactCount, formatFullCount, formatPercent } from '@/lib/presentation'
 import { shareOf } from '@/lib/usage-chart'
 
@@ -16,13 +17,14 @@ interface UsageBarListProps {
   title: string
   // What decides the grouping, for a list whose title alone does not say.
   description?: string
+  sources?: ReactNode
   rows: UsageBarRow[]
   grandTotal: number
   isStale: boolean
 }
 
 /** Horizontal bars of token totals, labelled with the value and its share of the whole. */
-export const UsageBarList = ({ title, description, rows, grandTotal, isStale }: UsageBarListProps) => {
+export const UsageBarList = ({ title, description, sources, rows, grandTotal, isStale }: UsageBarListProps) => {
   const largestTotal = Math.max(1, ...rows.map((row) => row.total))
   return (
     <Card size="2">
@@ -36,6 +38,7 @@ export const UsageBarList = ({ title, description, rows, grandTotal, isStale }: 
               {description}
             </Text>
           )}
+          {sources}
         </Flex>
         {rows.length === 0 ? (
           <Text size="2" color="gray">
