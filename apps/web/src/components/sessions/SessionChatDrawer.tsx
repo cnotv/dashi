@@ -2,6 +2,7 @@ import { Cross2Icon, ExternalLinkIcon, GearIcon, PaperPlaneIcon } from '@radix-u
 import { Badge, Callout, Dialog, Flex, IconButton, Link, Skeleton, Text, TextArea, Tooltip } from '@radix-ui/themes'
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import type { ChatDelivery, ChatMessage, SessionChat } from '@dashi/contracts'
+import { SourceTags } from '@/components/charts/SourceTags'
 import { usePolledResource } from '@/hooks/usePolledResource'
 import { useToast } from '@/hooks/useToast'
 import { dashboardApi } from '@/lib/api'
@@ -214,6 +215,7 @@ export const SessionChatDrawer = ({ subject, onClose }: SessionChatDrawerProps) 
                   {subject.detail}
                 </Text>
               </Flex>
+              <SourceTags sourceIds={['laptop-runner']} note="The session's Claude Code transcript" />
             </Flex>
             <Dialog.Close>
               <IconButton size="2" variant="ghost" color="gray" aria-label="Close">

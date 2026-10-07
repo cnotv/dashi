@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import type { AgentSessionState, SessionStart } from '@dashi/contracts'
 import { NewIssueDialog } from '@/components/board/NewIssueDialog'
+import { SourceTags } from '@/components/charts/SourceTags'
 import { StatTile } from '@/components/charts/StatTile'
 import { SessionChatDrawer } from '@/components/sessions/SessionChatDrawer'
 import { SessionStartsList } from '@/components/sessions/SessionStartsList'
@@ -84,7 +85,11 @@ export const SessionsView = () => {
             <StatTile label="Working" value={String(countInState('working'))} />
             <StatTile label="Waiting for you" value={String(countInState('waiting'))} />
             <StatTile label="Idle" value={String(countInState('idle'))} />
-            <StatTile label="Tokens in this window" value={formatCompactCount(windowTokens)} />
+            <StatTile
+              label="Tokens in this window"
+              value={formatCompactCount(windowTokens)}
+              detail={<SourceTags sourceIds={['claude-code-otel']} note="Claude Code only" />}
+            />
           </Grid>
           <SessionsTable
             overview={overview}

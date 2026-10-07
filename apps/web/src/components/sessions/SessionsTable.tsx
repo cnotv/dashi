@@ -3,6 +3,7 @@ import { Badge, Card, Flex, IconButton, Link, Text, Tooltip } from '@radix-ui/th
 import { createColumnHelper } from '@tanstack/react-table'
 import type { AgentSessionSummary, SessionsOverview } from '@dashi/contracts'
 import { Link as RouterLink } from 'react-router'
+import { SourceTags } from '@/components/charts/SourceTags'
 import { ChartLegend } from '@/components/charts/ChartLegend'
 import { SortableTable } from '@/components/tables/SortableTable'
 import type { sortableTableFeatures } from '@/components/tables/sortable-table-features'
@@ -86,7 +87,14 @@ const sessionColumns = (now: number, onOpenChat: (session: AgentSessionSummary) 
       id: 'tokens',
       header: 'Tokens',
       sortFn: 'basic',
-      cell: ({ getValue }) => <span title={`${formatFullCount(getValue())} tokens`}>{formatCompactCount(getValue())}</span>,
+      cell: ({ row, getValue }) =>
+        row.original.provider === 'codex' ? (
+          <Text color="gray" title="Codex sends no token metrics">
+            n/a
+          </Text>
+        ) : (
+          <span title={`${formatFullCount(getValue())} tokens`}>{formatCompactCount(getValue())}</span>
+        ),
     }),
   ])
 
@@ -109,9 +117,12 @@ export const SessionsTable = ({ overview, isStale, onOpenChat }: SessionsTablePr
     <Card size="1">
       <Flex direction="column" gap="3" className={isStale ? 'chart-stale' : undefined}>
         <Flex justify="between" align="center" gap="3" wrap="wrap" className="card-heading">
-          <Text size="2" weight="medium">
-            Sessions over time
-          </Text>
+          <Flex direction="column" gap="1">
+            <Text size="2" weight="medium">
+              Sessions over time
+            </Text>
+            <SourceTags sourceIds={['claude-code-hooks', 'codex-notify', 'claude-code-otel']} note="Tokens: Claude Code only" />
+          </Flex>
           <ChartLegend entries={timelineLegendEntries} />
         </Flex>
         {lanes.length === 0 && (

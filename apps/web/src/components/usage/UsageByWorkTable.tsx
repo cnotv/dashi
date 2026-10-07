@@ -1,6 +1,7 @@
 import { Card, Flex, Link, Text } from '@radix-ui/themes'
 import { createColumnHelper } from '@tanstack/react-table'
 import type { UsageByWork } from '@dashi/contracts'
+import { SourceTags } from '@/components/charts/SourceTags'
 import { SortableTable } from '@/components/tables/SortableTable'
 import type { sortableTableFeatures } from '@/components/tables/sortable-table-features'
 import {
@@ -92,9 +93,12 @@ const workColumns = (grandTotal: number) =>
 export const UsageByWorkTable = ({ rows, grandTotal }: { rows: UsageByWork[]; grandTotal: number }) => (
   <Card size="1">
     <Flex direction="column" gap="2">
-      <Text size="2" weight="medium" className="card-heading">
-        By pull request and branch
-      </Text>
+      <Flex direction="column" gap="1" className="card-heading">
+        <Text size="2" weight="medium">
+          By pull request and branch
+        </Text>
+        <SourceTags sourceIds={['claude-code-otel', 'claude-code-hooks', 'github-graphql']} note="Tokens per branch, matched to its open pull request" />
+      </Flex>
       <SortableTable
         columns={workColumns(grandTotal)}
         rows={rows}
