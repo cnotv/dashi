@@ -87,6 +87,8 @@ describe('launchPlanFor', () => {
       'agent-generative-art-0123abcd',
       '-c',
       '/Users/me/dashi/worktrees/generative-art-0123abcd',
+      '-e',
+      `DASHI_START_ID=${claimOf().start.startId}`,
       'claude',
       '--remote-control',
       '--name',
@@ -97,7 +99,7 @@ describe('launchPlanFor', () => {
 
   it('runs an unattended session with the chosen permission mode', () => {
     const plan = launchPlanFor(claimOf({ target: 'laptop-headless', permissionMode: 'acceptEdits' }), paths)
-    expect(plan).toMatchObject({ mode: 'detached', command: 'claude', cwd: paths.worktreePath })
+    expect(plan).toMatchObject({ mode: 'detached', command: 'claude', cwd: paths.worktreePath, environment: { DASHI_START_ID: claimOf().start.startId } })
     expect(plan.args).toEqual(['-p', claimOf().prompt, '--permission-mode', 'acceptEdits', '--output-format', 'json'])
   })
 
@@ -107,6 +109,7 @@ describe('launchPlanFor', () => {
       command: 'claude',
       args: ['--cloud', claimOf().prompt],
       cwd: '/Users/me/dashi/repos/cnotv/generative-art',
+      environment: { DASHI_START_ID: claimOf().start.startId },
     })
   })
 })

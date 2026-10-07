@@ -34,4 +34,15 @@ export const dataSources: Record<DataSourceId, DataSource> = {
       "Dashi's runner on your machine starts sessions from the board and, while a chat is open, sends the session's transcript from ~/.claude/projects.",
     docsUrl: 'https://github.com/cnotv/dashi#the-laptop-runner',
   },
+  'workflow-status-hook': {
+    label: 'Workflow plugin hook',
+    description:
+      "The workflow plugin's status hook reads, inside each session, what launched it and what pays for it (the entrypoint, the launching app, which API key or provider is set), and sends the kinds with every event. A key's value is never sent.",
+    docsUrl: 'https://github.com/cnotv/agent-base#what-the-reporter-sends',
+  },
+  'dashi-machine-token': {
+    label: 'Dashi machine token',
+    description: 'Each connected machine reports with its own ingest token, so the tokens it sends are counted under its name.',
+    docsUrl: 'https://github.com/cnotv/dashi#set-up-a-machine-with-the-dashi-cli',
+  },
 }

@@ -212,6 +212,9 @@ export interface AgentSessionSummary {
   startedAt: string
   lastEventAt: string
   tokens: TokenTotals
+  // What started the session, such as "Dashi board (laptop runner)" or "CodePilot", and what paid for it.
+  triggeredBy: string
+  billedThrough: string
 }
 
 export interface SessionTimelineSegment {
@@ -239,6 +242,9 @@ export interface UsageByWork {
   branch: string | null
   issueNumber: number | null
   pullRequestNumber: number | null
+  // What started its sessions and what paid for them, the largest share first.
+  triggeredBy: string[]
+  billedThrough: string[]
   tokens: TokenTotals
   sessionCount: number
 }
@@ -253,6 +259,16 @@ export interface UsageByModel {
   tokens: TokenTotals
 }
 
+// Tokens grouped by where they were spent: what triggered the session, what paid for it, the machine, or the agent.
+export interface UsageBySource {
+  sourceKey: string
+  label: string
+  // Why a row is partial or unknown, such as an agent that sends no token metrics.
+  note: string | null
+  sessionCount: number
+  tokens: TokenTotals
+}
+
 export interface UsageReport {
   windowStartedAt: string
   generatedAt: string
@@ -262,6 +278,10 @@ export interface UsageReport {
   byWork: UsageByWork[]
   byDay: UsageByDay[]
   byModel: UsageByModel[]
+  byTrigger: UsageBySource[]
+  byBilling: UsageBySource[]
+  byMachine: UsageBySource[]
+  byAgent: UsageBySource[]
 }
 
 export interface MachineTokenSummary {

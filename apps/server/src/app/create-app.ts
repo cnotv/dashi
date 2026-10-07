@@ -123,7 +123,7 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnvironment> =
 
   app.route('/api/auth', createAuthRoutes(auth))
   app.route('/api', createIngestRoutes(activity))
-  app.route('/api', createActivityRoutes(activity, findPullRequest))
+  app.route('/api', createActivityRoutes(activity, findPullRequest, dependencies.sessionStarts.startStore.listStartsSince))
   const markPullRequestDraft: PullRequestDraftMarker = async (session, repository, pullRequestNumber) => {
     const githubToken = session?.githubToken ?? vault.readSecretValue('github-token')
     if (githubToken === null) return

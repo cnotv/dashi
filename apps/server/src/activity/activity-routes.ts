@@ -6,7 +6,7 @@ import type { AppEnvironment } from '../app/types.ts'
 import { buildSessionsOverview, buildUsageReport, type PullRequestFinder } from './aggregate.ts'
 import { agentEventFrom, tokenUsagePointsFrom } from './ingest.ts'
 import { hookPayloadSchema, otlpMetricsSchema } from './schema.ts'
-import type { ActivityDependencies } from './types.ts'
+import type { ActivityDependencies, UsageStart } from './types.ts'
 
 // Reached by Claude Code and Codex rather than a browser, so they carry an ingest token
 // instead of a sign-in; the session guard lets exactly these through.
@@ -25,12 +25,14 @@ const clampedNumber = (value: string | undefined, fallback: number, minimum: num
  * @returns The routes, mounted under /api.
  */
 export const createIngestRoutes = ({ activityStore, ingestTokens, now }: ActivityDependencies) => {
-  const routes = new Hono<AppEnvironment>()
-  const requireIngestToken = createMiddleware(async (context, next) =>
-    ingestTokens.verifyToken(bearerTokenOf(context.req.header('authorization'))) !== null
-      ? next()
-      : context.json({ error: 'Send a valid ingest token' }, 401),
-  )
+  const routes = new Hono<AppEnvironment & { Variables: { ingestTokenId: string } }>()
+  // The token's id is kept so usage can be told apart by the machine that reported it.
+  const requireIngestToken = createMiddleware<{ Variables: { ingestTokenId: string } }>(async (context, next) => {
+    const ingestToken = ingestTokens.verifyToken(bearerTokenOf(context.req.header('authorization')))
+    if (ingestToken === null) return context.json({ error: 'Send a valid ingest token' }, 401)
+    context.set('ingestTokenId', ingestToken.tokenId)
+    return next()
+  })
 
   routes.post('/events', requireIngestToken, limitTo(64 * 1024), async (context) => {
     const parsedPayload = hookPayloadSchema.safeParse(await readJsonBody(context.req.raw))
@@ -42,6 +44,12 @@ export const createIngestRoutes = ({ activityStore, ingestTokens, now }: Activit
         branch: context.req.header('x-agent-branch'),
         remote: context.req.header('x-agent-remote'),
         cwd: context.req.header('x-agent-cwd'),
+        launcher: context.req.header('x-agent-launcher'),
+        terminal: context.req.header('x-agent-terminal'),
+        app: context.req.header('x-agent-app'),
+        billing: context.req.header('x-agent-billing'),
+        apiHost: context.req.header('x-agent-api-host'),
+        startId: context.req.header('x-dashi-start-id'),
       },
       new Date(now()).toISOString(),
     )
@@ -52,7 +60,7 @@ export const createIngestRoutes = ({ activityStore, ingestTokens, now }: Activit
   routes.post('/telemetry/v1/metrics', requireIngestToken, limitTo(1024 * 1024), async (context) => {
     const parsedRequest = otlpMetricsSchema.safeParse(await readJsonBody(context.req.raw))
     if (!parsedRequest.success) return context.json({ error: 'Not an OTLP metrics request' }, 400)
-    activityStore.recordTokenUsage(tokenUsagePointsFrom(parsedRequest.data, new Date(now()).toISOString()))
+    activityStore.recordTokenUsage(tokenUsagePointsFrom(parsedRequest.data, new Date(now()).toISOString()), context.get('ingestTokenId'))
     // An empty ExportMetricsServiceResponse: everything was accepted.
     return context.json({})
   })
@@ -62,12 +70,15 @@ export const createIngestRoutes = ({ activityStore, ingestTokens, now }: Activit
 
 /**
  * Builds the routes the dashboard reads sessions and usage from, and manages ingest tokens with.
+ * @param dependencies The activity store, the ingest tokens and the clock.
  * @param findPullRequest Finds the open pull request of a branch, so usage can be shown per pull request.
+ * @param listStartsSince Lists the board's starts since a time, so usage can tell sessions it started.
  * @returns The routes, mounted under /api.
  */
 export const createActivityRoutes = (
   { activityStore, ingestTokens, now }: ActivityDependencies,
   findPullRequest: PullRequestFinder,
+  listStartsSince: (since: string) => UsageStart[],
 ) => {
   const routes = new Hono<AppEnvironment>()
   const isoHoursAgo = (hours: number): string => new Date(now() - hours * hourMilliseconds).toISOString()
@@ -81,6 +92,7 @@ export const createActivityRoutes = (
         activityStore.readTokenSamplesSince(windowStartedAt),
         windowStartedAt,
         now(),
+        { starts: listStartsSince(windowStartedAt) },
       ),
     )
   })
@@ -94,6 +106,10 @@ export const createActivityRoutes = (
         findPullRequest,
         windowStartedAt,
         now(),
+        {
+          machineLabelOf: (tokenId) => ingestTokens.listTokens().find((ingestToken) => ingestToken.tokenId === tokenId)?.label ?? null,
+          starts: listStartsSince(windowStartedAt),
+        },
       ),
     )
   })

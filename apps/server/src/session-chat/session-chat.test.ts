@@ -70,6 +70,7 @@ describe('session chat', () => {
       branch: null,
       title: null,
       folder: null,
+      origin: { launcher: null, terminal: null, launchingApp: null, billing: null, apiHost: null, startId: null },
       occurredAt: new Date(clock.now).toISOString(),
     })
     await readChat()

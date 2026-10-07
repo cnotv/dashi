@@ -33,6 +33,8 @@ export const connectSnippet = ({ dashboardUrl, ingestToken }: ConnectSnippetInpu
         OTEL_EXPORTER_OTLP_PROTOCOL: 'http/json',
         OTEL_EXPORTER_OTLP_ENDPOINT: `${baseUrl}/api/telemetry`,
         OTEL_EXPORTER_OTLP_HEADERS: `Authorization=Bearer ${ingestToken}`,
+        // Off by default; Usage needs it to tell a terminal session from VS Code or the Agent SDK.
+        OTEL_METRICS_INCLUDE_ENTRYPOINT: 'true',
       },
     },
     null,

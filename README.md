@@ -173,9 +173,46 @@ sends.
 | [Claude Code OpenTelemetry](https://code.claude.com/docs/en/monitoring-usage) | The `claude_code.token.usage` counter, per session, model and token type, over OTLP/HTTP JSON | `POST /api/telemetry/v1/metrics` | Every token count, on Sessions and Usage |
 | [GitHub GraphQL API](https://docs.github.com/en/graphql) | Issues and pull requests, for the board | Fetched by the server | The pull request of a branch on Usage, read from boards already fetched |
 | [Claude Code routines](https://code.claude.com/docs/en/routines) | A session started on claude.ai | Called by the server | Cloud starts in Started from the board |
-| [Laptop runner](#the-laptop-runner) | Starts run on your machine, and an open chat's transcript from `~/.claude/projects` | Polls `/api/runner/*` | Laptop starts, and the session chat |
+| [Laptop runner](#the-laptop-runner) | Starts run on your machine, and an open chat's transcript from `~/.claude/projects` | Polls `/api/runner/*` | Laptop starts, the session chat, and `DASHI_START_ID` on the sessions it starts |
+| [Workflow plugin hook](https://github.com/cnotv/agent-base#what-the-reporter-sends) | What launched each session and what pays for it, as kinds: entrypoint, terminal, launching app, billing kind, API host, Dashi start id | `POST /api/events` headers | Triggered by and Billed through on Usage and Sessions |
+| [Dashi machine token](#set-up-a-machine-with-the-dashi-cli) | Which connected machine sent a report | Every ingest request | By machine on Usage |
 
-Codex sends no token metrics, so Codex sessions show n/a for tokens and are not in Usage.
+Codex sends no token metrics, so Codex sessions show n/a for tokens, and Usage lists them under By agent with no tokens.
+
+### Where the tokens were spent
+
+Usage says what spent the tokens four ways. The table by pull request and branch, and each session
+on the Sessions page, show the same "triggered by" and "billed through" labels.
+
+- **Triggered by**, in this order:
+  1. **The Dashi board** (laptop runner or Claude cloud): the runner sets `DASHI_START_ID` on the
+     sessions it starts. Older runners are recognised by the start's worktree folder; routines by
+     their cloud session.
+  2. **An app such as CodePilot:** the app that launched Claude Code.
+  3. **An editor** (VS Code, Cursor, Zed).
+  4. **The Agent SDK.**
+  5. **A terminal** (iTerm, Terminal, Warp, Ghostty and others).
+- **Billed through:**
+  - A Claude login, with its email when the metrics carry one (a subscription or a Console
+    account).
+  - An Anthropic API key, or OpenRouter (or another host) through `ANTHROPIC_BASE_URL`.
+  - Amazon Bedrock, Google Vertex AI or Microsoft Foundry.
+  - For Codex: an OpenAI API key or a ChatGPT login.
+- **By machine:** the connected machine whose ingest token reported the tokens.
+- **By agent:** Claude Code and Codex. Codex sends no token metrics, so its sessions are counted
+  with no tokens.
+
+Triggered by and billed through come from the workflow plugin's status hook (0.5.0 or later). It
+runs inside every session and reads them from the session's environment:
+- `CLAUDE_CODE_ENTRYPOINT`
+- `TERM_PROGRAM`
+- the launching app (the macOS bundle id it hands down, or the nearest ancestor process that is
+  not a shell)
+- which of `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `CLAUDE_CODE_USE_BEDROCK` and the like are set
+
+It sends kinds and hosts only, never a key's value. Where the hook said nothing, Claude Code's
+metric attributes fill in (`app.entrypoint`, which `dashi connect` turns on, and `user.email`).
+Tokens recorded before Dashi asked read "Not reported"; update the plugin to fill them in from then on.
 
 Both are fed by the machines running Claude Code, not read from them. The quick way to connect
 one is the `dashi` CLI, below; the steps after it do the same by hand.

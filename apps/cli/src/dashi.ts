@@ -63,6 +63,7 @@ const dashiEnvironmentKeys = [
   'OTEL_EXPORTER_OTLP_PROTOCOL',
   'OTEL_EXPORTER_OTLP_ENDPOINT',
   'OTEL_EXPORTER_OTLP_HEADERS',
+  'OTEL_METRICS_INCLUDE_ENTRYPOINT',
 ]
 
 const usage = `dashi: connect this machine to a Dashi dashboard
@@ -155,6 +156,8 @@ export const claudeSettingsFor = (dashboardUrl: string, ingestToken: string): Js
     OTEL_EXPORTER_OTLP_PROTOCOL: 'http/json',
     OTEL_EXPORTER_OTLP_ENDPOINT: `${dashboardUrl}/api/telemetry`,
     OTEL_EXPORTER_OTLP_HEADERS: `Authorization=Bearer ${ingestToken}`,
+    // Off by default; Usage needs it to tell a terminal session from VS Code or the Agent SDK.
+    OTEL_METRICS_INCLUDE_ENTRYPOINT: 'true',
   },
 })
 

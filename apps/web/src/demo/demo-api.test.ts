@@ -82,6 +82,15 @@ describe('createDemoApi', () => {
     expect(dailyTotal).toBe(report.totals.total)
   })
 
+  it('splits the demo usage by trigger, billing, machine and agent into parts of the total, rounding aside', async () => {
+    const report = await createDemoApi().readUsage(30)
+    const roundingAllowance = 20
+    const listTotals = [report.byTrigger, report.byBilling, report.byMachine, report.byAgent].map((rows) =>
+      rows.reduce((sum, row) => sum + row.tokens.total, 0),
+    )
+    expect(listTotals.every((listTotal) => Math.abs(listTotal - report.totals.total) <= roundingAllowance)).toBe(true)
+  })
+
   it('creates and revokes ingest tokens in memory', async () => {
     const demoApi = createDemoApi()
     const createdToken = await demoApi.createMachineToken('runner', 'Desk')

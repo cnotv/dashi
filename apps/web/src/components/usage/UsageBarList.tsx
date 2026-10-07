@@ -1,4 +1,5 @@
 import { Card, Flex, Text } from '@radix-ui/themes'
+import type { ReactNode } from 'react'
 import { formatCompactCount, formatFullCount, formatPercent } from '@/lib/presentation'
 import { shareOf } from '@/lib/usage-chart'
 
@@ -14,20 +15,31 @@ export interface UsageBarRow {
 
 interface UsageBarListProps {
   title: string
+  // What decides the grouping, for a list whose title alone does not say.
+  description?: string
+  sources?: ReactNode
   rows: UsageBarRow[]
   grandTotal: number
   isStale: boolean
 }
 
 /** Horizontal bars of token totals, labelled with the value and its share of the whole. */
-export const UsageBarList = ({ title, rows, grandTotal, isStale }: UsageBarListProps) => {
+export const UsageBarList = ({ title, description, sources, rows, grandTotal, isStale }: UsageBarListProps) => {
   const largestTotal = Math.max(1, ...rows.map((row) => row.total))
   return (
     <Card size="2">
       <Flex direction="column" gap="4" className={isStale ? 'chart-stale' : undefined}>
-        <Text size="2" weight="medium">
-          {title}
-        </Text>
+        <Flex direction="column" gap="1">
+          <Text size="2" weight="medium">
+            {title}
+          </Text>
+          {description && (
+            <Text size="1" color="gray">
+              {description}
+            </Text>
+          )}
+          {sources}
+        </Flex>
         {rows.length === 0 ? (
           <Text size="2" color="gray">
             No tokens recorded in this period.
@@ -38,10 +50,10 @@ export const UsageBarList = ({ title, rows, grandTotal, isStale }: UsageBarListP
               {rows.map((row) => (
                 <li key={row.rowKey} className="bar-list-row">
                   <div className="bar-list-label">
-                    <Text as="div" size="2" truncate>
+                    <Text as="div" size="2" truncate title={row.label}>
                       {row.label}
                     </Text>
-                    <Text as="div" size="1" color="gray" truncate>
+                    <Text as="div" size="1" color="gray">
                       {row.detail}
                     </Text>
                   </div>

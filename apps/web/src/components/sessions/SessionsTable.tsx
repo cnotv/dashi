@@ -16,7 +16,7 @@ import {
   sessionStateColors,
   sessionStateLabels,
 } from '@/lib/presentation'
-import { layoutSessionTimeline, sessionDetail, sessionLabel, sessionStateOrder } from '@/lib/session-timeline'
+import { layoutSessionTimeline, sessionDetail, sessionLabel, sessionOriginLine, sessionStateOrder } from '@/lib/session-timeline'
 import { formatTickTime, SessionTimelineAxis, SessionTimelineTrack, timelineLegendEntries } from './SessionTimeline'
 
 const columnHelper = createColumnHelper<typeof sortableTableFeatures, AgentSessionSummary>()
@@ -51,6 +51,11 @@ const sessionColumns = (now: number, onOpenChat: (session: AgentSessionSummary) 
           <Text as="div" size="1" color="gray">
             {sessionDetail(row.original)}
           </Text>
+          {sessionOriginLine(row.original) !== null && (
+            <Text as="div" size="1" color="gray">
+              {sessionOriginLine(row.original)}
+            </Text>
+          )}
         </>
       ),
     }),

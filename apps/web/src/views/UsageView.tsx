@@ -1,6 +1,6 @@
 import { Callout, Flex, Grid, SegmentedControl } from '@radix-ui/themes'
 import { useSearchParams } from 'react-router'
-import type { UsageReport } from '@dashi/contracts'
+import type { UsageBySource, UsageReport } from '@dashi/contracts'
 import { SourceTags } from '@/components/charts/SourceTags'
 import { StatTile } from '@/components/charts/StatTile'
 import { UsageBarList, type UsageBarRow } from '@/components/usage/UsageBarList'
@@ -37,7 +37,15 @@ const modelRows = (report: UsageReport): UsageBarRow[] =>
     total: usage.tokens.total,
   }))
 
-/** The Usage page: tokens for all repositories, then by day, repository, model and pull request. */
+const sourceRows = (rows: UsageBySource[]): UsageBarRow[] =>
+  rows.map((usage) => ({
+    rowKey: usage.sourceKey,
+    label: usage.label,
+    detail: usage.note === null ? sessionsLabel(usage.sessionCount) : `${sessionsLabel(usage.sessionCount)} · ${usage.note}`,
+    total: usage.tokens.total,
+  }))
+
+/** The Usage page: tokens for all repositories, then by day, where they were spent, repository, model and pull request. */
 export const UsageView = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const periodDays = periodDaysFrom(searchParams.get('days'))
@@ -84,6 +92,40 @@ export const UsageView = () => {
             <StatTile label="Cache write" value={formatCompactCount(report.totals.cacheCreation)} />
           </Grid>
           <UsageByDayChart days={fillMissingDays(report.byDay, report.windowStartedAt, report.generatedAt)} isStale={isStale} />
+          <Grid columns={{ initial: '1', md: '2' }} gap="4">
+            <UsageBarList
+              title="Triggered by"
+              description="What started each session: the Dashi board, an app such as CodePilot, an editor, the Agent SDK or a terminal."
+              sources={<SourceTags sourceIds={['workflow-status-hook', 'laptop-runner', 'claude-code-routines', 'claude-code-otel']} />}
+              rows={sourceRows(report.byTrigger)}
+              grandTotal={report.totals.total}
+              isStale={isStale}
+            />
+            <UsageBarList
+              title="Billed through"
+              description="What paid for the tokens: a Claude login (subscription or Console), an API key, OpenRouter or a cloud provider."
+              sources={<SourceTags sourceIds={['workflow-status-hook', 'claude-code-otel']} />}
+              rows={sourceRows(report.byBilling)}
+              grandTotal={report.totals.total}
+              isStale={isStale}
+            />
+            <UsageBarList
+              title="By machine"
+              description="The connected machine whose Dashi token reported the tokens."
+              sources={<SourceTags sourceIds={['dashi-machine-token', 'claude-code-otel']} />}
+              rows={sourceRows(report.byMachine)}
+              grandTotal={report.totals.total}
+              isStale={isStale}
+            />
+            <UsageBarList
+              title="By agent"
+              description="Claude Code reports its tokens; Codex sends none, so its sessions are counted without them."
+              sources={<SourceTags sourceIds={['claude-code-hooks', 'codex-notify', 'claude-code-otel']} />}
+              rows={sourceRows(report.byAgent)}
+              grandTotal={report.totals.total}
+              isStale={isStale}
+            />
+          </Grid>
           <Grid columns={{ initial: '1', md: '2' }} gap="4">
             <UsageBarList title="By repository" rows={repositoryRows(report)} grandTotal={report.totals.total} isStale={isStale} />
             <UsageBarList title="By model" rows={modelRows(report)} grandTotal={report.totals.total} isStale={isStale} />

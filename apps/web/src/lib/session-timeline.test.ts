@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentSessionSummary, SessionsOverview } from '@dashi/contracts'
-import { buildTimeTicks, layoutSessionTimeline, sessionLabel } from './session-timeline'
+import { buildTimeTicks, layoutSessionTimeline, sessionLabel, sessionOriginLine } from './session-timeline'
 
 const zeroTokens = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0, total: 0 }
 
@@ -16,6 +16,8 @@ const sessionWith = (overrides: Partial<AgentSessionSummary>): AgentSessionSumma
   startedAt: '2026-09-29T00:00:00.000Z',
   lastEventAt: '2026-09-29T09:00:00.000Z',
   tokens: zeroTokens,
+  triggeredBy: 'Not reported',
+  billedThrough: 'Not reported',
   ...overrides,
 })
 
@@ -90,5 +92,16 @@ describe('sessionLabel', () => {
   it('names a session by its repository, or by its id when it has none', () => {
     expect(sessionLabel(sessionWith({}))).toBe('example')
     expect(sessionLabel(sessionWith({ repository: null, sessionId: 'abcdef1234567' }))).toBe('Session abcdef12')
+  })
+})
+
+describe('sessionOriginLine', () => {
+  it('says what started a session and what paid for it, leaving out what was not reported', () => {
+    expect(sessionOriginLine(sessionWith({ triggeredBy: 'CodePilot', billedThrough: 'Anthropic API key' }))).toBe(
+      'via CodePilot · Anthropic API key',
+    )
+    expect(sessionOriginLine(sessionWith({ triggeredBy: 'Terminal (iTerm)' }))).toBe('via Terminal (iTerm)')
+    expect(sessionOriginLine(sessionWith({ billedThrough: 'OpenRouter' }))).toBe('paid through OpenRouter')
+    expect(sessionOriginLine(sessionWith({}))).toBeNull()
   })
 })

@@ -15,6 +15,7 @@ describe('connectSnippet', () => {
         OTEL_EXPORTER_OTLP_PROTOCOL: 'http/json',
         OTEL_EXPORTER_OTLP_ENDPOINT: 'https://agents.example.com/api/telemetry',
         OTEL_EXPORTER_OTLP_HEADERS: 'Authorization=Bearer adt_example',
+        OTEL_METRICS_INCLUDE_ENTRYPOINT: 'true',
       },
     })
   })

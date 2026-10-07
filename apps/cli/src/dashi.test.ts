@@ -78,6 +78,7 @@ describe('Claude Code settings', () => {
       DASHI_TOKEN: ingestToken,
       OTEL_EXPORTER_OTLP_ENDPOINT: `${dashboardUrl}/api/telemetry`,
       OTEL_EXPORTER_OTLP_HEADERS: `Authorization=Bearer ${ingestToken}`,
+      OTEL_METRICS_INCLUDE_ENTRYPOINT: 'true',
     })
   })
 
