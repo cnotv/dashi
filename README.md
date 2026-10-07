@@ -131,7 +131,10 @@ and Close). API keys for
 Anthropic, OpenAI and OpenRouter are stored the same way, for sessions that are not on a
 subscription, and so is a Netlify personal access token for the board's Netlify button.
 
-Each credential's dialog links to the page where that token or key is created.
+Each credential's dialog links to the page where that token or key is created. Under each credential, **How
+Dashi uses it** lists what Dashi does with it, every API call it makes, the permissions the token
+needs, and links to that API's documentation. The Anthropic, OpenAI and OpenRouter keys are marked
+**Not used yet**: Dashi keeps them but no session reads them, and only Test calls their API.
 
 A credential can hold several tokens, each with a name, such as a personal and a work GitHub
 token. A credential's tokens are a radio group: the selected one, marked **In use**, is the one
