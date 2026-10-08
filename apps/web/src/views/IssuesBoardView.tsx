@@ -5,6 +5,7 @@ import { Link as RouterLink, useSearchParams } from 'react-router'
 import { BoardCardItem } from '@/components/board/BoardCardItem'
 import { NetlifyControl } from '@/components/board/NetlifyControl'
 import { NewIssueDialog } from '@/components/board/NewIssueDialog'
+import { WorkflowSkillsPrompt } from '@/components/board/WorkflowSkillsPrompt'
 import { useBoards, useRepositories } from '@/hooks/useBoard'
 import { useCollapsedColumns } from '@/hooks/useCollapsedColumns'
 import { mergeBoards } from '@/lib/board-merge'
@@ -16,6 +17,7 @@ const allRepositoriesKey = 'all'
 /**
  * The Issues page: issues and pull requests as a board, one column per status, for every
  * configured repository at once unless the address names one with `?repository=owner/name`.
+ * Above it, the question to add agent-base's workflow skills to a shown repository that lacks them.
  */
 export const IssuesBoardView = () => {
   const { repositories, errorMessage: repositoriesError } = useRepositories()
@@ -77,6 +79,8 @@ export const IssuesBoardView = () => {
           <NewIssueDialog defaultRepository={showsAllRepositories ? null : selectedRepository} />
         </Flex>
       </Flex>
+
+      <WorkflowSkillsPrompt repositories={shownRepositories} />
 
       {loadError && (
         <Callout.Root color="red" variant="surface">

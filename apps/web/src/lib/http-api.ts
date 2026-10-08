@@ -89,6 +89,8 @@ export const createHttpApi = (apiBaseUrl: string): DashboardApi => {
     readPullRequestFiles: (repository, pullRequest) => requestJson(`${repositoryPath(repository)}/pulls/${pullRequest.number}/files`),
     readNetlifyStatus: (repository) => requestJson(`${repositoryPath(repository)}/netlify`),
     enableNetlify: (repository) => sendJson('POST', `${repositoryPath(repository)}/netlify`),
+    readWorkflowSkills: (repository) => requestJson(`${repositoryPath(repository)}/workflow-skills`),
+    addWorkflowSkills: (repository) => sendJson('POST', `${repositoryPath(repository)}/workflow-skills`),
     pullRequestMediaUrl: (repository, pullRequest, kind) =>
       `${apiBaseUrl}${repositoryPath(repository)}/pulls/${pullRequest.number}/media/${kind}${pullRequest.headSha ? `?sha=${encodeURIComponent(pullRequest.headSha)}` : ''}`,
   }

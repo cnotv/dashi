@@ -38,6 +38,8 @@ import type {
   StartWorkflow,
   StartOptions,
   UsageReport,
+  WorkflowSkillsPullRequest,
+  WorkflowSkillsStatus,
   VaultState,
 } from '@dashi/contracts'
 
@@ -90,6 +92,11 @@ export interface LogoParticle {
   concentration: number
 }
 
+export interface RepositoryWorkflowSkills {
+  repository: RepositoryReference
+  status: WorkflowSkillsStatus
+}
+
 export interface RepositoryBoardCard {
   card: BoardCard
   repository: RepositoryReference
@@ -136,6 +143,8 @@ export interface DashboardApi {
   readPullRequestFiles: (repository: RepositoryReference, pullRequest: PullRequestSummary) => Promise<PullRequestFiles>
   readNetlifyStatus: (repository: RepositoryReference) => Promise<NetlifyStatus>
   enableNetlify: (repository: RepositoryReference) => Promise<NetlifyStatus>
+  readWorkflowSkills: (repository: RepositoryReference) => Promise<WorkflowSkillsStatus>
+  addWorkflowSkills: (repository: RepositoryReference) => Promise<WorkflowSkillsPullRequest>
   readSessions: (hours: number) => Promise<SessionsOverview>
   readSessionChat: (target: ChatTarget) => Promise<SessionChat>
   sendChatMessage: (target: ChatTarget, text: string) => Promise<ChatDelivery>
