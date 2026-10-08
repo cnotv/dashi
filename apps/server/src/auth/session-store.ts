@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import type { SignedInUser } from '@dashi/contracts'
 import { createRandomToken } from './pkce.ts'
 import type { DashboardSession, PendingSignIn, SessionStore } from './types.ts'
 
@@ -32,15 +31,21 @@ export const createSessionStore = (now: () => number): SessionStore => {
   }
 
   return {
-    createSession: (user: SignedInUser, githubToken: string, expiresAt: number) => {
+    createSession: (user, credentials, expiresAt) => {
       const sessionId = createRandomToken()
-      memory.sessions = withoutExpired(memory.sessions, now()).set(hashSessionId(sessionId), { user, githubToken, expiresAt })
+      memory.sessions = withoutExpired(memory.sessions, now()).set(hashSessionId(sessionId), { user, ...credentials, expiresAt })
       return sessionId
     },
     readSession: (sessionId) => {
       if (sessionId === undefined) return null
       const session = memory.sessions.get(hashSessionId(sessionId))
       return session !== undefined && session.expiresAt > now() ? session : null
+    },
+    replaceCredentials: (sessionId, credentials, expiresAt) => {
+      if (sessionId === undefined) return
+      const key = hashSessionId(sessionId)
+      const session = memory.sessions.get(key)
+      if (session !== undefined) memory.sessions.set(key, { ...session, ...credentials, expiresAt })
     },
     removeSession: (sessionId) => {
       if (sessionId !== undefined) memory.sessions.delete(hashSessionId(sessionId))

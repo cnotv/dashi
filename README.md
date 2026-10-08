@@ -36,7 +36,9 @@ accept another origin yet, so the UI it serves itself is the one to use.
 Signing in does two things: it is the lock on a cloud deployment, and it is how the dashboard
 reads GitHub, with your own token, so no GitHub token has to be saved under Credentials. It
 uses a GitHub App rather than an OAuth App, because an App's user token can only read what the
-App is allowed to on the repositories it is installed on, and it expires after eight hours; an
+App is allowed to on the repositories it is installed on, and it expires after eight hours, which
+the dashboard renews with the App's refresh token while you use it (keep "Expire user authorization
+tokens" on); an
 OAuth App would need the `repo` scope, which can write to every private repository you have.
 
 Create the App once at <https://github.com/settings/apps/new>:
