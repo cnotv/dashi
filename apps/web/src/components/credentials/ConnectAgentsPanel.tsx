@@ -5,7 +5,7 @@ import { machineGuides } from '@/lib/credential-guides'
 import { useToast } from '@/hooks/useToast'
 import { connectSnippet, pluginInstallCommands } from '@/lib/connect-snippet'
 import { dashboardAddress } from '@/lib/runtime-configuration'
-import { CredentialGuideDetails } from './CredentialGuideDetails'
+import { CredentialGuideDialog } from './CredentialGuideDialog'
 import { CopyableSnippet } from './CopyableSnippet'
 
 
@@ -53,9 +53,12 @@ export const ConnectAgentsPanel = () => {
       <Flex direction="column" gap="4">
         <Flex justify="between" align="start" gap="4" wrap="wrap">
           <Flex direction="column" gap="1" maxWidth="620px">
-            <Heading as="h2" size="3" weight="medium">
-              Connect Claude Code
-            </Heading>
+            <Flex align="center" gap="2">
+              <Heading as="h2" size="3" weight="medium">
+                Connect Claude Code
+              </Heading>
+              <CredentialGuideDialog label="Connect Claude Code" guide={machineGuides['connect-claude-code']} />
+            </Flex>
             <Text size="2" color="gray">
               Each machine running Claude Code gets its own token. Its hooks report session state and its telemetry
               reports tokens used, and neither can read anything back from this dashboard.
@@ -119,8 +122,6 @@ export const ConnectAgentsPanel = () => {
             </Dialog.Content>
           </Dialog.Root>
         </Flex>
-
-        <CredentialGuideDetails guide={machineGuides['connect-claude-code']} />
 
         {ingestTokens.length > 0 && (
           <Table.Root variant="ghost" size="2">

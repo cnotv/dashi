@@ -817,8 +817,3 @@ body {
 .credential-call {
   overflow-wrap: anywhere;
 }
-
-/* A credential and the guide row under it read as one entry, so no line runs between them. */
-.credential-row > * {
-  box-shadow: none;
-}
