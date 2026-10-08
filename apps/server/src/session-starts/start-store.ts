@@ -85,6 +85,7 @@ export const createSessionStartStore = (database: DatabaseSync, now: () => numbe
         .all(since)
         .flatMap(startsOfRow),
     readStart,
+    deleteStart: (startId) => database.prepare('DELETE FROM session_starts WHERE start_id = ?').run(startId).changes === 1,
     // The oldest queued laptop start goes to whichever runner asks first; the state check in
     // the UPDATE keeps two runners asking at once from both getting it.
     claimNextLaptopStart: (runnerLabel) => {

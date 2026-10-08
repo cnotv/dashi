@@ -1,6 +1,8 @@
-import { ChatBubbleIcon, ExternalLinkIcon, InfoCircledIcon } from '@radix-ui/react-icons'
+import { ChatBubbleIcon, ExternalLinkIcon, InfoCircledIcon, TrashIcon } from '@radix-ui/react-icons'
 import { Badge, Card, Flex, Heading, IconButton, Link, Table, Text, Tooltip } from '@radix-ui/themes'
 import type { SessionStart } from '@dashi/contracts'
+import { useToast } from '@/hooks/useToast'
+import { dashboardApi } from '@/lib/api'
 import { SourceTags } from '@/components/charts/SourceTags'
 import { sessionStartStateColors, sessionStartStateLabels, startTargetLabels } from '@/lib/presentation'
 import { canChatWithStart } from '@/lib/session-chat'
@@ -12,11 +14,38 @@ interface SessionStartsListProps {
   windowStartedAt: string
   onOpenChat: (start: SessionStart) => void
   onOpenDetails: (start: SessionStart) => void
+  onDeleted: () => void
 }
 
 const windowLabelOf = (windowHours: number): string => (windowHours % 24 === 0 && windowHours > 24 ? `${windowHours / 24} days` : `${windowHours} hours`)
 
-const StartActions = ({ start, onOpenChat, onOpenDetails }: { start: SessionStart } & Pick<SessionStartsListProps, 'onOpenChat' | 'onOpenDetails'>) => (
+const shortIdOf = (start: SessionStart): string => start.startId.slice(0, 8)
+
+const DeleteStartButton = ({ start, onDeleted }: { start: SessionStart } & Pick<SessionStartsListProps, 'onDeleted'>) => {
+  const toast = useToast()
+  const remove = async (): Promise<void> => {
+    try {
+      await dashboardApi.deleteSessionStart(start.startId)
+      onDeleted()
+    } catch (deleteError) {
+      toast.notifyError(deleteError)
+    }
+  }
+  return (
+    <Tooltip content="Remove from this list">
+      <IconButton size="1" variant="ghost" color="gray" aria-label={`Remove ${start.repository.name} ${start.workflow} ${shortIdOf(start)}`} onClick={() => void remove()}>
+        <TrashIcon />
+      </IconButton>
+    </Tooltip>
+  )
+}
+
+const StartActions = ({
+  start,
+  onOpenChat,
+  onOpenDetails,
+  onDeleted,
+}: { start: SessionStart } & Pick<SessionStartsListProps, 'onOpenChat' | 'onOpenDetails' | 'onDeleted'>) => (
   <Flex gap="3" align="center">
     <Tooltip content="Details">
       <IconButton
@@ -36,6 +65,7 @@ const StartActions = ({ start, onOpenChat, onOpenDetails }: { start: SessionStar
         </IconButton>
       </Tooltip>
     )}
+    <DeleteStartButton start={start} onDeleted={onDeleted} />
   </Flex>
 )
 
@@ -67,7 +97,7 @@ const StartState = ({ start }: { start: SessionStart }) => (
  * runs, its state, its link or message, the button that opens its details, and for one running on
  * the laptop the button that opens its conversation.
  */
-export const SessionStartsList = ({ starts, windowHours, windowStartedAt, onOpenChat, onOpenDetails }: SessionStartsListProps) => {
+export const SessionStartsList = ({ starts, windowHours, windowStartedAt, onOpenChat, onOpenDetails, onDeleted }: SessionStartsListProps) => {
   const startsShown = startsSince(starts, windowStartedAt)
   return (
     <Card size="2">
@@ -97,7 +127,7 @@ export const SessionStartsList = ({ starts, windowHours, windowStartedAt, onOpen
               {startsShown.map((start) => (
                 <Table.Row key={start.startId} align="center">
                   <Table.Cell>
-                    <StartActions start={start} onOpenChat={onOpenChat} onOpenDetails={onOpenDetails} />
+                    <StartActions start={start} onOpenChat={onOpenChat} onOpenDetails={onOpenDetails} onDeleted={onDeleted} />
                   </Table.Cell>
                   <Table.Cell>
                     <Text size="1" color="gray">
@@ -108,6 +138,9 @@ export const SessionStartsList = ({ starts, windowHours, windowStartedAt, onOpen
                     <Text size="2">
                       {start.repository.name}
                       {start.issueNumber === null ? '' : ` #${start.issueNumber}`} · {start.workflow}
+                    </Text>
+                    <Text size="1" color="gray" as="div">
+                      ID {shortIdOf(start)}
                     </Text>
                   </Table.RowHeaderCell>
                   <Table.Cell>

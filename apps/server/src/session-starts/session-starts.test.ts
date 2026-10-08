@@ -151,6 +151,14 @@ describe('details, retry and routine tests', () => {
     expect(startStore.readStart(failedId)?.state).toBe('failed')
   })
 
+  it('deletes a start and says so when it is gone', async () => {
+    const { app, startStore } = createTestApp()
+    const startId = await startIdOf(await app.request(jsonRequest('POST', '/api/session-starts', startBody())))
+    expect((await app.request(jsonRequest('DELETE', `/api/session-starts/${startId}`, {}))).status).toBe(204)
+    expect(startStore.readStart(startId)).toBeNull()
+    expect((await app.request(jsonRequest('DELETE', `/api/session-starts/${startId}`, {}))).status).toBe(404)
+  })
+
   it('retries only failed starts', async () => {
     const { app } = createTestApp()
     const startId = await startIdOf(await app.request(jsonRequest('POST', '/api/session-starts', startBody())))

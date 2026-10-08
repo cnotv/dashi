@@ -148,6 +148,7 @@ export interface DashboardApi {
   startSession: (submission: SessionStartSubmission) => Promise<SessionStart>
   createIssue: (repository: RepositoryReference, newIssue: NewIssueRequest) => Promise<CreatedIssue>
   readSessionStart: (startId: string) => Promise<SessionStartDetails>
+  deleteSessionStart: (startId: string) => Promise<void>
   retrySessionStart: (startId: string) => Promise<SessionStart>
   testRoutine: (repository: RepositoryReference) => Promise<RoutineTestResult>
   readRunnerScriptInfo: () => Promise<ServedScriptInfo>

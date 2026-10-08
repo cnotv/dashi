@@ -69,6 +69,7 @@ export const createHttpApi = (apiBaseUrl: string): DashboardApi => {
     startSession: (submission) => sendJson('POST', '/api/session-starts', submission),
     createIssue: (repository, newIssue) => sendJson('POST', `${repositoryPath(repository)}/issues`, newIssue),
     readSessionStart: (startId) => requestJson(`/api/session-starts/${encodeURIComponent(startId)}`),
+    deleteSessionStart: (startId) => sendJson('DELETE', `/api/session-starts/${encodeURIComponent(startId)}`),
     retrySessionStart: (startId) => sendJson('POST', `/api/session-starts/${encodeURIComponent(startId)}/retry`),
     testRoutine: (repository) => sendJson('POST', `${repositoryPath(repository)}/routine/test`),
     readRunnerScriptInfo: () => requestJson('/api/runner/script-info'),

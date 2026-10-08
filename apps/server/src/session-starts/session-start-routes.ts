@@ -149,6 +149,11 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
     return context.json<SessionStartDetails>({ start, firstMessage: sessionPromptFor(start, []) })
   })
 
+  // Removes the record only; a session already running keeps running. For a start made by accident.
+  routes.delete('/session-starts/:startId', (context) =>
+    startStore.deleteStart(context.req.param('startId')) ? context.body(null, 204) : context.json({ error: 'Unknown start' }, 404),
+  )
+
   // A retry is a new start from the same request, so the failed one stays as the record of what
   // happened; its attachments were never kept, so it goes without them.
   routes.post('/session-starts/:startId/retry', async (context) => {

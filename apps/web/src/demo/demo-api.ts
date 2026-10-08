@@ -232,6 +232,9 @@ export const createDemoApi = (): DashboardApi => {
       const subject = start.issueNumber === null ? '' : ` https://github.com/${start.repository.owner}/${start.repository.name}/issues/${start.issueNumber}`
       return { start, firstMessage: [`/workflow:start ${start.workflow}${subject}`, start.note].filter((part) => part !== '').join('\n\n') }
     },
+    deleteSessionStart: async (startId) => {
+      demoMemory.sessionStarts = demoMemory.sessionStarts.filter((listedStart) => listedStart.startId !== startId)
+    },
     retrySessionStart: async (startId) => {
       const failedStart = demoMemory.sessionStarts.find((listedStart) => listedStart.startId === startId)
       if (failedStart === undefined) throw new Error('Unknown start')

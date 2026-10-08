@@ -68,6 +68,7 @@ export const SessionsView = () => {
           windowStartedAt={overview.windowStartedAt}
           onOpenChat={(start) => setChatSubject(chatSubjectOfStart(start))}
           onOpenDetails={setDetailedStart}
+          onDeleted={() => setStartsRevision((revision) => revision + 1)}
         />
       )}
       <StartDetailsDrawer
