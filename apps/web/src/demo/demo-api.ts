@@ -12,6 +12,7 @@ import type {
   SessionState,
   VaultState,
 } from '@dashi/contracts'
+import { sessionPromptFor } from '@dashi/contracts/first-message'
 import { repositoryKey } from '@/lib/presentation'
 import { chatKeyOf } from '@/lib/session-chat'
 import type { DashboardApi, DemoPullRequestOutcome } from '@/lib/types'
@@ -221,8 +222,7 @@ export const createDemoApi = (): DashboardApi => {
     readSessionStart: async (startId) => {
       const start = demoMemory.sessionStarts.find((listedStart) => listedStart.startId === startId)
       if (start === undefined) throw new Error('Unknown start')
-      const subject = start.issueNumber === null ? '' : ` https://github.com/${start.repository.owner}/${start.repository.name}/issues/${start.issueNumber}`
-      return { start, firstMessage: [`/workflow:start ${start.workflow}${subject}`, start.note].filter((part) => part !== '').join('\n\n') }
+      return { start, firstMessage: sessionPromptFor(start, []) }
     },
     retrySessionStart: async (startId) => {
       const failedStart = demoMemory.sessionStarts.find((listedStart) => listedStart.startId === startId)

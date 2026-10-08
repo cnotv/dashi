@@ -3,10 +3,11 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/types.ts"
+    ".": "./src/types.ts",
+    "./first-message": "./src/first-message.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p .",
-    "test": "echo 'types only'"
+    "test": "echo 'tested through @dashi/server'"
   }
 }

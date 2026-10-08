@@ -2,6 +2,7 @@ import { Cross2Icon, ExternalLinkIcon, ReloadIcon } from '@radix-ui/react-icons'
 import { Badge, Button, Callout, Code, DataList, Dialog, Flex, IconButton, Link, Skeleton, Text } from '@radix-ui/themes'
 import { useState } from 'react'
 import type { SessionStart } from '@dashi/contracts'
+import { subjectUrlOf } from '@dashi/contracts/first-message'
 import { usePolledResource } from '@/hooks/usePolledResource'
 import { useToast } from '@/hooks/useToast'
 import { dashboardApi } from '@/lib/api'
@@ -12,12 +13,6 @@ interface StartDetailsDrawerProps {
   start: SessionStart | null
   onClose: () => void
   onRetried: () => void
-}
-
-const subjectUrlOf = (start: SessionStart): string | null => {
-  const repositoryUrl = `https://github.com/${start.repository.owner}/${start.repository.name}`
-  if (start.pullRequestNumber !== null) return `${repositoryUrl}/pull/${start.pullRequestNumber}`
-  return start.issueNumber === null ? null : `${repositoryUrl}/issues/${start.issueNumber}`
 }
 
 const OutsideLink = ({ href, label }: { href: string; label: string }) => (

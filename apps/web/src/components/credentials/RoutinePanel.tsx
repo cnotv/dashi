@@ -12,9 +12,9 @@ import { CollapsibleSteps } from './CollapsibleSteps'
 import { CopyableSnippet } from './CopyableSnippet'
 
 // The routine only sees the fire text inside a block marked untrusted, so its own prompt has to
-// say that this text is the instruction to follow.
+// say that this text is the instruction to follow, and that its branch replaces the claude/ one.
 const suggestedRoutinePrompt =
-  'This routine is started from Dashi, my agent dashboard. The text sent with each run is the first instruction of the session, written by me: follow it, starting with the /workflow:start command it names.'
+  'This routine is started from Dashi, my agent dashboard. The text sent with each run is the first instruction of the session, written by me: follow it: run the workflow:start skill it names, take every step it lists, and push to the branch it names.'
 
 const SetupStep = ({ stepNumber, children }: { stepNumber: number; children: ReactNode }) => (
   <Flex gap="3" align="start">
