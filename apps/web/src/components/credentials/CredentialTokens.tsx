@@ -5,6 +5,7 @@ import { SecretDialog } from '@/components/credentials/SecretDialog'
 interface CredentialTokensProps {
   secret: SecretSummary
   isUnlocked: boolean
+  isVaultSetUp: boolean
   onAdd: (newEntry: NewSecretEntry) => Promise<void>
   onUpdate: (entryId: string, change: SecretEntryChange) => Promise<void>
   onUse: (entry: SecretEntrySummary) => void
@@ -17,7 +18,7 @@ interface CredentialTokensProps {
  * selecting another switches to it. Each token can be edited, tested or removed, and Add token
  * adds one.
  */
-export const CredentialTokens = ({ secret, isUnlocked, onAdd, onUpdate, onUse, onTest, onRemove }: CredentialTokensProps) => {
+export const CredentialTokens = ({ secret, isUnlocked, isVaultSetUp, onAdd, onUpdate, onUse, onTest, onRemove }: CredentialTokensProps) => {
   const inUseEntry = secret.entries.find((entry) => entry.isInUse)
 
   const useEntryWithId = (entryId: string): void => {
@@ -46,9 +47,11 @@ export const CredentialTokens = ({ secret, isUnlocked, onAdd, onUpdate, onUse, o
                   <Text size="2" weight="medium">
                     {entry.label}
                   </Text>
-                  <Code variant="soft" color="gray">
-                    ••••{entry.lastFour}
-                  </Code>
+                  {isVaultSetUp && (
+                    <Code variant="soft" color="gray">
+                      ••••{entry.lastFour}
+                    </Code>
+                  )}
                   {entry.isInUse && (
                     <Badge color="green" radius="full">
                       In use

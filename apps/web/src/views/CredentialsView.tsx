@@ -91,6 +91,7 @@ export const CredentialsView = () => {
                   <CredentialTokens
                     secret={secret}
                     isUnlocked={isUnlocked}
+                    isVaultSetUp={vault.vaultState?.initialised ?? false}
                     onAdd={(newEntry) => vault.addSecretEntry(secret.name, newEntry)}
                     onUpdate={(entryId, change) => vault.updateSecretEntry(secret.name, entryId, change)}
                     onUse={(entry) => void run(() => vault.useSecretEntry(secret.name, entry.entryId), `${secret.label}: Dashi now uses ${entry.label}`)}
