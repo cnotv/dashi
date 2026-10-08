@@ -50,14 +50,19 @@ export const chatSubjectOfSession = (session: AgentSessionSummary): ChatSubject 
   badgeColor: sessionStateColors[session.state],
 })
 
+const cloudSessionLinkPattern = /^https:\/\/claude\.ai\/code\/session_[A-Za-z0-9]+/
+
 /**
- * Tells whether a start from the board has a chat: one that runs on the laptop and has started.
- * A cloud start has none, since its conversation lives only in the Claude app.
+ * Tells whether a start from the board has a chat: one that has started, on the laptop, or in
+ * the cloud once claude.ai has given its session's link.
  * @param start The start.
- * @returns True when the runner can read and steer its session.
+ * @returns True when Dashi can show its conversation and send to it.
  */
-export const canChatWithStart = (start: SessionStart): boolean =>
-  start.state === 'started' && (start.target === 'laptop-remote-control' || start.target === 'laptop-headless')
+export const canChatWithStart = (start: SessionStart): boolean => {
+  if (start.state !== 'started') return false
+  if (start.target === 'laptop-remote-control' || start.target === 'laptop-headless') return true
+  return start.sessionUrl !== null && cloudSessionLinkPattern.test(start.sessionUrl)
+}
 
 /**
  * The drawer heading for a start from the board.

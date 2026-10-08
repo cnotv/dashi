@@ -1,5 +1,5 @@
 import { ExternalLinkIcon } from '@radix-ui/react-icons'
-import { Badge, Button, Callout, Card, Flex, Heading, Link, Select, Text, TextField } from '@radix-ui/themes'
+import { Badge, Button, Callout, Card, Code, Flex, Heading, Link, Select, Text, TextField } from '@radix-ui/themes'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { RepositoryReference, RoutineSettings, RoutineTestResult, SessionStart } from '@dashi/contracts'
 import { useRepositories } from '@/hooks/useBoard'
@@ -7,6 +7,7 @@ import { useSessionStarts } from '@/hooks/useSessionStarts'
 import { useToast } from '@/hooks/useToast'
 import { dashboardApi } from '@/lib/api'
 import { parseRepositoryKey, repositoryKey } from '@/lib/presentation'
+import { dashboardAddress } from '@/lib/runtime-configuration'
 import { routineFailureAdviceFor, routinesPageUrl } from '@/lib/session-starts'
 import { CollapsibleSteps } from './CollapsibleSteps'
 import { CopyableSnippet } from './CopyableSnippet'
@@ -245,6 +246,15 @@ export const RoutinePanel = () => {
               </Button>
             </Flex>
             {testResult && <TestOutcome testResult={testResult} />}
+          </SetupStep>
+          <SetupStep stepNumber={7}>
+            <Text size="2">
+              To read and answer its sessions from Sessions, let the routine&rsquo;s cloud environment reach Dashi. On claude.ai,
+              edit the environment: add these variables, with an ingest token from <strong>Connect Claude Code</strong> above
+              (it can only report, never read), and add <Code>{new URL(dashboardAddress()).hostname}</Code> to its allowed
+              domains. The repository needs the workflow plugin 0.6.0 or later, and messages go out through the laptop runner.
+            </Text>
+            <CopyableSnippet snippet={`DASHI_URL=${dashboardAddress()}\nDASHI_TOKEN=<ingest token>`} />
           </SetupStep>
         </CollapsibleSteps>
       </Flex>

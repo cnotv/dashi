@@ -157,3 +157,72 @@ describe('session chat', () => {
     expect((await app.request(runnerRequest('/chat-work', 'adr_wrong'))).status).toBe(401)
   })
 })
+
+describe('cloud session chat', () => {
+  const routineToken = 'sk-ant-oat01-exampleRoutineToken0123456789'
+  const hookSessionId = '9a8b7c6d-0000-4000-8000-000000000000'
+  const cloudWorkSchema = z.object({
+    deliveries: z.array(z.object({ deliveryId: z.string(), sessionId: z.string(), text: z.string(), cloudSessionId: z.string().nullable() })),
+  })
+
+  const setUpRoutineStart = async () => {
+    const testApp = setUp()
+    const { token: ingestToken } = testApp.ingestTokens.createToken('Claude cloud')
+    await testApp.app.request(
+      jsonRequest('PUT', '/api/repositories/cnotv/generative-art/routine', { routineId: 'trig_01ABCDEFGHJK', token: routineToken }),
+    )
+    const startBody = { repository: { owner: 'cnotv', name: 'generative-art' }, issueNumber: 42, workflow: 'fix', target: 'cloud-routine', note: '' }
+    const startId = z.object({ startId: z.string() }).parse(await (await testApp.app.request(jsonRequest('POST', '/api/session-starts', startBody))).json()).startId
+    const reportHook = (payload: Record<string, unknown>, cloudSession = 'cse_01Fired') =>
+      testApp.app.request(
+        jsonRequest('POST', '/api/events', { session_id: hookSessionId, ...payload }, { authorization: `Bearer ${ingestToken}`, 'x-agent-cloud-session': cloudSession }),
+      )
+    const readStartChat = async () => sessionChatSchema.parse(await (await testApp.app.request(getRequest(`/api/session-starts/${startId}/chat`))).json())
+    return { ...testApp, startId, reportHook, readStartChat }
+  }
+
+  it("shows a routine start's prompts and final replies from its hooks, scrubbed of stored secrets", async () => {
+    const { vault, reportHook, readStartChat } = await setUpRoutineStart()
+    vault.saveSecret('github-token', githubToken)
+    await reportHook({ hook_event_name: 'SessionStart' })
+    await reportHook({ hook_event_name: 'UserPromptSubmit', prompt: '/workflow:start fix https://github.com/cnotv/generative-art/issues/42' })
+    await reportHook({ hook_event_name: 'Stop', last_assistant_message: `Opened the draft pull request; pushed with ${githubToken}` })
+    await reportHook({ hook_event_name: 'Stop', last_assistant_message: 'Not this session' }, 'cse_01Another')
+
+    const chat = await readStartChat()
+    expect(chat).toMatchObject({ availability: 'in-cloud', deliveryRoute: 'none', sendBlocker: expect.stringContaining('laptop runner') })
+    expect(chat.messages.map((message) => message.text)).toEqual([
+      '/workflow:start fix https://github.com/cnotv/generative-art/issues/42',
+      'Opened the draft pull request; pushed with [redacted]',
+    ])
+  })
+
+  it('opens the same chat from the Sessions table, by the session id its hooks report', async () => {
+    const { app, reportHook } = await setUpRoutineStart()
+    await reportHook({ hook_event_name: 'Stop', last_assistant_message: 'Done' })
+    const chat = sessionChatSchema.parse(await (await app.request(getRequest(`/api/sessions/${hookSessionId}/chat`))).json())
+    expect(chat).toMatchObject({ availability: 'in-cloud', messages: [{ text: 'Done' }] })
+  })
+
+  it('hands a message to the runner with the cloud session to send it to, and shows how it went', async () => {
+    const { app, token, startId, readStartChat } = await setUpRoutineStart()
+    await app.request(runnerRequest('/chat-work', token))
+    expect(await readStartChat()).toMatchObject({ deliveryRoute: 'cloud', sendBlocker: null })
+
+    expect((await app.request(jsonRequest('POST', `/api/session-starts/${startId}/chat`, { text: 'Also update the README' }))).status).toBe(201)
+    const work = cloudWorkSchema.parse(await (await app.request(runnerRequest('/chat-work', token))).json())
+    expect(work.deliveries).toEqual([
+      { deliveryId: expect.any(String), sessionId: 'session_01Fired', text: 'Also update the README', cloudSessionId: 'session_01Fired' },
+    ])
+    const deliveryId = work.deliveries[0]?.deliveryId ?? ''
+    expect((await app.request(runnerRequest(`/deliveries/${deliveryId}`, token, { state: 'delivered', message: null }))).status).toBe(204)
+    expect((await readStartChat()).deliveries).toEqual([expect.objectContaining({ deliveryId, state: 'delivered' })])
+  })
+
+  it('ignores a hook that names no cloud session, or a malformed one', async () => {
+    const { reportHook, readStartChat } = await setUpRoutineStart()
+    await reportHook({ hook_event_name: 'Stop', last_assistant_message: 'From a laptop' }, '')
+    await reportHook({ hook_event_name: 'Stop', last_assistant_message: 'Forged' }, 'cse_../../x')
+    expect((await readStartChat()).messages).toEqual([])
+  })
+})

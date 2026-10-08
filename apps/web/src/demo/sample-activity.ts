@@ -301,7 +301,7 @@ export const sampleSessionStarts = (now: number): SessionStart[] => [
     note: '',
     state: 'started',
     runnerLabel: null,
-    sessionUrl: 'https://claude.ai/code',
+    sessionUrl: 'https://claude.ai/code/session_01DemoRoutineStart',
     message: null,
     createdAt: minutesBefore(now, 90),
     updatedAt: minutesBefore(now, 90),
@@ -357,5 +357,41 @@ export const sampleChatMessages: ChatMessage[] = [
     text: 'The speed is never clamped, so a fast marble tunnels through the edge collider.\n\nI added a failing test and a clamp of 40 units a second; the test passes now. Shall I open the draft pull request?',
     toolName: null,
     createdAt: '2026-09-30T10:03:40Z',
+  },
+]
+
+// A cloud session's chat holds only what its hooks carry: each prompt and each turn's final reply.
+export const sampleCloudChatMessages: ChatMessage[] = [
+  {
+    messageId: 'demo-cloud-1',
+    role: 'user',
+    kind: 'text',
+    text: '/workflow:start feature https://github.com/cnotv/example/issues/12',
+    toolName: null,
+    createdAt: '2026-10-08T09:20:00Z',
+  },
+  {
+    messageId: 'demo-cloud-2',
+    role: 'assistant',
+    kind: 'text',
+    text: 'Issue #12 asks for a dark mode toggle, but not where it should live: in the header, or under Settings?',
+    toolName: null,
+    createdAt: '2026-10-08T09:21:30Z',
+  },
+  {
+    messageId: 'demo-cloud-3',
+    role: 'user',
+    kind: 'text',
+    text: 'In the header, next to the account menu.',
+    toolName: null,
+    createdAt: '2026-10-08T09:25:00Z',
+  },
+  {
+    messageId: 'demo-cloud-4',
+    role: 'assistant',
+    kind: 'text',
+    text: 'Done: the toggle sits next to the account menu and remembers the choice. Draft pull request #13 is open, and its checks are green.',
+    toolName: null,
+    createdAt: '2026-10-08T09:41:10Z',
   },
 ]

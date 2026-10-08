@@ -93,6 +93,8 @@ export const createChatRelay = (now: () => number): ChatRelay => {
       }
     },
 
+    listDeliveries: (sessionId) => deliveriesOf(update((current) => current), sessionId),
+
     queueMessage: (sessionId, text) => {
       const pendingCount = deliveriesOf(pruneRelayState(relay.state, now()), sessionId).filter(
         (delivery) => delivery.state === 'queued',

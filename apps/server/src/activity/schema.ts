@@ -1,13 +1,15 @@
 import { z } from 'zod'
 
 // Claude Code hooks send `session_id` and `hook_event_name`; Codex's `notify` sends `type`
-// and `thread-id`. Anything else in the payload is dropped, not stored.
+// and `thread-id`. A cloud session's prompt and final replies are kept in memory for its chat;
+// anything else in the payload is dropped, not stored.
 export const hookPayloadSchema = z.object({
   session_id: z.string().min(1).max(200).optional(),
   hook_event_name: z.string().max(100).optional(),
   type: z.string().max(100).optional(),
   'thread-id': z.string().min(1).max(200).optional(),
   prompt: z.string().optional(),
+  last_assistant_message: z.string().optional(),
   'input-messages': z.array(z.string()).optional(),
   cwd: z.string().max(4096).optional(),
 })

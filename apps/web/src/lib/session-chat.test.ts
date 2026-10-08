@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ChatDelivery, SessionChat } from '@dashi/contracts'
-import { chatTimelineOf } from './session-chat'
+import type { ChatDelivery, SessionChat, SessionStart } from '@dashi/contracts'
+import { canChatWithStart, chatTimelineOf } from './session-chat'
 
 const delivery = (overrides: Partial<ChatDelivery>): ChatDelivery => ({
   deliveryId: 'd1',
@@ -49,5 +49,36 @@ describe('chatTimelineOf', () => {
       'd1',
     ])
     expect(chatTimelineOf(chatWith([delivery({})], '2026-09-30T09:00:00Z')).map((item) => item.itemKey)).toEqual(['m1', 'm2', 'd1'])
+  })
+})
+
+describe('canChatWithStart', () => {
+  const start: SessionStart = {
+    startId: 'start-1',
+    repository: { owner: 'cnotv', name: 'example' },
+    issueNumber: 12,
+    pullRequestNumber: null,
+    workflow: 'feature',
+    target: 'cloud-routine',
+    permissionMode: 'auto',
+    note: '',
+    state: 'started',
+    runnerLabel: null,
+    sessionUrl: 'https://claude.ai/code/session_01HJKLMNOP',
+    message: null,
+    createdAt: '2026-10-08T10:00:00Z',
+    updatedAt: '2026-10-08T10:00:00Z',
+  }
+
+  it('opens a cloud start once claude.ai has given its session link', () => {
+    expect(canChatWithStart(start)).toBe(true)
+    expect(canChatWithStart({ ...start, target: 'laptop-cloud' })).toBe(true)
+    expect(canChatWithStart({ ...start, sessionUrl: null })).toBe(false)
+    expect(canChatWithStart({ ...start, sessionUrl: 'https://claude.ai/code' })).toBe(false)
+    expect(canChatWithStart({ ...start, state: 'failed' })).toBe(false)
+  })
+
+  it('opens a started laptop start, which the runner reads', () => {
+    expect(canChatWithStart({ ...start, target: 'laptop-headless', sessionUrl: null })).toBe(true)
   })
 })

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   chatDeliveryPlanFor,
+  cloudSendArgumentsFor,
+  cloudSendOutcomeOf,
   cloudSessionUrlFrom,
   deliveryPlanFor,
   isStartProjectFolder,
@@ -174,8 +176,8 @@ describe('parseChatWork', () => {
       ],
     })
     expect(work).toEqual({
-      sessions: [{ sessionId, sessionState: 'working', start: null }],
-      deliveries: [{ deliveryId, sessionId, text: 'Also the docs', sessionState: null, start: null }],
+      sessions: [{ sessionId, sessionState: 'working', start: null, cloudSessionId: null }],
+      deliveries: [{ deliveryId, sessionId, text: 'Also the docs', sessionState: null, start: null, cloudSessionId: null }],
     })
     expect(parseChatWork(null)).toEqual({ sessions: [], deliveries: [] })
   })
@@ -184,11 +186,40 @@ describe('parseChatWork', () => {
     const start = { repositoryName: 'generative-art', startId, target: 'laptop-headless' }
     const startChatId = `start-${startId}`
     expect(parseChatWork({ sessions: [{ sessionId: startChatId, sessionState: null, start }], deliveries: [] }).sessions).toEqual([
-      { sessionId: startChatId, sessionState: null, start },
+      { sessionId: startChatId, sessionState: null, start, cloudSessionId: null },
     ])
     const escaping = { sessionId: startChatId, sessionState: null, start: { ...start, repositoryName: '..' } }
     const cloud = { sessionId: startChatId, sessionState: null, start: { ...start, target: 'laptop-cloud' } }
     expect(parseChatWork({ sessions: [escaping, cloud], deliveries: [] }).sessions).toEqual([])
+  })
+
+  it('keeps the cloud session a message goes to, and drops one that is not a cloud session id', () => {
+    const cloudSessionId = 'session_01AbCdEfGh'
+    const delivery = { deliveryId, sessionId: cloudSessionId, text: 'Also the docs', sessionState: null, start: null }
+    expect(parseChatWork({ sessions: [], deliveries: [{ ...delivery, cloudSessionId }] }).deliveries).toEqual([{ ...delivery, cloudSessionId }])
+    expect(parseChatWork({ sessions: [], deliveries: [{ ...delivery, cloudSessionId: '--help' }] }).deliveries).toEqual([])
+  })
+})
+
+describe('sending to a cloud session', () => {
+  it('names the session as an argument and leaves the message for standard input', () => {
+    expect(cloudSendArgumentsFor('session_01AbCdEfGh')).toEqual(['-p', '--cloud', 'session_01AbCdEfGh', '--output-format', 'json'])
+  })
+
+  it('reads whether claude --cloud queued the message', () => {
+    expect(cloudSendOutcomeOf('{"ok":true,"session_id":"session_01AbCdEfGh","url":"https://claude.ai/code/session_01AbCdEfGh"}\n', '')).toEqual({
+      state: 'delivered',
+      message: null,
+    })
+    expect(cloudSendOutcomeOf('{"ok":false,"session_id":"session_01AbCdEfGh","error":"cloud session is archived"}', '')).toEqual({
+      state: 'failed',
+      message: 'cloud session is archived',
+    })
+    expect(cloudSendOutcomeOf('', 'Error: Cloud sessions are disabled by your organization\'s policy.')).toEqual({
+      state: 'failed',
+      message: "Error: Cloud sessions are disabled by your organization's policy.",
+    })
+    expect(cloudSendOutcomeOf('', '')).toEqual({ state: 'failed', message: 'claude --cloud gave no answer' })
   })
 })
 
@@ -215,7 +246,12 @@ describe('finding a board start\'s transcript', () => {
 
 describe('chatDeliveryPlanFor', () => {
   const directory = '/Users/me/dashi/worktrees/generative-art-0123abcd'
-  const headlessStart = { sessionId: `start-${startId}`, sessionState: null, start: { repositoryName: 'generative-art', startId, target: 'laptop-headless' as const } }
+  const headlessStart = {
+    sessionId: `start-${startId}`,
+    sessionState: null,
+    start: { repositoryName: 'generative-art', startId, target: 'laptop-headless' as const },
+    cloudSessionId: null,
+  }
 
   it('waits for an unattended start to go quiet, then resumes it', () => {
     expect(chatDeliveryPlanFor(headlessStart, [], directory, 5_000)).toMatchObject({ route: 'none', reason: expect.stringContaining('still running') })

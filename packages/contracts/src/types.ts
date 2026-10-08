@@ -409,9 +409,9 @@ export interface ChatMessage {
   createdAt: string | null
 }
 
-// How the runner can put a message into a session: pasted into its tmux pane, or by resuming an
-// ended session headless.
-export type ChatDeliveryRoute = 'tmux' | 'resume' | 'none'
+// How the runner can put a message into a session: pasted into its tmux pane, by resuming an
+// ended session headless, or queued into a cloud session with claude --cloud.
+export type ChatDeliveryRoute = 'tmux' | 'resume' | 'cloud' | 'none'
 
 export type ChatDeliveryState = 'queued' | 'sent' | 'delivered' | 'failed'
 
@@ -423,7 +423,8 @@ export interface ChatDelivery {
   createdAt: string
 }
 
-export type SessionChatAvailability = 'runner-offline' | 'waiting-for-runner' | 'on-laptop' | 'not-on-laptop'
+// A cloud session's conversation is what its hooks reported, so it is there with the laptop off.
+export type SessionChatAvailability = 'runner-offline' | 'waiting-for-runner' | 'on-laptop' | 'not-on-laptop' | 'in-cloud'
 
 export interface SessionChat {
   sessionId: string

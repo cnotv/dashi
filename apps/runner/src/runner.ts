@@ -1,7 +1,7 @@
 // Dashi's laptop runner. It asks the dashboard every few seconds for a session
 // started from the board, prepares a fresh worktree of the repository, and starts Claude Code
 // there. While a chat drawer is open in Dashi it also sends that session's recent transcript and
-// delivers the messages typed there. It needs Node 22.18 or later, git, Claude Code and, for
+// delivers the messages typed there, to a cloud session too, with claude --cloud. It needs Node 22.18 or later, git, Claude Code and, for
 // sessions steered from the phone, tmux 3.2 or later. Every command is an argument list; nothing
 // goes through a shell.
 import { spawn, spawnSync } from 'node:child_process'
@@ -53,6 +53,7 @@ interface ChatWorkSession {
   sessionId: string
   sessionState: SessionState | null
   start: ChatWorkStart | null
+  cloudSessionId: string | null
 }
 
 interface ChatWorkDelivery extends ChatWorkSession {
@@ -140,6 +141,8 @@ const chatTextLimit = 4000
 const toolSummaryLimit = 300
 const sessionStates: SessionState[] = ['working', 'waiting', 'idle', 'ended', 'inactive']
 const sessionIdPattern = /^[A-Za-z0-9_-]{8,100}$/
+const cloudSessionIdPattern = /^session_[A-Za-z0-9]{1,100}$/
+const cloudSendTimeoutMilliseconds = 60_000
 const deliveryIdPattern = /^[0-9a-f-]{36}$/
 // A pane showing a shell would run pasted text as a command, so only a pane whose foreground
 // process is Claude Code gets it. Claude Code names its process claude, or its version on some
@@ -333,11 +336,18 @@ const chatWorkStartOf = (value: unknown): ChatWorkStart | null | undefined => {
   return { repositoryName, startId, target }
 }
 
+const chatWorkCloudSessionOf = (value: unknown): string | null | undefined => {
+  if (value === null || value === undefined) return null
+  return typeof value === 'string' && cloudSessionIdPattern.test(value) ? value : undefined
+}
+
 const chatWorkSessionOf = (value: unknown): ChatWorkSession | null => {
   if (!isRecord(value) || typeof value.sessionId !== 'string' || !sessionIdPattern.test(value.sessionId)) return null
   const sessionState = value.sessionState === null ? null : isOneOf(sessionStates, value.sessionState) ? value.sessionState : undefined
   const start = chatWorkStartOf(value.start)
-  return sessionState === undefined || start === undefined ? null : { sessionId: value.sessionId, sessionState, start }
+  const cloudSessionId = chatWorkCloudSessionOf(value.cloudSessionId)
+  if (sessionState === undefined || start === undefined || cloudSessionId === undefined) return null
+  return { sessionId: value.sessionId, sessionState, start, cloudSessionId }
 }
 
 const chatWorkDeliveryOf = (value: unknown): ChatWorkDelivery | null => {
@@ -498,6 +508,36 @@ export const chatDeliveryPlanFor = (
     return { route: 'none', reason: 'It is still running unattended; send a message once it finishes' }
   }
   return deliveryPlanFor('ended', panes, directory)
+}
+
+/**
+ * The command line that queues one message into a running cloud session. The message itself goes
+ * on standard input, so no text can be read as an option.
+ * @param cloudSessionId The cloud session, as session_<id>.
+ * @returns The arguments for claude.
+ */
+export const cloudSendArgumentsFor = (cloudSessionId: string): string[] => ['-p', '--cloud', cloudSessionId, '--output-format', 'json']
+
+/**
+ * Reads how claude --cloud answered a message sent to a cloud session.
+ * @param standardOutput What it printed on stdout: {ok, session_id, url} on success, {ok: false, error} on a failed send.
+ * @param standardError What it printed on stderr, where a configuration error goes as plain text.
+ * @returns Delivered, or failed with the reason.
+ */
+export const cloudSendOutcomeOf = (standardOutput: string, standardError: string): { state: 'delivered' | 'failed'; message: string | null } => {
+  const answer = standardOutput
+    .split('\n')
+    .map((line): unknown => {
+      try {
+        return JSON.parse(line)
+      } catch {
+        return null
+      }
+    })
+    .find((parsedLine) => isRecord(parsedLine) && typeof parsedLine.ok === 'boolean')
+  if (isRecord(answer) && answer.ok === true) return { state: 'delivered', message: null }
+  const reason = isRecord(answer) && typeof answer.error === 'string' ? answer.error : lastCharacters(`${standardError}\n${standardOutput}`, 300)
+  return { state: 'failed', message: reason === '' ? 'claude --cloud gave no answer' : reason }
 }
 
 /**
@@ -740,7 +780,18 @@ const resumeWithMessage = (settings: RunnerSettings, claudeSessionId: string, te
   return `Resumed unattended; its output goes to ${logPath}`
 }
 
+// Needs this machine's claude logged in to the claude.ai account the cloud session belongs to.
+const sendToCloudSession = (cloudSessionId: string, text: string): { state: 'delivered' | 'failed'; message: string | null } => {
+  const result = spawnSync('claude', cloudSendArgumentsFor(cloudSessionId), { input: text, encoding: 'utf8', timeout: cloudSendTimeoutMilliseconds })
+  if (result.error) return { state: 'failed', message: result.error.message }
+  return cloudSendOutcomeOf(result.stdout ?? '', result.stderr ?? '')
+}
+
 const deliverMessage = async (settings: RunnerSettings, delivery: ChatWorkDelivery): Promise<void> => {
+  if (delivery.cloudSessionId !== null) {
+    await postToDashboard(settings, `/api/runner/deliveries/${delivery.deliveryId}`, sendToCloudSession(delivery.cloudSessionId, delivery.text))
+    return
+  }
   const located = locateTranscript(settings, delivery)
   const plan: DeliveryPlan =
     located === null

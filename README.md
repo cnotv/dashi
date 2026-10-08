@@ -182,13 +182,13 @@ sends.
 
 | Source | What Dashi gets from it | Received at | Shown in |
 | --- | --- | --- | --- |
-| [Claude Code hooks](https://code.claude.com/docs/en/hooks) | `SessionStart`, `UserPromptSubmit`, `Notification`, `Stop` and `SessionEnd`, with the session id, git remote, branch, folder and first prompt | `POST /api/events` | Session rows, states, timeline; the branch that Usage groups by |
+| [Claude Code hooks](https://code.claude.com/docs/en/hooks) | `SessionStart`, `UserPromptSubmit`, `Notification`, `Stop` and `SessionEnd`, with the session id, git remote, branch, folder and first prompt; from a cloud session, every prompt and final reply | `POST /api/events` | Session rows, states, timeline; the branch that Usage groups by; a cloud session's chat |
 | [Codex `notify`](https://developers.openai.com/codex/config-advanced) | `agent-turn-complete`, with the thread id and first input message | `POST /api/events` | Codex session rows and states |
 | [Claude Code OpenTelemetry](https://code.claude.com/docs/en/monitoring-usage) | The `claude_code.token.usage` counter, per session, model and token type, over OTLP/HTTP JSON | `POST /api/telemetry/v1/metrics` | Every token count, on Sessions and Usage |
 | [GitHub GraphQL API](https://docs.github.com/en/graphql) | Issues and pull requests, for the board | Fetched by the server | The pull request of a branch on Usage, read from boards already fetched |
 | [Claude Code routines](https://code.claude.com/docs/en/routines) | A session started on claude.ai | Called by the server | Cloud starts in Started from the board |
-| [Laptop runner](#the-laptop-runner) | Starts run on your machine, and an open chat's transcript from `~/.claude/projects` | Polls `/api/runner/*` | Laptop starts, the session chat, and `DASHI_START_ID` on the sessions it starts |
-| [Workflow plugin hook](https://github.com/cnotv/agent-base#what-the-reporter-sends) | What launched each session and what pays for it, as kinds: entrypoint, terminal, launching app, billing kind, API host, Dashi start id | `POST /api/events` headers | Triggered by and Billed through on Usage and Sessions |
+| [Laptop runner](#the-laptop-runner) | Starts run on your machine, an open chat's transcript from `~/.claude/projects`, and chat messages sent on to cloud sessions | Polls `/api/runner/*` | Laptop starts, the session chat, and `DASHI_START_ID` on the sessions it starts |
+| [Workflow plugin hook](https://github.com/cnotv/agent-base#what-the-reporter-sends) | What launched each session and what pays for it, as kinds: entrypoint, terminal, launching app, billing kind, API host, Dashi start id; the cloud session it runs in | `POST /api/events` headers | Triggered by and Billed through on Usage and Sessions; which start a cloud chat belongs to |
 | [Dashi machine token](#set-up-a-machine-with-the-dashi-cli) | Which connected machine sent a report | Every ingest request | By machine on Usage |
 
 Codex sends no token metrics, so Codex sessions show n/a for tokens, and Usage lists them under By agent with no tokens.
@@ -290,9 +290,9 @@ inactive, since a closed terminal never reports that it ended.
 
 The speech-bubble icon opens a session's conversation in a drawer, as in Claude: what was
 typed, Claude's answers, and each tool it used, updated live, with a box for the next message
-(Enter sends, Shift+Enter starts a new line). It leads each laptop start under **Started from
-the board**, and each row of the sessions table, which lists only sessions whose hooks report
-here. It needs the laptop runner below, because the conversation lives on the laptop:
+(Enter sends, Shift+Enter starts a new line). It leads each start under **Started from the
+board**, and each row of the sessions table, which lists only sessions whose hooks report
+here. A laptop session's conversation lives on the laptop, so it needs the laptop runner below:
 
 - While the drawer is open, the runner reads the session's transcript in
   `~/.claude/projects` every couple of seconds and sends its last 150 messages, without tool
@@ -306,8 +306,21 @@ here. It needs the laptop runner below, because the conversation lives on the la
   `claude --resume <id> -p <message>`, its output going to `~/dashi/logs`. A session
   waiting on a permission, or running in a plain terminal, can't take one, and the drawer says
   why.
-- Claude cloud sessions have no public API to read or write them, so their drawer points to the
-  Claude app instead.
+
+A routine's or other cloud session's conversation comes from its own hooks instead, since there is
+no API to read one, and claude.ai refuses to be shown in a frame:
+
+- The workflow plugin's status hook (0.6.0 or later) sends the cloud session it runs in, with each
+  prompt (`UserPromptSubmit`) and each turn's final reply (`Stop`'s `last_assistant_message`).
+  Dashi keeps a cloud session's last 150 messages in memory, scrubbed of every stored secret, for
+  the 200 sessions it heard from most recently; a restart forgets them. Tool calls are not shown.
+- The hook has to reach Dashi from the cloud: the routine's cloud environment needs `DASHI_URL`,
+  `DASHI_TOKEN` (an ingest token, which can only report) and Dashi's host in its allowed domains.
+  **Credentials, Claude cloud routines** lists them under its last setup step.
+- A message goes out through the laptop runner, with
+  [`claude -p --cloud <session>`](https://code.claude.com/docs/en/claude-code-on-the-web#send-follow-ups-from-the-cli)
+  and the message on standard input, so the runner's `claude` must be logged in to the same
+  claude.ai account. The session takes it as its next message, as if typed in the Claude app.
 
 ## Board cards
 
