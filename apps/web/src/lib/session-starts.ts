@@ -1,4 +1,4 @@
-import type { SessionStart } from '@dashi/contracts'
+import type { RepositoryReference, SessionStart } from '@dashi/contracts'
 
 export const routinesPageUrl = 'https://claude.ai/code/routines'
 /**
@@ -36,3 +36,27 @@ export const failureAdviceFor = (start: SessionStart): string | null => {
   if (start.target === 'cloud-routine') return routineFailureAdviceFor(start.message ?? '')
   return "Read the runner's log on the laptop, ~/dashi/runner.log on macOS or journalctl --user -u dashi-runner on Linux, fix what it says, then retry."
 }
+
+/**
+ * Finds the session to resume from a board card: the newest start that has a session link and was
+ * made for one of the card's issues or for its pull request.
+ * @param starts The starts, newest first.
+ * @param repository The repository the card belongs to.
+ * @param issueNumbers The issues the card shows.
+ * @param pullRequestNumber The card's pull request, or null.
+ * @returns The session link, or null when no start has one.
+ */
+export const sessionUrlForCard = (
+  starts: SessionStart[],
+  repository: RepositoryReference,
+  issueNumbers: number[],
+  pullRequestNumber: number | null,
+): string | null =>
+  starts.find(
+    (start) =>
+      start.sessionUrl !== null &&
+      start.repository.owner === repository.owner &&
+      start.repository.name === repository.name &&
+      ((start.issueNumber !== null && issueNumbers.includes(start.issueNumber)) ||
+        (start.pullRequestNumber !== null && start.pullRequestNumber === pullRequestNumber)),
+  )?.sessionUrl ?? null

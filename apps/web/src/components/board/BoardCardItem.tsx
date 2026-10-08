@@ -1,4 +1,4 @@
-import { FileTextIcon, GlobeIcon, Link2Icon } from '@radix-ui/react-icons'
+import { ChatBubbleIcon, FileTextIcon, GlobeIcon, Link2Icon } from '@radix-ui/react-icons'
 import { Badge, Card, Flex, IconButton, Link, Separator, Text, Tooltip } from '@radix-ui/themes'
 import type { BoardCard, IssueSummary, RepositoryReference } from '@dashi/contracts'
 import { GateIndicator } from './GateIndicator'
@@ -11,6 +11,7 @@ interface BoardCardItemProps {
   card: BoardCard
   repository: RepositoryReference
   showRepository: boolean
+  sessionUrl: string | null
   onPullRequestChanged: () => void
 }
 
@@ -30,6 +31,17 @@ const IssueHeading = ({ issue }: { issue: IssueSummary }) => (
     )}
   </Flex>
 )
+
+const SessionButton = ({ sessionUrl }: { sessionUrl: string | null }) =>
+  sessionUrl === null ? null : (
+    <Tooltip content="Open the session in Claude to resume it or answer its questions">
+      <IconButton size="1" variant="ghost" aria-label="Open the session in Claude" asChild>
+        <a href={sessionUrl} target="_blank" rel="noopener noreferrer">
+          <ChatBubbleIcon />
+        </a>
+      </IconButton>
+    </Tooltip>
+  )
 
 const closedDateFormat = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
@@ -62,10 +74,11 @@ const PreviewButton = ({ previewUrl }: { previewUrl: string | null }) =>
  * One board card: its repository when the board shows several, every issue its pull request works
  * on with the pull request's checks at the top right, then the pull request, and one row of icons.
  * An issue without a pull request has only Start; a pull request has its merge conflict, deploy
- * preview, screenshot, video, changed files, merge and close. A closed issue says when it closed
+ * preview, screenshot, video, changed files, merge and close. When a session was started for the
+ * card its icon opens that session in Claude, so it can be resumed or its questions answered. A closed issue says when it closed
  * and keeps the preview, recording and files of the merged pull request that closed it.
  */
-export const BoardCardItem = ({ card, repository, showRepository, onPullRequestChanged }: BoardCardItemProps) => (
+export const BoardCardItem = ({ card, repository, showRepository, sessionUrl, onPullRequestChanged }: BoardCardItemProps) => (
   <Card size="2">
     <Flex direction="column" gap="3">
       <Flex gap="3" align="start" justify="between">
@@ -107,6 +120,7 @@ export const BoardCardItem = ({ card, repository, showRepository, onPullRequestC
         <>
           <Separator size="4" />
           <Flex className="card-icon-row" gap="2" align="center">
+            <SessionButton sessionUrl={sessionUrl} />
             <PreviewButton previewUrl={card.pullRequest.previewUrl} />
             <PullRequestMedia repository={repository} pullRequest={card.pullRequest} />
             <PullRequestFilesDrawer repository={repository} pullRequest={card.pullRequest} />
@@ -118,9 +132,13 @@ export const BoardCardItem = ({ card, repository, showRepository, onPullRequestC
           <Separator size="4" />
           <Flex className="card-icon-row" gap="2" align="center">
             {card.pullRequest === null ? (
-              <StartSessionDialog repository={repository} issue={card.issues[0] ?? null} />
+              <>
+                <SessionButton sessionUrl={sessionUrl} />
+                <StartSessionDialog repository={repository} issue={card.issues[0] ?? null} />
+              </>
             ) : (
               <>
+                <SessionButton sessionUrl={sessionUrl} />
                 {card.pullRequest.mergeable === 'CONFLICTING' && (
                   <StartSessionDialog repository={repository} issue={card.issues[0] ?? null} conflictingPullRequest={card.pullRequest} />
                 )}

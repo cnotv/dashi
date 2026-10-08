@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionStart } from '@dashi/contracts'
-import { failureAdviceFor, startsSince } from './session-starts'
+import { failureAdviceFor, sessionUrlForCard, startsSince } from './session-starts'
 
 const startAt = (createdAt: string, overrides: Partial<SessionStart> = {}): SessionStart => ({
   startId: createdAt,
@@ -42,5 +42,32 @@ describe('failureAdviceFor', () => {
 
   it('says nothing for a start that did not fail', () => {
     expect(failureAdviceFor(startAt('2026-10-02T17:30:00Z'))).toBeNull()
+  })
+})
+
+describe('sessionUrlForCard', () => {
+  const dashi = { owner: 'cnotv', name: 'dashi' }
+  const url = (id: string): string => `https://claude.ai/code/${id}`
+
+  it('gives the newest session started for one of the card issues', () => {
+    const starts = [
+      startAt('2026-10-02T17:30:00Z', { sessionUrl: url('new') }),
+      startAt('2026-10-02T10:00:00Z', { sessionUrl: url('old') }),
+    ]
+    expect(sessionUrlForCard(starts, dashi, [55], null)).toBe(url('new'))
+  })
+
+  it('matches a start made for the card pull request', () => {
+    const starts = [startAt('2026-10-02T17:30:00Z', { issueNumber: null, pullRequestNumber: 9, sessionUrl: url('pull') })]
+    expect(sessionUrlForCard(starts, dashi, [], 9)).toBe(url('pull'))
+  })
+
+  it('skips starts without a session, in another repository or for another issue', () => {
+    const starts = [
+      startAt('2026-10-02T17:30:00Z', { sessionUrl: null }),
+      startAt('2026-10-02T17:20:00Z', { sessionUrl: url('other-repository'), repository: { owner: 'cnotv', name: 'example' } }),
+      startAt('2026-10-02T17:10:00Z', { sessionUrl: url('other-issue'), issueNumber: 7 }),
+    ]
+    expect(sessionUrlForCard(starts, dashi, [55], null)).toBeNull()
   })
 })

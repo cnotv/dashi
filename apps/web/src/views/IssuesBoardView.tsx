@@ -7,7 +7,9 @@ import { NetlifyControl } from '@/components/board/NetlifyControl'
 import { NewIssueDialog } from '@/components/board/NewIssueDialog'
 import { useBoards, useRepositories } from '@/hooks/useBoard'
 import { useCollapsedColumns } from '@/hooks/useCollapsedColumns'
+import { useSessionStarts } from '@/hooks/useSessionStarts'
 import { mergeBoards } from '@/lib/board-merge'
+import { sessionUrlForCard } from '@/lib/session-starts'
 import { issueStatusColors, issueStatusLabels, parseRepositoryKey, repositoryKey } from '@/lib/presentation'
 
 const skeletonColumnCount = 6
@@ -32,6 +34,7 @@ export const IssuesBoardView = () => {
   )
   const { boards, isLoading, errorMessage, refresh } = useBoards(shownRepositories)
   const columns = useMemo(() => mergeBoards(boards), [boards])
+  const { resource: sessionStarts } = useSessionStarts(0)
   const oldestFetchedAt = boards.map((board) => board.fetchedAt).sort()[0]
 
   const selectRepository = (nextKey: string): void => setSearchParams({ repository: nextKey }, { replace: true })
@@ -130,6 +133,12 @@ export const IssuesBoardView = () => {
                       card={card}
                       repository={repository}
                       showRepository={showsAllRepositories}
+                      sessionUrl={sessionUrlForCard(
+                        sessionStarts ?? [],
+                        repository,
+                        card.issues.map((issue) => issue.number),
+                        card.pullRequest?.number ?? null,
+                      )}
                       onPullRequestChanged={refresh}
                     />
                   ))}
