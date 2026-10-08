@@ -1,11 +1,12 @@
 import { Hono, type Context } from 'hono'
-import { getCookie } from 'hono/cookie'
+import { getCookie, setCookie } from 'hono/cookie'
 import { secureHeaders } from 'hono/secure-headers'
 import { z } from 'zod'
 import type { Board, CreatedIssue, CreatedSecretEntry, NetlifyStatus } from '@dashi/contracts'
 import { createActivityRoutes, createIngestRoutes, ingestApiPaths } from '../activity/activity-routes.ts'
 import type { PullRequestFinder } from '../activity/aggregate.ts'
-import { authCookieNamesFor, createAuthRoutes, publicApiPaths } from '../auth/auth-routes.ts'
+import { authCookieNamesFor, cookieOptionsFor, createAuthRoutes, publicApiPaths } from '../auth/auth-routes.ts'
+import { createSessionRenewer } from '../auth/session-credentials.ts'
 import { fetchPullRequestBodyHtml, fetchRepositoryBoard } from '../github/board.ts'
 import { mediaUrlFromBodyHtml } from '../github/media.ts'
 import { createIssue } from '../github/issues.ts'
@@ -93,8 +94,17 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnvironment> =
     return next()
   })
 
+  const renewSession = auth.githubSignIn === null ? null : createSessionRenewer(auth.sessionStore, auth.githubSignIn.client, auth.now)
+
   app.use('/api/*', async (context, next) => {
-    const session = auth.sessionStore.readSession(getCookie(context, sessionCookieName))
+    const sessionId = getCookie(context, sessionCookieName)
+    // Renewing before the read keeps a person who is using the dashboard signed in past the
+    // eight hours a GitHub user token lasts, and the cookie is extended to match.
+    const renewedLifetime = sessionId === undefined || renewSession === null ? null : await renewSession(sessionId)
+    if (sessionId !== undefined && renewedLifetime !== null) {
+      setCookie(context, sessionCookieName, sessionId, { ...cookieOptionsFor(auth.secureCookies), maxAge: Math.floor(renewedLifetime / 1000) })
+    }
+    const session = auth.sessionStore.readSession(sessionId)
     context.set('session', session)
     const needsNoSession =
       publicApiPaths.includes(context.req.path) ||

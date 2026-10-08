@@ -7,9 +7,15 @@ export interface GitHubSignInSettings {
   allowedLogins: string[]
 }
 
-export interface DashboardSession {
-  user: SignedInUser
+export interface SessionCredentials {
   githubToken: string
+  // Null when the GitHub App does not expire user tokens, so there is nothing to renew.
+  refreshToken: string | null
+  tokenExpiresAt: number
+}
+
+export interface DashboardSession extends SessionCredentials {
+  user: SignedInUser
   expiresAt: number
 }
 
@@ -19,7 +25,8 @@ export interface PendingSignIn {
 }
 
 export interface SessionStore {
-  createSession: (user: SignedInUser, githubToken: string, expiresAt: number) => string
+  createSession: (user: SignedInUser, credentials: SessionCredentials, expiresAt: number) => string
+  replaceCredentials: (sessionId: string | undefined, credentials: SessionCredentials, expiresAt: number) => void
   readSession: (sessionId: string | undefined) => DashboardSession | null
   removeSession: (sessionId: string | undefined) => void
   createPendingSignIn: (codeVerifier: string) => string
@@ -29,10 +36,13 @@ export interface SessionStore {
 export interface GitHubUserToken {
   accessToken: string
   expiresInSeconds: number | null
+  refreshToken: string | null
+  refreshTokenExpiresInSeconds: number | null
 }
 
 export interface GitHubAuthClient {
   exchangeCode: (code: string, codeVerifier: string) => Promise<GitHubUserToken>
+  refreshToken: (refreshToken: string) => Promise<GitHubUserToken>
   readUser: (accessToken: string) => Promise<SignedInUser>
 }
 

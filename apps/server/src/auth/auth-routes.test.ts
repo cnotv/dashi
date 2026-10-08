@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createTestApp, getRequest, jsonRequest } from '../app/test-app.ts'
 import { codeChallengeFor } from './pkce.ts'
+import { createSessionRenewer } from './session-credentials.ts'
 import { createSessionStore } from './session-store.ts'
 import type { GitHubAuthClient, GitHubSignIn } from './types.ts'
 
@@ -16,7 +17,10 @@ const createFakeClient = (login: string, receivedVerifiers: string[] = []): GitH
   exchangeCode: async (code, codeVerifier) => {
     receivedVerifiers.push(codeVerifier)
     if (code !== 'good-code') throw new Error('bad code')
-    return { accessToken: userToken, expiresInSeconds: 28800 }
+    return { accessToken: userToken, expiresInSeconds: 28800, refreshToken: null, refreshTokenExpiresInSeconds: null }
+  },
+  refreshToken: async () => {
+    throw new Error('not refreshable')
   },
   readUser: async () => ({ login, avatarUrl: `https://avatars.example/${login}` }),
 })
@@ -189,9 +193,47 @@ describe('session expiry', () => {
   it('forgets a session once its token has expired', async () => {
     const clock = { now: 0 }
     const sessionStore = createSessionStore(() => clock.now)
-    const sessionId = sessionStore.createSession({ login: 'cnotv', avatarUrl: '' }, userToken, 1000)
+    const sessionId = sessionStore.createSession({ login: 'cnotv', avatarUrl: '' }, { githubToken: userToken, refreshToken: null, tokenExpiresAt: 1000 }, 1000)
     expect(sessionStore.readSession(sessionId)).not.toBeNull()
     clock.now = 1000
     expect(sessionStore.readSession(sessionId)).toBeNull()
+  })
+})
+
+describe('session renewal', () => {
+  const user = { login: 'cnotv', avatarUrl: '' }
+  const minute = 60_000
+
+  it('swaps the token shortly before it expires and extends the session', async () => {
+    const clock = { now: 0 }
+    const sessionStore = createSessionStore(() => clock.now)
+    const refreshedWith: string[] = []
+    const client: GitHubAuthClient = {
+      ...createFakeClient('cnotv'),
+      refreshToken: async (refreshToken) => {
+        refreshedWith.push(refreshToken)
+        return { accessToken: 'ghu_renewed', expiresInSeconds: 28800, refreshToken: 'ghr_next', refreshTokenExpiresInSeconds: 15_552_000 }
+      },
+    }
+    const renew = createSessionRenewer(sessionStore, client, () => clock.now)
+    const sessionId = sessionStore.createSession(user, { githubToken: userToken, refreshToken: 'ghr_first', tokenExpiresAt: 60 * minute }, 1000 * minute)
+
+    expect(await renew(sessionId)).toBeNull()
+    clock.now = 58 * minute
+    const [first, second] = await Promise.all([renew(sessionId), renew(sessionId)])
+
+    expect(refreshedWith).toEqual(['ghr_first'])
+    expect(first).toBe(second)
+    expect(sessionStore.readSession(sessionId)).toEqual(
+      expect.objectContaining({ githubToken: 'ghu_renewed', refreshToken: 'ghr_next', tokenExpiresAt: 58 * minute + 8 * 60 * minute }),
+    )
+  })
+
+  it('leaves the session alone when GitHub refuses the refresh', async () => {
+    const sessionStore = createSessionStore(() => 0)
+    const renew = createSessionRenewer(sessionStore, createFakeClient('cnotv'), () => 0)
+    const sessionId = sessionStore.createSession(user, { githubToken: userToken, refreshToken: 'ghr_first', tokenExpiresAt: minute }, 1000 * minute)
+    expect(await renew(sessionId)).toBeNull()
+    expect(sessionStore.readSession(sessionId)?.githubToken).toBe(userToken)
   })
 })

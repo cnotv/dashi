@@ -4,10 +4,9 @@ import type { SessionState } from '@dashi/contracts'
 import type { AppEnvironment } from '../app/types.ts'
 import { buildAuthorizeUrl, isAllowedLogin } from './github-auth.ts'
 import { createRandomToken } from './pkce.ts'
+import { credentialsFromUserToken } from './session-credentials.ts'
 import type { AuthCookieNames, AuthDependencies, GitHubSignIn, SignInFailure } from './types.ts'
 
-// GitHub App user tokens last eight hours; a session never outlives the token it carries.
-const maximumSessionMilliseconds = 8 * 60 * 60_000
 const pendingSignInSeconds = 10 * 60
 
 /**
@@ -23,6 +22,14 @@ export const authCookieNamesFor = (secureCookies: boolean): AuthCookieNames => {
   return { session: `${prefix}dashi_session`, pendingSignIn: `${prefix}dashi_sign_in` }
 }
 
+/**
+ * The attributes every session cookie carries.
+ * @param secureCookies Whether the dashboard is served over https.
+ * @returns The cookie options.
+ */
+export const cookieOptionsFor = (secureCookies: boolean) =>
+  ({ httpOnly: true, secure: secureCookies, sameSite: 'Lax', path: '/' }) as const
+
 export const publicApiPaths = ['/api/health', '/api/auth/session', '/api/auth/github/start', '/api/auth/github/callback']
 
 const signInFailedPath = (failure: SignInFailure): string => `/?sign-in-error=${failure}`
@@ -33,7 +40,7 @@ const signInFailedPath = (failure: SignInFailure): string => `/?sign-in-error=${
  */
 export const createAuthRoutes = ({ sessionStore, githubSignIn, signInRequired, secureCookies, now }: AuthDependencies) => {
   const cookieNames = authCookieNamesFor(secureCookies)
-  const cookieOptions = { httpOnly: true, secure: secureCookies, sameSite: 'Lax', path: '/' } as const
+  const cookieOptions = cookieOptionsFor(secureCookies)
   const routes = new Hono<AppEnvironment>()
 
   routes.get('/session', (context) => {
@@ -56,8 +63,8 @@ export const createAuthRoutes = ({ sessionStore, githubSignIn, signInRequired, s
     const userToken = await signIn.client.exchangeCode(code, codeVerifier)
     const user = await signIn.client.readUser(userToken.accessToken)
     if (!isAllowedLogin(user.login, signIn.settings.allowedLogins)) return 'not-allowed'
-    const lifetimeMilliseconds = Math.min(maximumSessionMilliseconds, (userToken.expiresInSeconds ?? Infinity) * 1000)
-    return { sessionId: sessionStore.createSession(user, userToken.accessToken, now() + lifetimeMilliseconds), lifetimeMilliseconds }
+    const { credentials, expiresAt, lifetimeMilliseconds } = credentialsFromUserToken(userToken, now())
+    return { sessionId: sessionStore.createSession(user, credentials, expiresAt), lifetimeMilliseconds }
   }
 
   routes.get('/github/start', (context) => {
