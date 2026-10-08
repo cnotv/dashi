@@ -143,7 +143,7 @@ describe('environment vault', () => {
     createVault(database, { mode: 'environment', environmentKey: generateKeyMaterial() }).saveSecret('github-token', sampleToken)
     const restartedVault = createVault(database, { mode: 'environment', environmentKey: generateKeyMaterial() })
     expect(restartedVault.readState()).toEqual({ mode: 'environment', initialised: true, unlocked: false })
-    expect(() => restartedVault.readSecretValue('github-token')).toThrow('locked')
+    expect(restartedVault.readSecretValue('github-token')).toBeNull()
   })
 
   it('rotates every secret to a new key', () => {
@@ -165,7 +165,7 @@ describe('passphrase vault', () => {
     vault.initialise(strongPassphrase)
     vault.saveSecret('github-token', sampleToken)
     vault.lock()
-    expect(() => vault.readSecretValue('github-token')).toThrow('locked')
+    expect(vault.readSecretValue('github-token')).toBeNull()
     expect(() => vault.unlock('wrong passphrase entirely')).toThrow('Wrong passphrase')
     vault.unlock(strongPassphrase)
     expect(vault.readSecretValue('github-token')).toBe(sampleToken)

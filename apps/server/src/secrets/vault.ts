@@ -337,8 +337,10 @@ export const createVault = (database: DatabaseSync, options: VaultOptions): Vaul
     })
   }
 
+  // Using a token (starting a session, filing an issue) must keep working with the vault locked;
+  // only managing the credentials needs it open. A locked vault therefore reads as "no token".
   const readSecretValue = (name: string): string | null => {
-    const inUseRow = inUseRowOf(name)
+    const inUseRow = vaultMemory.activeKey === null ? null : inUseRowOf(name)
     return inUseRow === null ? null : decryptValue(requireActiveKey(), inUseRow, inUseRow.name)
   }
 
