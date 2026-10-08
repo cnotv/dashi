@@ -135,10 +135,15 @@ A Netlify personal access token for the board's Netlify button is stored the sam
 keys for Anthropic, OpenAI and OpenRouter, kept for sessions that are not on a subscription,
 though no session uses them yet.
 
-Each credential's dialog links to the page where that token or key is created. Under each credential, **How
-Dashi uses it** lists what Dashi does with it, every API call it makes, the permissions the token
+Each credential's dialog links to the page where that token or key is created. The question mark beside each credential opens **How
+Dashi uses it**, which lists what Dashi does with it, every API call it makes, the permissions the token
 needs, and links to that API's documentation. The Anthropic, OpenAI and OpenRouter keys are marked
 **Not used yet**: Dashi keeps them but no session reads them, and only Test calls their API.
+
+The machine panels below the credentials, **Set up a machine**, **Connect Claude Code** and
+**Laptop runner**, have the same question mark beside their titles, for the tokens they issue: the ingest token
+a machine reports with, the runner token the laptop runner polls with, and the pairing that hands
+both to the dashi CLI.
 
 A credential can hold several tokens, each with a name, such as a personal and a work GitHub
 token. A credential's tokens are a radio group: the selected one, marked **In use**, is the one

@@ -1,4 +1,4 @@
-import type { CredentialGuide } from './types'
+import type { CredentialGuide, MachineGuideName } from './types'
 
 export const credentialGuides: Record<string, CredentialGuide> = {
   'github-token': {
@@ -78,5 +78,62 @@ export const credentialGuides: Record<string, CredentialGuide> = {
       { label: 'OpenRouter quickstart', url: 'https://openrouter.ai/docs/quickstart' },
       { label: 'Claude Code through a gateway (ANTHROPIC_BASE_URL)', url: 'https://code.claude.com/docs/en/llm-gateway' },
     ],
+  },
+}
+
+// The panels that connect a machine are not stored credentials, but each issues tokens, so each gets the same guide.
+export const machineGuides: Record<MachineGuideName, CredentialGuide> = {
+  'machine-setup': {
+    isUsedByDashi: true,
+    usedFor:
+      'Connects a Mac or Linux machine in one command: the dashi CLI is approved here with a code and receives its tokens directly, so none is pasted or shown.',
+    calls: [
+      'GET /api/cli/script and /api/cli/script-info: the CLI and its hash, checked before it runs',
+      'POST /api/pairings: the CLI asks for a code, signed out',
+      'GET /api/pairings/{pairingId}: the CLI waits for you to approve the code',
+      'POST /api/pairing-requests/approve: Approve on the pair page, which creates an ingest token and, if ticked, a runner token',
+      'GET and DELETE /api/machine/whoami: dashi doctor and dashi disconnect, with the machine’s own token',
+    ],
+    permissions: [
+      'Approving needs a signed-in session in cloud mode; the CLI itself holds no session.',
+      'The tokens it receives are the ingest and runner tokens described under Connect Claude Code and Laptop runner.',
+    ],
+    docs: [{ label: 'Set up a machine with the dashi CLI', url: 'https://github.com/cnotv/dashi#set-up-a-machine-with-the-dashi-cli' }],
+  },
+  'connect-claude-code': {
+    isUsedByDashi: true,
+    usedFor:
+      'An ingest token for one machine. The workflow plugin’s hook and Claude Code’s telemetry send with it; it can write session activity and token counts and read nothing back.',
+    calls: [
+      'POST /api/events: the hook reports SessionStart, UserPromptSubmit, Notification, Stop and SessionEnd',
+      'POST /api/telemetry/v1/metrics: Claude Code’s OpenTelemetry token usage, per session and model',
+    ],
+    permissions: [
+      'Sent as DASHI_TOKEN and in the OTLP Authorization header, both in ~/.claude/settings.json on that machine.',
+      'Shown once; the dashboard keeps only its hash. Revoke cuts the machine off.',
+    ],
+    docs: [
+      { label: 'Claude Code hooks', url: 'https://code.claude.com/docs/en/hooks' },
+      { label: 'Claude Code monitoring and usage', url: 'https://code.claude.com/docs/en/monitoring-usage' },
+      { label: 'The workflow plugin (agent-base)', url: 'https://github.com/cnotv/agent-base#what-the-reporter-sends' },
+    ],
+  },
+  'laptop-runner': {
+    isUsedByDashi: true,
+    usedFor:
+      'A runner token for one machine. The runner polls with it for sessions started from the board and reports back; the dashboard never connects to the laptop.',
+    calls: [
+      'POST /api/runner/claim: takes the next start waiting for this machine',
+      'POST /api/runner/starts/{startId}: reports a start’s progress and result',
+      'POST /api/runner/chat-work: takes chat messages to type into a session',
+      'POST /api/runner/chat/{sessionId}: sends the transcript while that session’s chat drawer is open',
+      'POST /api/runner/deliveries/{deliveryId}: reports whether a chat message was typed',
+    ],
+    permissions: [
+      'Can only take and report starts and chat; it cannot read the board, credentials or other machines.',
+      'The runner clones with your own git credentials on that machine, never one from here.',
+      'Shown once inside the install commands; the dashboard keeps only its hash. Revoke cuts the runner off.',
+    ],
+    docs: [{ label: 'The laptop runner', url: 'https://github.com/cnotv/dashi#the-laptop-runner' }],
   },
 }

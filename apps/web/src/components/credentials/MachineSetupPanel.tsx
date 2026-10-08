@@ -2,11 +2,13 @@ import { Card, Flex, Heading, SegmentedControl, Text } from '@radix-ui/themes'
 import { useState } from 'react'
 import type { MachinePlatform } from '@dashi/contracts'
 import { usePolledResource } from '@/hooks/usePolledResource'
+import { machineGuides } from '@/lib/credential-guides'
 import { dashboardApi } from '@/lib/api'
 import { cliConnectCommands, platformLabels, platformOfUserAgent } from '@/lib/machine-setup'
 import { dashboardAddress } from '@/lib/runtime-configuration'
 import { CollapsibleSteps } from './CollapsibleSteps'
 import { CopyableSnippet } from './CopyableSnippet'
+import { CredentialGuideDialog } from './CredentialGuideDialog'
 import { ServedScriptSource } from './ServedScriptSource'
 
 // What dashi connect does, said plainly, so it can be checked against the source before it runs.
@@ -32,9 +34,12 @@ export const MachineSetupPanel = () => {
     <Card size="2" id="set-up-a-machine">
       <Flex direction="column" gap="4">
         <Flex direction="column" gap="1" maxWidth="620px">
-          <Heading as="h2" size="3" weight="medium">
-            Set up a machine
-          </Heading>
+          <Flex align="center" gap="2">
+            <Heading as="h2" size="3" weight="medium">
+              Set up a machine
+            </Heading>
+            <CredentialGuideDialog label="Set up a machine" guide={machineGuides['machine-setup']} />
+          </Flex>
           <Text size="2" color="gray">
             One command connects a Mac or Linux machine. Its Claude Code sessions then report here, and, if you choose, it runs the
             sessions you start from the board. You approve it on this dashboard with a code. The panels below do the same by hand.

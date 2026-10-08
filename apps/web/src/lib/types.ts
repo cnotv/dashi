@@ -245,6 +245,8 @@ export interface CredentialDocLink {
   url: string
 }
 
+export type MachineGuideName = 'machine-setup' | 'connect-claude-code' | 'laptop-runner'
+
 // What Dashi does with a credential, shown under it on the Credentials page.
 export interface CredentialGuide {
   isUsedByDashi: boolean
