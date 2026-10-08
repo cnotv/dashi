@@ -73,10 +73,21 @@ const AvailabilityNotice = ({ chat }: { chat: SessionChat }) => {
     return (
       <Callout.Root color="gray" variant="surface">
         <Callout.Text>
-          This session is not on the laptop. Claude cloud sessions can only be read and answered in the Claude app.{' '}
+          This session is not on the laptop. A cloud session shows here once its hooks say which cloud session they run in, with
+          the workflow plugin 0.6.0 or later; until then, read and answer it in the Claude app.{' '}
           <Link href={claudeSessionsUrl} target="_blank" rel="noopener noreferrer">
             Open Claude <ExternalLinkIcon />
           </Link>
+        </Callout.Text>
+      </Callout.Root>
+    )
+  }
+  if (chat.availability === 'in-cloud' && chat.messages.length === 0) {
+    return (
+      <Callout.Root color="gray" variant="surface">
+        <Callout.Text>
+          Nothing from this cloud session has reached Dashi yet. Its prompts and replies arrive through the workflow plugin&rsquo;s
+          hook once its cloud environment can reach Dashi: see Claude cloud routines under Credentials.
         </Callout.Text>
       </Callout.Root>
     )
@@ -177,6 +188,14 @@ const ChatBody = ({ target }: { target: ChatTarget }) => {
 
   return (
     <>
+      {chat.availability === 'in-cloud' ? (
+        <SourceTags
+          sourceIds={['workflow-status-hook', 'laptop-runner']}
+          note="The cloud session's prompts and final replies, from its hooks; tool calls are not shown. Messages go out through the laptop runner."
+        />
+      ) : (
+        <SourceTags sourceIds={['laptop-runner']} note="The session's Claude Code transcript" />
+      )}
       <Flex direction="column" gap="3" className="chat-messages">
         <AvailabilityNotice chat={chat} />
         {timeline.map((item) =>
@@ -188,14 +207,15 @@ const ChatBody = ({ target }: { target: ChatTarget }) => {
         )}
         <div ref={endRef} />
       </Flex>
-      {chat.availability === 'on-laptop' && <ChatComposer target={target} sendBlocker={chat.sendBlocker} />}
+      {(chat.availability === 'on-laptop' || chat.availability === 'in-cloud') && <ChatComposer target={target} sendBlocker={chat.sendBlocker} />}
     </>
   )
 }
 
 /**
  * A session's conversation as a chat, in a drawer from the side: the transcript the laptop runner
- * reads live, and a box that sends the next message through it.
+ * reads live, or for a cloud session what its hooks reported, and a box that sends the next
+ * message through the runner.
  */
 export const SessionChatDrawer = ({ subject, onClose }: SessionChatDrawerProps) => (
   <Dialog.Root open={subject !== null} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -215,7 +235,6 @@ export const SessionChatDrawer = ({ subject, onClose }: SessionChatDrawerProps) 
                   {subject.detail}
                 </Text>
               </Flex>
-              <SourceTags sourceIds={['laptop-runner']} note="The session's Claude Code transcript" />
             </Flex>
             <Dialog.Close>
               <IconButton size="2" variant="ghost" color="gray" aria-label="Close">

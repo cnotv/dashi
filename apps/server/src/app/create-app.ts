@@ -4,6 +4,7 @@ import { secureHeaders } from 'hono/secure-headers'
 import { z } from 'zod'
 import type { Board, CreatedIssue, CreatedSecretEntry, NetlifyStatus } from '@dashi/contracts'
 import { createActivityRoutes, createIngestRoutes, ingestApiPaths } from '../activity/activity-routes.ts'
+import type { CloudHookRecorder } from '../activity/types.ts'
 import type { PullRequestFinder } from '../activity/aggregate.ts'
 import { authCookieNamesFor, cookieOptionsFor, createAuthRoutes, publicApiPaths } from '../auth/auth-routes.ts'
 import { createSessionRenewer } from '../auth/session-credentials.ts'
@@ -19,6 +20,7 @@ import type { PreviewArtifactsBySha } from '../media/types.ts'
 import { activeStatusOf, enableNetlifyForRepository, fetchNetlifySites, findSiteForRepository } from '../netlify/sites.ts'
 import { findRepository } from '../repos/load-repositories.ts'
 import { createChatRelay } from '../session-chat/chat-relay.ts'
+import { createCloudConversationStore } from '../session-chat/cloud-conversations.ts'
 import { createRunnerChatRoutes, createSessionChatRoutes } from '../session-chat/session-chat-routes.ts'
 import { createMachineRoutes, machineApiPathPrefixes } from '../machines/machine-routes.ts'
 import { createPairingRelay } from '../machines/pairing-relay.ts'
@@ -132,7 +134,15 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnvironment> =
       .find((card) => card.pullRequest?.headRefName === branch)?.pullRequest?.number ?? null
 
   app.route('/api/auth', createAuthRoutes(auth))
-  app.route('/api', createIngestRoutes(activity))
+  // A cloud session's prompts and replies are scrubbed of every stored secret before they are kept.
+  const cloudConversations = createCloudConversationStore(dependencies.now)
+  const recordCloudHook: CloudHookRecorder = (hookSessionId, cloudSessionId, message) =>
+    cloudConversations.recordHook(
+      hookSessionId,
+      cloudSessionId,
+      message === null ? null : { ...message, text: createRedactor(vault.readAllSecretValues())(message.text) },
+    )
+  app.route('/api', createIngestRoutes(activity, recordCloudHook))
   app.route('/api', createActivityRoutes(activity, findPullRequest, dependencies.sessionStarts.startStore.listStartsSince))
   const markPullRequestDraft: PullRequestDraftMarker = async (session, repository, pullRequestNumber) => {
     const githubToken = session?.githubToken ?? vault.readSecretValue('github-token')
@@ -152,6 +162,7 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnvironment> =
   app.route('/api/runner', createRunnerRoutes(sessionStartDependencies))
   const sessionChatDependencies = {
     chatRelay: createChatRelay(dependencies.now),
+    cloudConversations,
     activityStore: activity.activityStore,
     runnerTokens: dependencies.sessionStarts.runnerTokens,
     startStore: dependencies.sessionStarts.startStore,

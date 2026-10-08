@@ -14,9 +14,10 @@ import type {
 } from '@dashi/contracts'
 import { repositoryKey } from '@/lib/presentation'
 import { chatKeyOf } from '@/lib/session-chat'
-import type { DashboardApi, DemoPullRequestOutcome } from '@/lib/types'
+import type { ChatTarget, DashboardApi, DemoPullRequestOutcome } from '@/lib/types'
 import {
   sampleChatMessages,
+  sampleCloudChatMessages,
   sampleIngestTokens,
   sampleRunnerTokens,
   sampleSessionStarts,
@@ -71,7 +72,11 @@ export const createDemoApi = (): DashboardApi => {
     chatMessages: new Map(),
     createdIssues: new Map(),
   }
-  const chatMessagesOf = (chatKey: string): ChatMessage[] => demoMemory.chatMessages.get(chatKey) ?? sampleChatMessages
+  const chatMessagesOf = (chatKey: string, isCloud: boolean): ChatMessage[] =>
+    demoMemory.chatMessages.get(chatKey) ?? (isCloud ? sampleCloudChatMessages : sampleChatMessages)
+  const isCloudChat = (target: ChatTarget): boolean =>
+    target.kind === 'start' &&
+    demoMemory.sessionStarts.some((start) => start.startId === target.startId && (start.target === 'cloud-routine' || start.target === 'laptop-cloud'))
 
   const entriesOf = (name: string): SecretEntrySummary[] => demoMemory.secrets.find((secret) => secret.name === name)?.entries ?? []
   // As on the server, the oldest token takes over when the one in use is removed.
@@ -147,15 +152,18 @@ export const createDemoApi = (): DashboardApi => {
       return demoNetlifySite(repository)
     },
     readSessions: async (hours) => sampleSessionsOverview(hours, Date.now()),
-    readSessionChat: async (target) => ({
-      sessionId: chatKeyOf(target),
-      availability: 'on-laptop',
-      deliveryRoute: 'tmux',
-      sendBlocker: null,
-      messages: chatMessagesOf(chatKeyOf(target)),
-      deliveries: [],
-      updatedAt: new Date().toISOString(),
-    }),
+    readSessionChat: async (target) => {
+      const isCloud = isCloudChat(target)
+      return {
+        sessionId: chatKeyOf(target),
+        availability: isCloud ? 'in-cloud' : 'on-laptop',
+        deliveryRoute: isCloud ? 'cloud' : 'tmux',
+        sendBlocker: null,
+        messages: chatMessagesOf(chatKeyOf(target), isCloud),
+        deliveries: [],
+        updatedAt: new Date().toISOString(),
+      }
+    },
     sendChatMessage: async (target, text) => {
       const createdAt = new Date().toISOString()
       const typedMessage: ChatMessage = { messageId: `demo-typed-${createdAt}`, role: 'user', kind: 'text', text, toolName: null, createdAt }
@@ -168,7 +176,7 @@ export const createDemoApi = (): DashboardApi => {
         createdAt,
       }
       const chatKey = chatKeyOf(target)
-      demoMemory.chatMessages = new Map([...demoMemory.chatMessages, [chatKey, [...chatMessagesOf(chatKey), typedMessage, reply]]])
+      demoMemory.chatMessages = new Map([...demoMemory.chatMessages, [chatKey, [...chatMessagesOf(chatKey, isCloudChat(target)), typedMessage, reply]]])
       return { deliveryId: `demo-${createdAt}`, text, state: 'delivered', message: null, createdAt }
     },
     readUsage: async (days) => sampleUsageReport(days, Date.now()),

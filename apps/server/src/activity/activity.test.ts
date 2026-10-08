@@ -543,7 +543,7 @@ describe('ingest and read routes', () => {
   it('refuses an oversized event body', async () => {
     const { app, token } = setUp()
     const response = await app.request(
-      jsonRequest('POST', '/api/events', { session_id: 's1', hook_event_name: 'Stop', padding: 'x'.repeat(70 * 1024) }, { authorization: `Bearer ${token}` }),
+      jsonRequest('POST', '/api/events', { session_id: 's1', hook_event_name: 'Stop', padding: 'x'.repeat(520 * 1024) }, { authorization: `Bearer ${token}` }),
     )
     expect(response.status).toBe(413)
   })

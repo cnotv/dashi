@@ -6,6 +6,7 @@ import type {
   SessionStart,
 } from '@dashi/contracts'
 import type { MachineTokenStore } from '../machine-tokens/types.ts'
+import type { CloudHookMessage } from '../session-chat/types.ts'
 import type { hookPayloadSchema, keyValueSchema, otlpMetricsSchema } from './schema.ts'
 
 export type HookPayload = z.infer<typeof hookPayloadSchema>
@@ -113,6 +114,10 @@ export interface ActivityDependencies {
   ingestTokens: MachineTokenStore
   now: () => number
 }
+
+// Hands a cloud session's hook to its chat: the session id in the payload, the cloud session it
+// runs in, and the prompt or reply it carried.
+export type CloudHookRecorder = (hookSessionId: string, cloudSessionId: string, message: CloudHookMessage | null) => void
 
 export type UsageStart = Pick<SessionStart, 'startId' | 'repository' | 'target' | 'sessionUrl'>
 

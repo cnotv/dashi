@@ -4,9 +4,10 @@ import { z } from 'zod'
 import { bearerTokenOf, limitTo, readJsonBody } from '../app/http.ts'
 import type { AppEnvironment } from '../app/types.ts'
 import { buildSessionsOverview, buildUsageReport, type PullRequestFinder } from './aggregate.ts'
-import { agentEventFrom, tokenUsagePointsFrom } from './ingest.ts'
+import { cloudSessionIdOf } from '../session-chat/cloud-conversations.ts'
+import { agentEventFrom, hookChatMessageOf, tokenUsagePointsFrom } from './ingest.ts'
 import { hookPayloadSchema, otlpMetricsSchema } from './schema.ts'
-import type { ActivityDependencies, UsageStart } from './types.ts'
+import type { ActivityDependencies, CloudHookRecorder, UsageStart } from './types.ts'
 
 // Reached by Claude Code and Codex rather than a browser, so they carry an ingest token
 // instead of a sign-in; the session guard lets exactly these through.
@@ -22,9 +23,11 @@ const clampedNumber = (value: string | undefined, fallback: number, minimum: num
 
 /**
  * Builds the routes Claude Code and Codex report to: hook events and OTLP token metrics, each behind an ingest token.
+ * @param dependencies The activity store, the ingest tokens and the clock.
+ * @param recordCloudHook Takes a cloud session's hooks, which make up its chat.
  * @returns The routes, mounted under /api.
  */
-export const createIngestRoutes = ({ activityStore, ingestTokens, now }: ActivityDependencies) => {
+export const createIngestRoutes = ({ activityStore, ingestTokens, now }: ActivityDependencies, recordCloudHook: CloudHookRecorder) => {
   const routes = new Hono<AppEnvironment & { Variables: { ingestTokenId: string } }>()
   // The token's id is kept so usage can be told apart by the machine that reported it.
   const requireIngestToken = createMiddleware<{ Variables: { ingestTokenId: string } }>(async (context, next) => {
@@ -34,7 +37,8 @@ export const createIngestRoutes = ({ activityStore, ingestTokens, now }: Activit
     return next()
   })
 
-  routes.post('/events', requireIngestToken, limitTo(64 * 1024), async (context) => {
+  // Room for a long final reply, which a cloud session's Stop hook carries whole.
+  routes.post('/events', requireIngestToken, limitTo(512 * 1024), async (context) => {
     const parsedPayload = hookPayloadSchema.safeParse(await readJsonBody(context.req.raw))
     if (!parsedPayload.success) return context.json({ error: 'Unrecognised event' }, 400)
     const event = agentEventFrom(
@@ -54,6 +58,11 @@ export const createIngestRoutes = ({ activityStore, ingestTokens, now }: Activit
       new Date(now()).toISOString(),
     )
     if (event !== null) activityStore.recordEvent(event)
+    const cloudSessionId = cloudSessionIdOf(context.req.header('x-agent-cloud-session'))
+    const hookSessionId = parsedPayload.data.session_id
+    if (cloudSessionId !== null && hookSessionId !== undefined) {
+      recordCloudHook(hookSessionId, cloudSessionId, hookChatMessageOf(parsedPayload.data))
+    }
     return context.body(null, 204)
   })
 

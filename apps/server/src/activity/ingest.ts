@@ -9,6 +9,7 @@ import type {
   TokenType,
   TokenUsagePoint,
 } from './types.ts'
+import type { CloudHookMessage } from '../session-chat/types.ts'
 import { sessionBillingOf } from './origin.ts'
 
 const tokenUsageMetricName = 'claude_code.token.usage'
@@ -112,6 +113,20 @@ export const agentEventFrom = (payload: HookPayload, headers: HookHeaders, occur
     origin: originFrom(headers),
     occurredAt,
   }
+}
+
+/**
+ * Picks the line of conversation a Claude Code hook carries: the prompt it was given, or the
+ * final reply of the turn that just ended.
+ * @param payload The hook's JSON body.
+ * @returns The message, or null for a hook that carries neither.
+ */
+export const hookChatMessageOf = (payload: HookPayload): CloudHookMessage | null => {
+  if (payload.hook_event_name === 'UserPromptSubmit' && payload.prompt !== undefined) return { role: 'user', text: payload.prompt }
+  if (payload.hook_event_name === 'Stop' && payload.last_assistant_message !== undefined) {
+    return { role: 'assistant', text: payload.last_assistant_message }
+  }
+  return null
 }
 
 const attributeValue = (attributes: OtlpKeyValue[], key: string): string | null => {

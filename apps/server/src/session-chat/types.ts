@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import type { AgentSessionState, ChatDelivery, SessionChat } from '@dashi/contracts'
+import type { AgentSessionState, ChatDelivery, ChatMessage, ChatMessageRole, SessionChat } from '@dashi/contracts'
 import type { deliveryReportSchema, runnerChatReportSchema } from './schema.ts'
 
 export type RunnerChatReport = z.infer<typeof runnerChatReportSchema>
@@ -17,6 +17,8 @@ export interface ChatWorkStart {
 export interface ChatWorkContext {
   sessionState: AgentSessionState | null
   start: ChatWorkStart | null
+  // Set for a cloud session, which the runner sends to with claude --cloud instead of reading.
+  cloudSessionId: string | null
 }
 
 export interface ChatWorkSession extends ChatWorkContext {
@@ -47,8 +49,32 @@ export interface ChatRelayState {
 
 export interface ChatRelay {
   readChat: (sessionId: string, isRunnerOnline: boolean) => SessionChat
+  listDeliveries: (sessionId: string) => ChatDelivery[]
   queueMessage: (sessionId: string, text: string) => ChatDelivery | null
   takeWork: (contextOf: (sessionId: string) => ChatWorkContext) => ChatWork
   recordTranscript: (sessionId: string, report: RunnerChatReport) => boolean
   recordDeliveryReport: (deliveryId: string, report: DeliveryReport) => boolean
+}
+
+// One line of a cloud session's conversation, as a hook reported it: what it was asked, or a
+// turn's final reply.
+export interface CloudHookMessage {
+  role: ChatMessageRole
+  text: string
+}
+
+export interface CloudConversation {
+  messages: ChatMessage[]
+  updatedAt: number
+}
+
+export interface CloudConversationState {
+  conversations: Map<string, CloudConversation>
+  cloudSessionByHookSession: Map<string, string>
+}
+
+export interface CloudConversationStore {
+  recordHook: (hookSessionId: string, cloudSessionId: string, message: CloudHookMessage | null) => void
+  cloudSessionOf: (hookSessionId: string) => string | null
+  readMessages: (cloudSessionId: string) => ChatMessage[]
 }
