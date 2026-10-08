@@ -195,6 +195,34 @@ describe('details, retry and routine tests', () => {
     expect((await app.request(jsonRequest('POST', `/api/session-starts/${startId}/retry`, {}))).status).toBe(409)
   })
 
+  it('discards a queued or failed start, which no runner then claims', async () => {
+    const { app, runnerTokens, startStore } = createTestApp()
+    const { token } = runnerTokens.createToken('Mac mini')
+    const queuedId = await startIdOf(await app.request(jsonRequest('POST', '/api/session-starts', startBody())))
+    const failedId = await startIdOf(await app.request(jsonRequest('POST', '/api/session-starts', startBody())))
+    startStore.recordOutcome(failedId, { state: 'failed', sessionUrl: null, message: 'No runner' })
+
+    expect((await app.request(jsonRequest('DELETE', `/api/session-starts/${queuedId}`, {}))).status).toBe(204)
+    expect((await app.request(jsonRequest('DELETE', `/api/session-starts/${failedId}`, {}))).status).toBe(204)
+    expect((await app.request(jsonRequest('DELETE', `/api/session-starts/${queuedId}`, {}))).status).toBe(404)
+    expect(await (await app.request(getRequest('/api/session-starts'))).json()).toEqual([])
+    expect((await app.request(runnerRequest('/claim', token))).status).toBe(204)
+  })
+
+  it('keeps a start a runner is launching or that started', async () => {
+    const { app, runnerTokens, startStore } = createTestApp()
+    const { token } = runnerTokens.createToken('Mac mini')
+    const claimedId = await startIdOf(await app.request(jsonRequest('POST', '/api/session-starts', startBody())))
+    await app.request(runnerRequest('/claim', token))
+    const startedId = await startIdOf(await app.request(jsonRequest('POST', '/api/session-starts', startBody())))
+    startStore.recordOutcome(startedId, { state: 'started', sessionUrl: null, message: null })
+
+    expect((await app.request(jsonRequest('DELETE', `/api/session-starts/${claimedId}`, {}))).status).toBe(409)
+    expect((await app.request(jsonRequest('DELETE', `/api/session-starts/${startedId}`, {}))).status).toBe(409)
+    expect(startStore.readStart(claimedId)?.state).toBe('claimed')
+    expect(startStore.readStart(startedId)?.state).toBe('started')
+  })
+
   it('tests a routine with a run told to change nothing', async () => {
     const { app, firedRoutines } = createTestApp()
     expect((await app.request(jsonRequest('POST', '/api/repositories/cnotv/generative-art/routine/test', {}))).status).toBe(412)

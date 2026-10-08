@@ -4,16 +4,16 @@ import type {
   GateOverallState,
   GateState,
   HeadlessPermissionMode,
-  IssueStatus,
   RepositoryReference,
   SessionStartState,
   StartTarget,
   StartWorkflow,
 } from '@dashi/contracts'
-import type { GateRingGroup, RadixColor, StartModelSource } from './types'
+import type { BoardColumnStatus, GateRingGroup, RadixColor, StartModelSource } from './types'
 
-export const issueStatusLabels: Record<IssueStatus, string> = {
+export const issueStatusLabels: Record<BoardColumnStatus, string> = {
   'no-pull-request': 'No pull request',
+  'started-from-dashi': 'Started from Dashi',
   draft: 'Draft',
   'checks-running': 'Checks running',
   'checks-failing': 'Checks failing',
@@ -22,8 +22,9 @@ export const issueStatusLabels: Record<IssueStatus, string> = {
   closed: 'Closed',
 }
 
-export const issueStatusColors: Record<IssueStatus, RadixColor> = {
+export const issueStatusColors: Record<BoardColumnStatus, RadixColor> = {
   'no-pull-request': 'gray',
+  'started-from-dashi': 'jade',
   draft: 'sky',
   'checks-running': 'amber',
   'checks-failing': 'red',

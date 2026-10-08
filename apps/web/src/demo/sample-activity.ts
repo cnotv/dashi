@@ -275,6 +275,23 @@ const minutesBefore = (now: number, minutes: number): string => new Date(now - m
  */
 export const sampleSessionStarts = (now: number): SessionStart[] => [
   {
+    startId: 'demo-start-queued',
+    repository: { owner: 'cnotv', name: 'example' },
+    issueNumber: 14,
+    pullRequestNumber: null,
+    workflow: 'feature',
+    target: 'laptop-headless',
+    permissionMode: 'auto',
+    openRouterModel: null,
+    note: '',
+    state: 'queued',
+    runnerLabel: null,
+    sessionUrl: null,
+    message: null,
+    createdAt: minutesBefore(now, 5),
+    updatedAt: minutesBefore(now, 5),
+  },
+  {
     startId: 'demo-start-failed',
     repository: { owner: 'cnotv', name: 'example' },
     issueNumber: 5,

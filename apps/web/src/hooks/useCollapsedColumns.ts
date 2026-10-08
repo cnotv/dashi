@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { IssueStatus } from '@dashi/contracts'
 import { parseCollapsedStatuses, toggleCollapsedStatus } from '@/lib/board-columns'
+import type { BoardColumnStatus } from '@/lib/types'
 
 const storageKey = 'dashi.board.collapsed-columns'
 
@@ -13,7 +13,7 @@ const readStoredValue = (): string | null => {
   }
 }
 
-const writeStoredValue = (collapsedStatuses: IssueStatus[]): void => {
+const writeStoredValue = (collapsedStatuses: BoardColumnStatus[]): void => {
   try {
     window.localStorage.setItem(storageKey, JSON.stringify(collapsedStatuses))
   } catch {
@@ -26,9 +26,9 @@ const writeStoredValue = (collapsedStatuses: IssueStatus[]): void => {
  * @returns The folded statuses and a toggle for one column.
  */
 export const useCollapsedColumns = () => {
-  const [collapsedStatuses, setCollapsedStatuses] = useState<IssueStatus[]>(() => parseCollapsedStatuses(readStoredValue()))
+  const [collapsedStatuses, setCollapsedStatuses] = useState<BoardColumnStatus[]>(() => parseCollapsedStatuses(readStoredValue()))
 
-  const toggleColumn = (status: IssueStatus): void => {
+  const toggleColumn = (status: BoardColumnStatus): void => {
     const nextStatuses = toggleCollapsedStatus(collapsedStatuses, status)
     setCollapsedStatuses(nextStatuses)
     writeStoredValue(nextStatuses)

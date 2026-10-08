@@ -19,6 +19,7 @@ export interface SessionStartStore {
   readStart: (startId: string) => SessionStart | null
   claimNextLaptopStart: (runnerLabel: string) => SessionStart | null
   recordRunnerReport: (startId: string, runnerLabel: string, report: RunnerReport) => SessionStart | null
+  discardUnstartedStart: (startId: string) => boolean
   recordOutcome: (startId: string, outcome: { state: 'started' | 'failed'; sessionUrl: string | null; message: string | null }) => SessionStart
 }
 

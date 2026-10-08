@@ -265,6 +265,9 @@ export const createDemoApi = (): DashboardApi => {
       demoMemory.sessionStarts = [retried, ...demoMemory.sessionStarts]
       return retried
     },
+    discardSessionStart: async (startId) => {
+      demoMemory.sessionStarts = demoMemory.sessionStarts.filter((listedStart) => listedStart.startId !== startId)
+    },
     testRoutine: async (repository) =>
       demoMemory.routineRepositoryKeys.has(repositoryKey(repository))
         ? { ok: true, sessionUrl: 'https://claude.ai/code' }

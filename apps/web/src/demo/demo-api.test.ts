@@ -35,6 +35,13 @@ describe('createDemoApi', () => {
     expect(JSON.stringify(await demoApi.listSessionStarts())).not.toContain(screenshot.base64)
   })
 
+  it('discards a start in memory', async () => {
+    const demoApi = createDemoApi()
+    const [queuedStart] = await demoApi.listSessionStarts()
+    await demoApi.discardSessionStart(queuedStart!.startId)
+    expect((await demoApi.listSessionStarts()).map((start) => start.startId)).not.toContain(queuedStart!.startId)
+  })
+
   it('keeps several tokens per credential in memory, showing only their last four characters', async () => {
     const demoApi = createDemoApi()
     const entriesOf = async () => (await demoApi.listSecrets()).find((secret) => secret.name === 'openrouter-api-key')?.entries ?? []
