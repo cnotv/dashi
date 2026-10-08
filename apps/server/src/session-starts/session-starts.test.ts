@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { createDraftGithub, createTestApp, getRequest, jsonRequest } from '../app/test-app.ts'
-import { sessionNameFor, sessionPromptFor } from './prompt.ts'
+import { sessionNameFor, sessionPromptFor, statusReportingSection } from './prompt.ts'
 
 const repository = { owner: 'cnotv', name: 'generative-art' }
 const startBody = (overrides: Record<string, unknown> = {}) => ({
@@ -50,17 +50,17 @@ describe('a start on a pull request', () => {
 describe('sessionPromptFor', () => {
   it('names the workflow for the router, links the issue and adds the note', () => {
     expect(sessionPromptFor({ repository, issueNumber: 42, pullRequestNumber: null, workflow: 'fix', note: 'Only the physics.' }, [])).toBe(
-      '/workflow:start fix https://github.com/cnotv/generative-art/issues/42\n\nOnly the physics.',
+      `/workflow:start fix https://github.com/cnotv/generative-art/issues/42\n\nOnly the physics.\n\n${statusReportingSection}`,
     )
     expect(sessionPromptFor({ repository, issueNumber: null, pullRequestNumber: null, workflow: 'research', note: '' }, [])).toBe(
-      '/workflow:start research',
+      `/workflow:start research\n\n${statusReportingSection}`,
     )
     expect(sessionNameFor({ repository, issueNumber: 42, pullRequestNumber: null, workflow: 'fix' })).toBe('generative-art #42 fix')
   })
 
   it('points a conflicts start at its pull request', () => {
     const conflictsStart = { repository, issueNumber: 42, pullRequestNumber: 43, workflow: 'conflicts' as const, note: '' }
-    expect(sessionPromptFor(conflictsStart, [])).toBe('/workflow:start conflicts https://github.com/cnotv/generative-art/pull/43')
+    expect(sessionPromptFor(conflictsStart, [])).toBe(`/workflow:start conflicts https://github.com/cnotv/generative-art/pull/43\n\n${statusReportingSection}`)
     expect(sessionNameFor(conflictsStart)).toBe('generative-art #43 conflicts')
   })
 })
@@ -74,6 +74,7 @@ describe('attachments', () => {
       [
         '/workflow:start fix https://github.com/cnotv/generative-art/issues/42',
         'See the image.',
+        statusReportingSection,
         'Attachments, as base64. Decode each into a file outside the repository with `base64 -d` and read it:',
         `ramp.png (image/png):\n\`\`\`base64\n${screenshot.base64}\n\`\`\``,
       ].join('\n\n'),
@@ -89,7 +90,7 @@ describe('attachments', () => {
     expect(await (await app.request(getRequest('/api/session-starts'))).text()).not.toContain(screenshot.base64)
 
     const claim = await (await app.request(runnerRequest('/claim', token))).json()
-    expect(claim).toMatchObject({ prompt: '/workflow:start fix https://github.com/cnotv/generative-art/issues/42', attachments: [screenshot] })
+    expect(claim).toMatchObject({ prompt: `/workflow:start fix https://github.com/cnotv/generative-art/issues/42\n\n${statusReportingSection}`, attachments: [screenshot] })
 
     await app.request(jsonRequest('POST', '/api/session-starts', startBody()))
     expect(await (await app.request(runnerRequest('/claim', token))).json()).toMatchObject({ attachments: [] })
@@ -132,7 +133,7 @@ describe('details, retry and routine tests', () => {
     const startId = await startIdOf(await app.request(jsonRequest('POST', '/api/session-starts', startBody({ note: 'Keep it small' }))))
     expect(await (await app.request(getRequest(`/api/session-starts/${startId}`))).json()).toMatchObject({
       start: { startId, state: 'queued' },
-      firstMessage: '/workflow:start fix https://github.com/cnotv/generative-art/issues/42\n\nKeep it small',
+      firstMessage: `/workflow:start fix https://github.com/cnotv/generative-art/issues/42\n\nKeep it small\n\n${statusReportingSection}`,
     })
     expect((await app.request(getRequest('/api/session-starts/unknown'))).status).toBe(404)
   })
@@ -157,6 +158,20 @@ describe('details, retry and routine tests', () => {
     expect((await app.request(jsonRequest('DELETE', `/api/session-starts/${startId}`, {}))).status).toBe(204)
     expect(startStore.readStart(startId)).toBeNull()
     expect((await app.request(jsonRequest('DELETE', `/api/session-starts/${startId}`, {}))).status).toBe(404)
+  })
+
+  it('keeps the state an agent reports, behind an ingest token, and says when the start is unknown', async () => {
+    const { app, startStore, ingestTokens } = createTestApp()
+    const startId = await startIdOf(await app.request(jsonRequest('POST', '/api/session-starts', startBody())))
+    const statusPath = `/api/session-starts/${startId}/status`
+    const report = { status: 'waiting', note: 'Which of the two layouts?' }
+    expect((await app.request(jsonRequest('POST', statusPath, report))).status).toBe(401)
+    const { token } = ingestTokens.createToken('laptop')
+    const authorization = { authorization: `Bearer ${token}` }
+    expect((await app.request(jsonRequest('POST', statusPath, report, authorization))).status).toBe(204)
+    expect(startStore.readStart(startId)).toMatchObject({ agentStatus: 'waiting', agentStatusNote: 'Which of the two layouts?' })
+    expect((await app.request(jsonRequest('POST', statusPath, { status: 'sleeping' }, authorization))).status).toBe(400)
+    expect((await app.request(jsonRequest('POST', '/api/session-starts/unknown/status', report, authorization))).status).toBe(404)
   })
 
   it('retries only failed starts', async () => {
@@ -209,7 +224,7 @@ describe('laptop starts', () => {
     const claimResponse = await app.request(runnerRequest('/claim', token))
     expect(await claimResponse.json()).toMatchObject({
       start: { startId: queuedStartId, state: 'claimed', runnerLabel: 'Mac mini' },
-      prompt: '/workflow:start fix https://github.com/cnotv/generative-art/issues/42\n\nKeep it small',
+      prompt: `/workflow:start fix https://github.com/cnotv/generative-art/issues/42\n\nKeep it small\n\n${statusReportingSection}`,
       sessionName: 'generative-art #42 fix',
     })
     expect((await app.request(runnerRequest('/claim', token))).status).toBe(204)
@@ -282,7 +297,7 @@ describe('cloud routine starts', () => {
     const started = await (await app.request(jsonRequest('POST', '/api/session-starts', startBody({ target: 'cloud-routine' })))).json()
     expect(started).toMatchObject({ state: 'started', sessionUrl: 'https://claude.ai/code/session_01Fired' })
     expect(firedRoutines).toEqual([
-      { routineId: 'trig_01ABCDEFGHJK', routineToken, text: '/workflow:start fix https://github.com/cnotv/generative-art/issues/42' },
+      { routineId: 'trig_01ABCDEFGHJK', routineToken, text: `/workflow:start fix https://github.com/cnotv/generative-art/issues/42\n\n${statusReportingSection}` },
     ])
   })
 

@@ -6,12 +6,15 @@ import type { AppEnvironment } from '../app/types.ts'
 import { buildSessionsOverview, buildUsageReport, type PullRequestFinder } from './aggregate.ts'
 import { cloudSessionIdOf } from '../session-chat/cloud-conversations.ts'
 import { agentEventFrom, hookChatMessageOf, tokenUsagePointsFrom } from './ingest.ts'
+import { agentStatusSchema } from '../session-starts/schema.ts'
 import { hookPayloadSchema, otlpMetricsSchema } from './schema.ts'
-import type { ActivityDependencies, CloudHookRecorder, UsageStart } from './types.ts'
+import type { ActivityDependencies, AgentStatusRecorder, CloudHookRecorder, UsageStart } from './types.ts'
 
 // Reached by Claude Code and Codex rather than a browser, so they carry an ingest token
 // instead of a sign-in; the session guard lets exactly these through.
 export const ingestApiPaths = ['/api/events', '/api/telemetry/v1/metrics']
+// An agent saying what state it is in; it can only write that one field of its own start.
+export const agentStatusApiPathPattern = /^\/api\/session-starts\/[^/]+\/status$/
 
 const hourMilliseconds = 60 * 60_000
 const createTokenBodySchema = z.object({ label: z.string().trim().min(1).max(80) })
@@ -22,12 +25,13 @@ const clampedNumber = (value: string | undefined, fallback: number, minimum: num
 }
 
 /**
- * Builds the routes Claude Code and Codex report to: hook events and OTLP token metrics, each behind an ingest token.
+ * Builds the routes Claude Code and Codex report to: hook events, OTLP token metrics and an agent's own status, each behind an ingest token.
  * @param dependencies The activity store, the ingest tokens and the clock.
  * @param recordCloudHook Takes a cloud session's hooks, which make up its chat.
+ * @param recordAgentStatus Keeps the state an agent reports for its own start.
  * @returns The routes, mounted under /api.
  */
-export const createIngestRoutes = ({ activityStore, ingestTokens, now }: ActivityDependencies, recordCloudHook: CloudHookRecorder) => {
+export const createIngestRoutes = ({ activityStore, ingestTokens, now }: ActivityDependencies, recordCloudHook: CloudHookRecorder, recordAgentStatus: AgentStatusRecorder) => {
   const routes = new Hono<AppEnvironment & { Variables: { ingestTokenId: string } }>()
   // The token's id is kept so usage can be told apart by the machine that reported it.
   const requireIngestToken = createMiddleware<{ Variables: { ingestTokenId: string } }>(async (context, next) => {
@@ -64,6 +68,14 @@ export const createIngestRoutes = ({ activityStore, ingestTokens, now }: Activit
       recordCloudHook(hookSessionId, cloudSessionId, hookChatMessageOf(parsedPayload.data))
     }
     return context.body(null, 204)
+  })
+
+  routes.post('/session-starts/:startId/status', requireIngestToken, limitTo(8 * 1024), async (context) => {
+    const parsedReport = agentStatusSchema.safeParse(await readJsonBody(context.req.raw))
+    if (!parsedReport.success) return context.json({ error: 'Send {"status": "working" | "waiting" | "blocked" | "done", "note": "..."}' }, 400)
+    return recordAgentStatus(context.req.param('startId'), parsedReport.data)
+      ? context.body(null, 204)
+      : context.json({ error: 'Unknown start' }, 404)
   })
 
   routes.post('/telemetry/v1/metrics', requireIngestToken, limitTo(1024 * 1024), async (context) => {

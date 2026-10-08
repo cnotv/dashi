@@ -96,7 +96,7 @@ line in the body when the change is not on the default route.
 - **In cloud mode every `/api` route needs a signed-in session**, except the ones listed in
   `publicApiPaths` in `apps/server/src/auth/auth-routes.ts`. Add to that list only what a
   signed-out browser must reach to sign in. The routes in `ingestApiPaths`
-  (`apps/server/src/activity/activity-routes.ts`) skip the session because agents, not
+  and `agentStatusApiPathPattern` (`apps/server/src/activity/activity-routes.ts`) skip the session because agents, not
   browsers, call them; each needs an ingest token instead, and nothing there may read data.
 - **GitHub user tokens stay in memory.** Sessions are never persisted; a restart signs people
   out rather than a token reaching the disk.

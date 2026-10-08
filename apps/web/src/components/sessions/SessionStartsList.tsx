@@ -4,7 +4,7 @@ import type { SessionStart } from '@dashi/contracts'
 import { useToast } from '@/hooks/useToast'
 import { dashboardApi } from '@/lib/api'
 import { SourceTags } from '@/components/charts/SourceTags'
-import { sessionStartStateColors, sessionStartStateLabels, startTargetLabels } from '@/lib/presentation'
+import { agentStatusColors, agentStatusDescriptions, agentStatusLabels, sessionStartStateColors, sessionStartStateLabels, startTargetLabels } from '@/lib/presentation'
 import { canChatWithStart } from '@/lib/session-chat'
 import { startsSince } from '@/lib/session-starts'
 
@@ -69,11 +69,28 @@ const StartActions = ({
   </Flex>
 )
 
-const StartState = ({ start }: { start: SessionStart }) => (
-  <Flex direction="column" gap="1" align="start">
+// Once a started session has said what it is doing, that replaces "Started", which only says it launched.
+const StartBadge = ({ start }: { start: SessionStart }) =>
+  start.state === 'started' && start.agentStatus !== null ? (
+    <Tooltip content={`${agentStatusDescriptions[start.agentStatus]} Reported ${new Date(start.agentStatusAt ?? start.updatedAt).toLocaleString()}.`}>
+      <Badge color={agentStatusColors[start.agentStatus]} radius="full">
+        {agentStatusLabels[start.agentStatus]}
+      </Badge>
+    </Tooltip>
+  ) : (
     <Badge color={sessionStartStateColors[start.state]} radius="full">
       {sessionStartStateLabels[start.state]}
     </Badge>
+  )
+
+const StartState = ({ start }: { start: SessionStart }) => (
+  <Flex direction="column" gap="1" align="start">
+    <StartBadge start={start} />
+    {start.agentStatusNote && start.state === 'started' && (
+      <Text size="1" color="gray">
+        {start.agentStatusNote}
+      </Text>
+    )}
     {start.sessionUrl ? (
       <Link href={start.sessionUrl} target="_blank" rel="noopener noreferrer" size="1">
         <Flex gap="1" align="center" asChild>

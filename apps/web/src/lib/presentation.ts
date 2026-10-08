@@ -7,6 +7,7 @@ import type {
   IssueStatus,
   RepositoryReference,
   SessionStartState,
+  AgentReportedStatus,
   StartTarget,
   StartWorkflow,
 } from '@dashi/contracts'
@@ -105,6 +106,28 @@ export const sessionStartStateLabels: Record<SessionStartState, string> = {
   claimed: 'Starting',
   started: 'Started',
   failed: 'Failed',
+}
+
+export const agentStatusColors: Record<AgentReportedStatus, RadixColor> = {
+  working: 'green',
+  waiting: 'amber',
+  blocked: 'red',
+  done: 'blue',
+}
+
+export const agentStatusLabels: Record<AgentReportedStatus, string> = {
+  working: 'Working',
+  waiting: 'Waiting for you',
+  blocked: 'Blocked',
+  done: 'Done',
+}
+
+// The same meanings the agent is given in its first message, so the badge and the agent agree.
+export const agentStatusDescriptions: Record<AgentReportedStatus, string> = {
+  working: 'The agent is doing the task.',
+  waiting: 'The agent needs an answer or a decision from you before it can go on.',
+  blocked: 'The agent cannot go on without outside help, such as a failing check or missing access.',
+  done: 'The agent finished and has nothing left to do.',
 }
 
 export const gateOverallLabels: Record<GateOverallState, string> = {

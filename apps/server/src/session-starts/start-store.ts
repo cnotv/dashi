@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
-import type { RepositoryReference, SessionStart, SessionStartState, StartTarget } from '@dashi/contracts'
+import type { AgentReportedStatus, RepositoryReference, SessionStart, SessionStartState, StartTarget } from '@dashi/contracts'
 import { sessionStartRequestSchema } from './schema.ts'
 import type { RoutineStore, SessionStartStore } from './types.ts'
 
 const recentStartCount = 50
 const laptopTargets: StartTarget[] = ['laptop-remote-control', 'laptop-headless', 'laptop-cloud']
 const startStates: SessionStartState[] = ['queued', 'claimed', 'started', 'failed']
+const agentStatuses: AgentReportedStatus[] = ['working', 'waiting', 'blocked', 'done']
 
 const readOptionalText = (row: Record<string, unknown>, column: string): string | null =>
   typeof row[column] === 'string' ? row[column] : null
@@ -24,6 +25,9 @@ const toSessionStart = (row: Record<string, unknown>): SessionStart | null => {
     runnerLabel: readOptionalText(row, 'runner_label'),
     sessionUrl: readOptionalText(row, 'session_url'),
     message: readOptionalText(row, 'message'),
+    agentStatus: agentStatuses.find((status) => status === row.agent_status) ?? null,
+    agentStatusNote: readOptionalText(row, 'agent_status_note'),
+    agentStatusAt: readOptionalText(row, 'agent_status_at'),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   }
@@ -55,6 +59,11 @@ export const createSessionStartStore = (database: DatabaseSync, now: () => numbe
     );
     CREATE INDEX IF NOT EXISTS session_starts_by_time ON session_starts (created_at);
   `)
+  // Databases made before agents could report a status get its columns here.
+  const startColumns = database.prepare('PRAGMA table_info(session_starts)').all().map((column) => String(column.name))
+  ;['agent_status', 'agent_status_note', 'agent_status_at']
+    .filter((column) => !startColumns.includes(column))
+    .forEach((column) => database.exec(`ALTER TABLE session_starts ADD COLUMN ${column} TEXT`))
   const nowIso = (): string => new Date(now()).toISOString()
   const readStart = (startId: string): SessionStart | null =>
     toSessionStart(database.prepare('SELECT * FROM session_starts WHERE start_id = ?').get(startId) ?? {})
@@ -85,6 +94,12 @@ export const createSessionStartStore = (database: DatabaseSync, now: () => numbe
         .all(since)
         .flatMap(startsOfRow),
     readStart,
+    recordAgentStatus: (startId, report) => {
+      const updateResult = database
+        .prepare('UPDATE session_starts SET agent_status = ?, agent_status_note = ?, agent_status_at = ? WHERE start_id = ?')
+        .run(report.status, report.note, nowIso(), startId)
+      return updateResult.changes === 1
+    },
     deleteStart: (startId) => database.prepare('DELETE FROM session_starts WHERE start_id = ?').run(startId).changes === 1,
     // The oldest queued laptop start goes to whichever runner asks first; the state check in
     // the UPDATE keeps two runners asking at once from both getting it.

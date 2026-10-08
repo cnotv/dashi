@@ -315,6 +315,16 @@ export type StartTarget = 'laptop-remote-control' | 'laptop-headless' | 'laptop-
 
 export type HeadlessPermissionMode = 'auto' | 'acceptEdits' | 'dontAsk'
 
+// What the agent says about itself, apart from where the start itself got to:
+// working: doing the task; waiting: needs an answer or a decision from the person;
+// blocked: cannot go on without outside help; done: finished and has nothing left to do.
+export type AgentReportedStatus = 'working' | 'waiting' | 'blocked' | 'done'
+
+export interface AgentStatusReport {
+  status: AgentReportedStatus
+  note: string | null
+}
+
 export type SessionStartState = 'queued' | 'claimed' | 'started' | 'failed'
 
 export interface SessionStartRequest {
@@ -354,6 +364,9 @@ export interface SessionStart extends SessionStartRequest {
   runnerLabel: string | null
   sessionUrl: string | null
   message: string | null
+  agentStatus: AgentReportedStatus | null
+  agentStatusNote: string | null
+  agentStatusAt: string | null
   createdAt: string
   updatedAt: string
 }

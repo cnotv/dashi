@@ -220,6 +220,9 @@ export const createDemoApi = (): DashboardApi => {
         runnerLabel: request.target === 'cloud-routine' ? null : 'Mac mini',
         sessionUrl: null,
         message: attachments.length === 0 ? 'Demo mode: nothing was started' : 'Demo mode: nothing was started, and its attachments stayed in this page',
+        agentStatus: null,
+        agentStatusNote: null,
+        agentStatusAt: null,
         createdAt: now,
         updatedAt: now,
       }
@@ -245,6 +248,9 @@ export const createDemoApi = (): DashboardApi => {
         state: 'started',
         sessionUrl: null,
         message: 'Demo mode: nothing was started',
+        agentStatus: null,
+        agentStatusNote: null,
+        agentStatusAt: null,
         createdAt: now,
         updatedAt: now,
       }

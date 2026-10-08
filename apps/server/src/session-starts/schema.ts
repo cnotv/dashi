@@ -41,6 +41,11 @@ export const runnerReportSchema = z.object({
   message: z.string().max(2000).nullable().default(null),
 })
 
+export const agentStatusSchema = z.object({
+  status: z.enum(['working', 'waiting', 'blocked', 'done']),
+  note: z.string().trim().max(500).nullable().default(null),
+})
+
 export const routineSettingsBodySchema = z.object({
   routineId: z.string().regex(/^trig_[A-Za-z0-9]{8,64}$/),
   token: z.string().trim().min(20).max(512),

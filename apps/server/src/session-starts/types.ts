@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import type { RepositoryReference, SessionStart, SessionStartRequest, StartAttachment } from '@dashi/contracts'
+import type { AgentStatusReport, RepositoryReference, SessionStart, SessionStartRequest, StartAttachment } from '@dashi/contracts'
 import type { DashboardSession } from '../auth/types.ts'
 import type { MachineTokenStore } from '../machine-tokens/types.ts'
 import type { Vault } from '../secrets/types.ts'
@@ -17,6 +17,7 @@ export interface SessionStartStore {
   listRecentStarts: () => SessionStart[]
   listStartsSince: (since: string) => SessionStart[]
   readStart: (startId: string) => SessionStart | null
+  recordAgentStatus: (startId: string, report: AgentStatusReport) => boolean
   deleteStart: (startId: string) => boolean
   claimNextLaptopStart: (runnerLabel: string) => SessionStart | null
   recordRunnerReport: (startId: string, runnerLabel: string, report: RunnerReport) => SessionStart | null

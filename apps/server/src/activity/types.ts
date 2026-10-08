@@ -1,6 +1,7 @@
 import type { z } from 'zod'
 import type {
   AgentProvider,
+  AgentStatusReport,
   AgentSessionState,
   RepositoryReference,
   SessionStart,
@@ -118,6 +119,9 @@ export interface ActivityDependencies {
 // Hands a cloud session's hook to its chat: the session id in the payload, the cloud session it
 // runs in, and the prompt or reply it carried.
 export type CloudHookRecorder = (hookSessionId: string, cloudSessionId: string, message: CloudHookMessage | null) => void
+
+// Keeps what an agent says about its own start, and tells whether that start exists.
+export type AgentStatusRecorder = (startId: string, report: AgentStatusReport) => boolean
 
 export type UsageStart = Pick<SessionStart, 'startId' | 'repository' | 'target' | 'sessionUrl'>
 

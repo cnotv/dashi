@@ -188,6 +188,7 @@ sends.
 | [GitHub GraphQL API](https://docs.github.com/en/graphql) | Issues and pull requests, for the board | Fetched by the server | The pull request of a branch on Usage, read from boards already fetched |
 | [Claude Code routines](https://code.claude.com/docs/en/routines) | A session started on claude.ai | Called by the server | Cloud starts in Started from the board |
 | [Laptop runner](#the-laptop-runner) | Starts run on your machine, an open chat's transcript from `~/.claude/projects`, and chat messages sent on to cloud sessions | Polls `/api/runner/*` | Laptop starts, the session chat, and `DASHI_START_ID` on the sessions it starts |
+| The agent itself | Its own state (`working`, `waiting`, `blocked`, `done`) and a one-line note, which the first message of every started session explains and tells it to send with `DASHI_URL`, `DASHI_TOKEN` and `DASHI_START_ID` | `POST /api/session-starts/:startId/status` | The badge on the Sessions page's Started from the board list, in place of Started |
 | [Workflow plugin hook](https://github.com/cnotv/agent-base#what-the-reporter-sends) | What launched each session and what pays for it, as kinds: entrypoint, terminal, launching app, billing kind, API host, Dashi start id; the cloud session it runs in | `POST /api/events` headers | Triggered by and Billed through on Usage and Sessions; which start a cloud chat belongs to |
 | [Dashi machine token](#set-up-a-machine-with-the-dashi-cli) | Which connected machine sent a report | Every ingest request | By machine on Usage |
 

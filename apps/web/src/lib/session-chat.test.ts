@@ -66,6 +66,9 @@ describe('canChatWithStart', () => {
     runnerLabel: null,
     sessionUrl: 'https://claude.ai/code/session_01HJKLMNOP',
     message: null,
+    agentStatus: null,
+    agentStatusNote: null,
+    agentStatusAt: null,
     createdAt: '2026-10-08T10:00:00Z',
     updatedAt: '2026-10-08T10:00:00Z',
   }

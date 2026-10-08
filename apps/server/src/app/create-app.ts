@@ -3,8 +3,8 @@ import { getCookie, setCookie } from 'hono/cookie'
 import { secureHeaders } from 'hono/secure-headers'
 import { z } from 'zod'
 import type { Board, CreatedIssue, CreatedSecretEntry, NetlifyStatus } from '@dashi/contracts'
-import { createActivityRoutes, createIngestRoutes, ingestApiPaths } from '../activity/activity-routes.ts'
-import type { CloudHookRecorder } from '../activity/types.ts'
+import { agentStatusApiPathPattern, createActivityRoutes, createIngestRoutes, ingestApiPaths } from '../activity/activity-routes.ts'
+import type { AgentStatusRecorder, CloudHookRecorder } from '../activity/types.ts'
 import type { PullRequestFinder } from '../activity/aggregate.ts'
 import { authCookieNamesFor, cookieOptionsFor, createAuthRoutes, publicApiPaths } from '../auth/auth-routes.ts'
 import { createSessionRenewer } from '../auth/session-credentials.ts'
@@ -111,6 +111,7 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnvironment> =
     const needsNoSession =
       publicApiPaths.includes(context.req.path) ||
       ingestApiPaths.includes(context.req.path) ||
+      agentStatusApiPathPattern.test(context.req.path) ||
       context.req.path.startsWith(runnerApiPathPrefix) ||
       machineApiPathPrefixes.some((pathPrefix) => context.req.path.startsWith(pathPrefix))
     if (auth.signInRequired && session === null && !needsNoSession) {
@@ -142,7 +143,13 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnvironment> =
       cloudSessionId,
       message === null ? null : { ...message, text: createRedactor(vault.readAllSecretValues())(message.text) },
     )
-  app.route('/api', createIngestRoutes(activity, recordCloudHook))
+  // The note is free text from an agent, so it is scrubbed of every stored secret before it is kept.
+  const recordAgentStatus: AgentStatusRecorder = (startId, report) =>
+    dependencies.sessionStarts.startStore.recordAgentStatus(startId, {
+      ...report,
+      note: report.note === null ? null : createRedactor(vault.readAllSecretValues())(report.note),
+    })
+  app.route('/api', createIngestRoutes(activity, recordCloudHook, recordAgentStatus))
   app.route('/api', createActivityRoutes(activity, findPullRequest, dependencies.sessionStarts.startStore.listStartsSince))
   const markPullRequestDraft: PullRequestDraftMarker = async (session, repository, pullRequestNumber) => {
     const githubToken = session?.githubToken ?? vault.readSecretValue('github-token')
