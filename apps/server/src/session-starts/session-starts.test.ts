@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { createDraftGithub, createTestApp, getRequest, jsonRequest } from '../app/test-app.ts'
-import { sessionNameFor, sessionPromptFor } from './prompt.ts'
+import { sessionNameFor, sessionPromptFor } from '@dashi/contracts/first-message'
 
 const repository = { owner: 'cnotv', name: 'generative-art' }
 const startBody = (overrides: Record<string, unknown> = {}) => ({
@@ -15,6 +15,8 @@ const startBody = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 })
 const routineToken = 'sk-ant-oat01-exampleRoutineToken0123456789'
+const issueStart: Parameters<typeof sessionPromptFor>[0] = { repository, issueNumber: 42, pullRequestNumber: null, workflow: 'fix', note: '' }
+const firstMessageOf = (overrides: Partial<typeof issueStart> = {}): string => sessionPromptFor({ ...issueStart, ...overrides }, [])
 
 const startIdOf = async (response: Response): Promise<string> => z.object({ startId: z.string() }).parse(await response.json()).startId
 
@@ -48,19 +50,56 @@ describe('a start on a pull request', () => {
 })
 
 describe('sessionPromptFor', () => {
-  it('names the workflow for the router, links the issue and adds the note', () => {
-    expect(sessionPromptFor({ repository, issueNumber: 42, pullRequestNumber: null, workflow: 'fix', note: 'Only the physics.' }, [])).toBe(
-      '/workflow:start fix https://github.com/cnotv/generative-art/issues/42\n\nOnly the physics.',
-    )
-    expect(sessionPromptFor({ repository, issueNumber: null, pullRequestNumber: null, workflow: 'research', note: '' }, [])).toBe(
-      '/workflow:start research',
-    )
-    expect(sessionNameFor({ repository, issueNumber: 42, pullRequestNumber: null, workflow: 'fix' })).toBe('generative-art #42 fix')
+  it('opens with the router line, then the note, then the workflow spelled out', () => {
+    const [routerLine, note, introduction, skillLine, steps] = sessionPromptFor({ ...issueStart, note: 'Only the physics.' }, []).split('\n\n')
+    expect(routerLine).toBe('/workflow:start fix https://github.com/cnotv/generative-art/issues/42')
+    expect(note).toBe('Only the physics.')
+    expect(introduction).toContain('`fix` workflow on https://github.com/cnotv/generative-art/issues/42')
+    expect(skillLine).toContain('run the `workflow:start` skill yourself with `fix https://github.com/cnotv/generative-art/issues/42`')
+    expect(steps?.split('\n').every((step, stepIndex) => step.startsWith(`${stepIndex + 1}. `))).toBe(true)
+    expect(sessionNameFor(issueStart)).toBe('generative-art #42 fix')
   })
 
-  it('points a conflicts start at its pull request', () => {
-    const conflictsStart = { repository, issueNumber: 42, pullRequestNumber: 43, workflow: 'conflicts' as const, note: '' }
-    expect(sessionPromptFor(conflictsStart, [])).toBe('/workflow:start conflicts https://github.com/cnotv/generative-art/pull/43')
+  it('names the branch after the issue and allows pushing it, so the board links the work', () => {
+    expect(firstMessageOf()).toContain("`fix/42-<two or three word slug of the issue title>`")
+    expect(firstMessageOf({ workflow: 'feature' })).toContain('`feat/42-')
+    expect(firstMessageOf({ workflow: 'tests' })).toContain('`test/42-')
+    expect(firstMessageOf()).toContain("this message is the owner's permission to create and push it")
+  })
+
+  it('asks for the draft pull request, the checks, the git rules and staying until green', () => {
+    const message = firstMessageOf()
+    expect(message).toContain('open a draft pull request against the default branch, titled `<type>: <summary> (#42)`')
+    expect(message).toContain('`Closes #42`')
+    expect(message).toContain("run the repository's checks")
+    expect(message).toContain('`--force-with-lease`')
+    expect(message).toContain('waiting 2, 4, 8 and 16 seconds')
+    expect(message).toContain('Stay with the pull request until it is green and mergeable')
+    expect(message).toContain('mark the pull request ready')
+  })
+
+  it('has a start without an issue write one first', () => {
+    const message = firstMessageOf({ issueNumber: null })
+    expect(message.split('\n\n')[0]).toBe('/workflow:start fix')
+    expect(message).toContain('Write the issue from the note first')
+    expect(message).toContain('`fix/<issue-number>-')
+  })
+
+  it('keeps a research start to an answer, with no branch or pull request', () => {
+    const message = firstMessageOf({ workflow: 'research' })
+    expect(message).toContain('Change nothing: no branch, commit or pull request.')
+    expect(message).toContain('Post the answer as a comment on the issue')
+    expect(message).not.toContain('Branch:')
+    expect(message).not.toContain('draft pull request')
+  })
+
+  it("points a conflicts start at its pull request and keeps it on that pull request's branch", () => {
+    const conflictsStart = { ...issueStart, pullRequestNumber: 43, workflow: 'conflicts' as const }
+    const message = sessionPromptFor(conflictsStart, [])
+    expect(message.split('\n\n')[0]).toBe('/workflow:start conflicts https://github.com/cnotv/generative-art/pull/43')
+    expect(message).toContain("Work on the pull request's own branch: no new issue, branch or pull request.")
+    expect(message).toContain('stop and ask which wins')
+    expect(message).not.toContain('Branch:')
     expect(sessionNameFor(conflictsStart)).toBe('generative-art #43 conflicts')
   })
 })
@@ -69,11 +108,10 @@ describe('attachments', () => {
   const screenshot = { name: 'ramp.png', mediaType: 'image/png', base64: Buffer.from('not really a png').toString('base64') }
 
   it('carries the attachments of a session that only takes text inside its prompt', () => {
-    const prompt = sessionPromptFor({ repository, issueNumber: 42, pullRequestNumber: null, workflow: 'fix', note: 'See the image.' }, [screenshot])
+    const prompt = sessionPromptFor({ ...issueStart, note: 'See the image.' }, [screenshot])
     expect(prompt).toBe(
       [
-        '/workflow:start fix https://github.com/cnotv/generative-art/issues/42',
-        'See the image.',
+        sessionPromptFor({ ...issueStart, note: 'See the image.' }, []),
         'Attachments, as base64. Decode each into a file outside the repository with `base64 -d` and read it:',
         `ramp.png (image/png):\n\`\`\`base64\n${screenshot.base64}\n\`\`\``,
       ].join('\n\n'),
@@ -89,7 +127,7 @@ describe('attachments', () => {
     expect(await (await app.request(getRequest('/api/session-starts'))).text()).not.toContain(screenshot.base64)
 
     const claim = await (await app.request(runnerRequest('/claim', token))).json()
-    expect(claim).toMatchObject({ prompt: '/workflow:start fix https://github.com/cnotv/generative-art/issues/42', attachments: [screenshot] })
+    expect(claim).toMatchObject({ prompt: firstMessageOf(), attachments: [screenshot] })
 
     await app.request(jsonRequest('POST', '/api/session-starts', startBody()))
     expect(await (await app.request(runnerRequest('/claim', token))).json()).toMatchObject({ attachments: [] })
@@ -132,7 +170,7 @@ describe('details, retry and routine tests', () => {
     const startId = await startIdOf(await app.request(jsonRequest('POST', '/api/session-starts', startBody({ note: 'Keep it small' }))))
     expect(await (await app.request(getRequest(`/api/session-starts/${startId}`))).json()).toMatchObject({
       start: { startId, state: 'queued' },
-      firstMessage: '/workflow:start fix https://github.com/cnotv/generative-art/issues/42\n\nKeep it small',
+      firstMessage: firstMessageOf({ note: 'Keep it small' }),
     })
     expect((await app.request(getRequest('/api/session-starts/unknown'))).status).toBe(404)
   })
@@ -201,7 +239,7 @@ describe('laptop starts', () => {
     const claimResponse = await app.request(runnerRequest('/claim', token))
     expect(await claimResponse.json()).toMatchObject({
       start: { startId: queuedStartId, state: 'claimed', runnerLabel: 'Mac mini' },
-      prompt: '/workflow:start fix https://github.com/cnotv/generative-art/issues/42\n\nKeep it small',
+      prompt: firstMessageOf({ note: 'Keep it small' }),
       sessionName: 'generative-art #42 fix',
     })
     expect((await app.request(runnerRequest('/claim', token))).status).toBe(204)
@@ -274,7 +312,7 @@ describe('cloud routine starts', () => {
     const started = await (await app.request(jsonRequest('POST', '/api/session-starts', startBody({ target: 'cloud-routine' })))).json()
     expect(started).toMatchObject({ state: 'started', sessionUrl: 'https://claude.ai/code/session_01Fired' })
     expect(firedRoutines).toEqual([
-      { routineId: 'trig_01ABCDEFGHJK', routineToken, text: '/workflow:start fix https://github.com/cnotv/generative-art/issues/42' },
+      { routineId: 'trig_01ABCDEFGHJK', routineToken, text: firstMessageOf() },
     ])
   })
 

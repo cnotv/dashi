@@ -10,13 +10,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@dashi/contracts": "workspace:*",
     "@hono/node-server": "^1.19.0",
     "fflate": "^0.8.3",
     "hono": "^4.10.0",
     "zod": "^4.1.0"
   },
   "devDependencies": {
-    "@dashi/contracts": "workspace:*",
     "@types/node": "^22.18.0",
     "vitest": "^3.2.0"
   }

@@ -378,12 +378,20 @@ issue leaves something out, and pick where it runs:
 | Claude cloud, sent from the laptop | The runner runs `claude --cloud` in its clone and reports the claude.ai link back                                     | The laptop runner, logged in to claude.ai |
 | Claude cloud routine               | The dashboard fires the repository's routine through the routines API; works with the laptop off                      | A routine for the repository              |
 
-Each start's session opens with `/workflow:start <workflow> <issue link>`, then the note.
+Each start's session opens with `/workflow:start <workflow> <issue link>`, then the note, then
+the workflow spelled out: read AGENTS.md and the issue, branch as `<type>/<issue>-<slug>` (with
+permission to push that name, so a cloud session does not stay on its `claude/` branch and drop
+off the board), tests first, the checks before every push, a draft pull request at the first
+commit, and staying with it until it is green. A routine receives the first line as text, not as a
+command, and a cloud session may not have the workflow plugin, so the steps travel with the
+message. The message is built once, in `packages/contracts/src/first-message.ts`, for the server
+and the demo alike.
 
 A pull request with merge conflicts shows a red warning icon on its card. Tapping it opens the
 same dialog for the `conflicts` workflow: the session checks out that pull request's branch,
 brings in the default branch, resolves the conflicts, runs the checks and pushes, and asks you
-when both sides changed the same logic. It opens with `/workflow:start conflicts <pull request link>`. **Sessions**
+when both sides changed the same logic. It opens with `/workflow:start conflicts <pull request link>`, and its steps
+keep it on that pull request's branch. **Sessions**
 lists the starts inside its time window, with the session's link or what the runner said. Each
 row's details icon opens the start in full: where it ran, its links, the first message the session
 was sent, and for a failed one what the error means and a **Retry**, which starts it again as a new
@@ -444,7 +452,8 @@ For starts with the laptop off, each repository needs a routine. Anthropic has n
 one, so **Credentials, Claude cloud routines** unfolds numbered steps for it, under **Set up the routine**: create the
 routine at [claude.ai/code/routines](https://claude.ai/code/routines) with the repository selected,
 give it the prompt shown (the routine only sees the fired text as untrusted until its own prompt
-says to follow it), add an **API** trigger and generate its token, and save the id and token there.
+says to follow it, and pushes to a `claude/` branch unless told otherwise; the prompt says to
+follow the text's steps and push to the branch it names), add an **API** trigger and generate its token, and save the id and token there.
 The token can fire that routine and nothing else, and is stored in the vault. Routines allow 30
 runs an hour each, and take at most 65,536 characters of text per run.
 
