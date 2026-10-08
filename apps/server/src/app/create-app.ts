@@ -26,6 +26,7 @@ import { createMachineRoutes, machineApiPathPrefixes } from '../machines/machine
 import { createPairingRelay } from '../machines/pairing-relay.ts'
 import { createAttachmentRelay } from '../session-starts/attachments.ts'
 import { createRunnerRoutes, createSessionStartRoutes, runnerApiPathPrefix } from '../session-starts/session-start-routes.ts'
+import { createWorkflowSkillsRoutes } from '../workflow-skills/workflow-skills-routes.ts'
 import type { PullRequestDraftMarker } from '../session-starts/types.ts'
 import { isAllowedHostHeader, isSameOriginRequest } from '../runtime/settings.ts'
 import { createRedactor } from '../secrets/redact.ts'
@@ -267,6 +268,16 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnvironment> =
   // Each signed-in user reads GitHub through their own token, so caches are kept per reader.
   const readerKeyOf = (session: DashboardSession | null): string => session?.user.login ?? '(stored token)'
   const githubTokenOf = (session: DashboardSession | null): string | null => session?.githubToken ?? vault.readSecretValue('github-token')
+  app.route(
+    '/api',
+    createWorkflowSkillsRoutes({
+      repositories,
+      githubTokenOf,
+      createGithubRestFetcher: dependencies.createGithubRestFetcher,
+      cacheMilliseconds: dependencies.boardCacheMilliseconds,
+      now: dependencies.now,
+    }),
+  )
   const readBodyHtml = async (cacheKey: string, loadBodyHtml: () => Promise<string | null>): Promise<string | null> => {
     const cachedBodyHtml = bodyHtmlCache.get(cacheKey)
     if (cachedBodyHtml && dependencies.now() - cachedBodyHtml.storedAt < bodyHtmlCacheMilliseconds) return cachedBodyHtml.bodyHtml

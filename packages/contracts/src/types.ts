@@ -111,6 +111,22 @@ export interface Board {
   fetchedAt: string
 }
 
+// Whether a repository carries agent-base's workflow skills under .claude/skills/, the only place
+// a cloud session loads them from.
+export type WorkflowSkillsState = 'current' | 'missing' | 'outdated' | 'pull-request-open'
+
+export interface WorkflowSkillsStatus {
+  state: WorkflowSkillsState
+  // The skill files missing from the repository or different from agent-base's.
+  changedFileCount: number
+  pullRequestUrl: string | null
+}
+
+export interface WorkflowSkillsPullRequest {
+  number: number
+  url: string
+}
+
 export type NetlifyStatus =
   | { state: 'active'; siteName: string; siteUrl: string; adminUrl: string }
   | { state: 'inactive' }

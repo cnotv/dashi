@@ -463,6 +463,19 @@ reason. The panel also shows how the repository's last routine start went. "Auth
 failed" means the token no longer matches the routine: it was regenerated or revoked, or saved for
 another routine; generate a new one, save it, and test.
 
+### Workflow skills in the repository
+
+A cloud session, routine or not, does not install the plugins a repository enables in
+`.claude/settings.json`, so it never gets agent-base's workflow plugin. It does load the skills
+committed under `.claude/skills/`. When a repository on the board lacks agent-base's workflow
+skills there, or holds an older copy, the board asks to add them. **Add them in a pull request**
+copies every file under agent-base's `plugins/workflow/skills/` into `.claude/skills/`, unchanged,
+on the `chore/workflow-skills` branch, and opens the pull request with your GitHub access, which
+needs write access to contents and pull requests. While it is open, the board links to it; **Not
+now** hides the question until the next visit. When agent-base changes its skills, the board
+offers the update the same way. A local session that also has the plugin lists each skill twice,
+once as `workflow:<name>` and once as `<name>`; they are the same files.
+
 ## Merge and close
 
 A board card with a pull request has **Merge** and **Close** buttons, each asking for

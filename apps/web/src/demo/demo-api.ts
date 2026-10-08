@@ -11,6 +11,7 @@ import type {
   SessionStart,
   SessionState,
   VaultState,
+  WorkflowSkillsPullRequest,
 } from '@dashi/contracts'
 import { sessionPromptFor } from '@dashi/contracts/first-message'
 import { repositoryKey } from '@/lib/presentation'
@@ -32,6 +33,7 @@ import { demoUser, sampleRepositories, sampleSecrets } from './sample-data'
 const demoAttachmentLimits = { fileCount: 5, fileTargetBytes: 8 * 1024 * 1024, inlineTargetBytes: 40 * 1024 }
 // Above every sample issue's number, so an issue opened in demo mode never takes one of theirs.
 const firstDemoIssueNumber = 100
+const demoWorkflowSkillFileCount = 12
 
 const withCreatedIssues = (columns: BoardColumn[], createdIssues: IssueSummary[]): BoardColumn[] =>
   columns.map((column) =>
@@ -63,6 +65,7 @@ export const createDemoApi = (): DashboardApi => {
     netlifyRepositoryKeys: Set<string>
     chatMessages: Map<string, ChatMessage[]>
     createdIssues: Map<string, IssueSummary[]>
+    workflowSkillsPullRequests: Map<string, WorkflowSkillsPullRequest>
   } = {
     secrets: sampleSecrets.map((secret) => ({ ...secret })),
     machineTokens: { ingest: sampleIngestTokens.map((token) => ({ ...token })), runner: sampleRunnerTokens.map((token) => ({ ...token })) },
@@ -72,6 +75,7 @@ export const createDemoApi = (): DashboardApi => {
     netlifyRepositoryKeys: new Set(['cnotv/example']),
     chatMessages: new Map(),
     createdIssues: new Map(),
+    workflowSkillsPullRequests: new Map(),
   }
   const chatMessagesOf = (chatKey: string, isCloud: boolean): ChatMessage[] =>
     demoMemory.chatMessages.get(chatKey) ?? (isCloud ? sampleCloudChatMessages : sampleChatMessages)
@@ -151,6 +155,19 @@ export const createDemoApi = (): DashboardApi => {
     enableNetlify: async (repository) => {
       demoMemory.netlifyRepositoryKeys = new Set([...demoMemory.netlifyRepositoryKeys, repositoryKey(repository)])
       return demoNetlifySite(repository)
+    },
+    // The first sample repository lacks the workflow skills, so the board shows its question.
+    readWorkflowSkills: async (repository) => {
+      const pullRequest = demoMemory.workflowSkillsPullRequests.get(repositoryKey(repository))
+      if (pullRequest !== undefined) return { state: 'pull-request-open', changedFileCount: demoWorkflowSkillFileCount, pullRequestUrl: pullRequest.url }
+      return repositoryKey(repository) === repositoryKey(sampleRepositories[0] ?? repository)
+        ? { state: 'missing', changedFileCount: demoWorkflowSkillFileCount, pullRequestUrl: null }
+        : { state: 'current', changedFileCount: 0, pullRequestUrl: null }
+    },
+    addWorkflowSkills: async (repository) => {
+      const pullRequest = { number: 40, url: `https://github.com/${repositoryKey(repository)}/pull/40` }
+      demoMemory.workflowSkillsPullRequests = new Map([...demoMemory.workflowSkillsPullRequests, [repositoryKey(repository), pullRequest]])
+      return pullRequest
     },
     readSessions: async (hours) => sampleSessionsOverview(hours, Date.now()),
     readSessionChat: async (target) => {
