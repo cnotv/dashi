@@ -114,17 +114,18 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
     if (request.target === 'cloud-routine' && routine === null) {
       return { ok: false, status: 412, error: 'Set up a Claude Code routine for this repository first' }
     }
-    const routineText = sessionPromptFor({ ...request, repository }, attachments)
+    // Created first because the first message names the start, so the agent can report on it.
+    const start = startStore.createStart({ ...request, repository })
+    const routineText = sessionPromptFor(start, attachments)
     if (routine !== null && routineText.length > routineTextCharacters) {
+      startStore.deleteStart(start.startId)
       return { ok: false, status: 413, error: `The first message comes to ${routineText.length} characters; a routine takes at most ${routineTextCharacters}` }
     }
     if (request.pullRequestNumber !== null) await markPullRequestDraft(session, repository, request.pullRequestNumber)
     if (routine === null) {
-      const queuedStart = startStore.createStart({ ...request, repository })
-      attachmentRelay.hold(queuedStart.startId, attachments)
-      return { ok: true, start: queuedStart }
+      attachmentRelay.hold(start.startId, attachments)
+      return { ok: true, start }
     }
-    const start = startStore.createStart({ ...request, repository })
     const fireResult = await fireRoutine(routine.routineId, routine.routineToken, routineText)
     const outcome = fireResult.ok
       ? { state: 'started' as const, sessionUrl: fireResult.sessionUrl, message: null }
