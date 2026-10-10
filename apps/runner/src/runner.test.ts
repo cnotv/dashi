@@ -7,12 +7,14 @@ import {
   deliveryPlanFor,
   isStartProjectFolder,
   launchPlanFor,
+  modelEnvironmentFor,
   newestTranscriptOf,
   parseChatWork,
   parseClaim,
   parseTmuxPanes,
   readRunnerSettings,
   resumeArgumentsFor,
+  sessionEnvironmentFor,
   runnerPathsFor,
   summariseTranscript,
   tmuxSessionNameFor,
@@ -51,6 +53,15 @@ describe('parseClaim', () => {
     expect(parseClaim(claimBody({ startId: '../../x' }))).toBeNull()
     expect(parseClaim({ start: null })).toBeNull()
   })
+
+  it('reads an OpenRouter model only for an unattended start, and only as a model slug', () => {
+    const headless = { target: 'laptop-headless' }
+    expect(claimOf().start.openRouterModel).toBeNull()
+    expect(claimOf({ ...headless, openRouterModel: 'openai/gpt-5-mini' }).start.openRouterModel).toBe('openai/gpt-5-mini')
+    expect(parseClaim(claimBody({ openRouterModel: 'openai/gpt-5-mini' }))).toBeNull()
+    expect(parseClaim(claimBody({ ...headless, openRouterModel: '--dangerously-skip-permissions' }))).toBeNull()
+    expect(parseClaim(claimBody({ ...headless, openRouterModel: 'a/b\nANTHROPIC_BASE_URL=https://evil' }))).toBeNull()
+  })
 })
 
 describe('attachments', () => {
@@ -80,7 +91,7 @@ describe('launchPlanFor', () => {
   const paths = runnerPathsFor('/Users/me/dashi', claimOf())
 
   it('starts a steerable session in tmux, passing the prompt as one argument', () => {
-    const plan = launchPlanFor(claimOf(), paths)
+    const plan = launchPlanFor(claimOf(), paths, {})
     expect(plan.mode).toBe('tmux')
     expect(plan.args).toEqual([
       'new-session',
@@ -100,13 +111,44 @@ describe('launchPlanFor', () => {
   })
 
   it('runs an unattended session with the chosen permission mode', () => {
-    const plan = launchPlanFor(claimOf({ target: 'laptop-headless', permissionMode: 'acceptEdits' }), paths)
+    const plan = launchPlanFor(claimOf({ target: 'laptop-headless', permissionMode: 'acceptEdits' }), paths, {})
     expect(plan).toMatchObject({ mode: 'detached', command: 'claude', cwd: paths.worktreePath, environment: { DASHI_START_ID: claimOf().start.startId } })
     expect(plan.args).toEqual(['-p', claimOf().prompt, '--permission-mode', 'acceptEdits', '--output-format', 'json'])
   })
 
+  it('runs an unattended session on an OpenRouter model with the laptop key in its environment only', () => {
+    const openRouterKey = 'sk-or-v1-exampleKey0123456789'
+    const plan = launchPlanFor(claimOf({ target: 'laptop-headless', openRouterModel: 'openai/gpt-5-mini' }), paths, { OPENROUTER_API_KEY: openRouterKey })
+    expect(plan.environment).toEqual({
+      DASHI_START_ID: claimOf().start.startId,
+      ANTHROPIC_BASE_URL: 'https://openrouter.ai/api',
+      ANTHROPIC_AUTH_TOKEN: openRouterKey,
+      ANTHROPIC_API_KEY: '',
+      ANTHROPIC_MODEL: 'openai/gpt-5-mini',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'openai/gpt-5-mini',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'openai/gpt-5-mini',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'openai/gpt-5-mini',
+    })
+    expect(plan.args.join(' ')).not.toContain(openRouterKey)
+  })
+
+  it('keeps the OpenRouter key out of every session but as the auth token of one on OpenRouter', () => {
+    const openRouterKey = 'sk-or-v1-exampleKey0123456789'
+    const runnerEnvironment = { PATH: '/usr/bin', OPENROUTER_API_KEY: openRouterKey }
+    expect(sessionEnvironmentFor(runnerEnvironment, { DASHI_START_ID: startId })).toEqual({ PATH: '/usr/bin', DASHI_START_ID: startId })
+    const onOpenRouter = sessionEnvironmentFor(runnerEnvironment, modelEnvironmentFor('openai/gpt-5-mini', runnerEnvironment))
+    expect(onOpenRouter.OPENROUTER_API_KEY).toBeUndefined()
+    expect(onOpenRouter.ANTHROPIC_AUTH_TOKEN).toBe(openRouterKey)
+  })
+
+  it('refuses an OpenRouter start when the laptop has no OpenRouter key', () => {
+    expect(() => launchPlanFor(claimOf({ target: 'laptop-headless', openRouterModel: 'openai/gpt-5-mini' }), paths, {})).toThrow(
+      'OPENROUTER_API_KEY',
+    )
+  })
+
   it('sends a cloud session from the clone itself', () => {
-    expect(launchPlanFor(claimOf({ target: 'laptop-cloud' }), paths)).toEqual({
+    expect(launchPlanFor(claimOf({ target: 'laptop-cloud' }), paths, {})).toEqual({
       mode: 'capture',
       command: 'claude',
       args: ['--cloud', claimOf().prompt],
@@ -176,8 +218,8 @@ describe('parseChatWork', () => {
       ],
     })
     expect(work).toEqual({
-      sessions: [{ sessionId, sessionState: 'working', start: null, cloudSessionId: null }],
-      deliveries: [{ deliveryId, sessionId, text: 'Also the docs', sessionState: null, start: null, cloudSessionId: null }],
+      sessions: [{ sessionId, sessionState: 'working', start: null, cloudSessionId: null, openRouterModel: null }],
+      deliveries: [{ deliveryId, sessionId, text: 'Also the docs', sessionState: null, start: null, cloudSessionId: null, openRouterModel: null }],
     })
     expect(parseChatWork(null)).toEqual({ sessions: [], deliveries: [] })
   })
@@ -186,17 +228,23 @@ describe('parseChatWork', () => {
     const start = { repositoryName: 'generative-art', startId, target: 'laptop-headless' }
     const startChatId = `start-${startId}`
     expect(parseChatWork({ sessions: [{ sessionId: startChatId, sessionState: null, start }], deliveries: [] }).sessions).toEqual([
-      { sessionId: startChatId, sessionState: null, start, cloudSessionId: null },
+      { sessionId: startChatId, sessionState: null, start, cloudSessionId: null, openRouterModel: null },
     ])
     const escaping = { sessionId: startChatId, sessionState: null, start: { ...start, repositoryName: '..' } }
     const cloud = { sessionId: startChatId, sessionState: null, start: { ...start, target: 'laptop-cloud' } }
     expect(parseChatWork({ sessions: [escaping, cloud], deliveries: [] }).sessions).toEqual([])
   })
 
+  it('keeps the OpenRouter model a session resumes on, and drops one that is not a model slug', () => {
+    const onModel = { sessionId, sessionState: 'ended', openRouterModel: 'openai/gpt-5-mini' }
+    expect(parseChatWork({ sessions: [onModel], deliveries: [] }).sessions).toEqual([{ ...onModel, start: null, cloudSessionId: null }])
+    expect(parseChatWork({ sessions: [{ ...onModel, openRouterModel: '-p x' }], deliveries: [] }).sessions).toEqual([])
+  })
+
   it('keeps the cloud session a message goes to, and drops one that is not a cloud session id', () => {
     const cloudSessionId = 'session_01AbCdEfGh'
     const delivery = { deliveryId, sessionId: cloudSessionId, text: 'Also the docs', sessionState: null, start: null }
-    expect(parseChatWork({ sessions: [], deliveries: [{ ...delivery, cloudSessionId }] }).deliveries).toEqual([{ ...delivery, cloudSessionId }])
+    expect(parseChatWork({ sessions: [], deliveries: [{ ...delivery, cloudSessionId }] }).deliveries).toEqual([{ ...delivery, cloudSessionId, openRouterModel: null }])
     expect(parseChatWork({ sessions: [], deliveries: [{ ...delivery, cloudSessionId: '--help' }] }).deliveries).toEqual([])
   })
 })
@@ -251,6 +299,7 @@ describe('chatDeliveryPlanFor', () => {
     sessionState: null,
     start: { repositoryName: 'generative-art', startId, target: 'laptop-headless' as const },
     cloudSessionId: null,
+    openRouterModel: null,
   }
 
   it('waits for an unattended start to go quiet, then resumes it', () => {
@@ -336,6 +385,15 @@ describe('deliveryPlanFor', () => {
     expect(deliveryPlanFor('ended', [], directory)).toEqual({ route: 'resume', directory })
     expect(deliveryPlanFor('waiting', panes, directory)).toMatchObject({ route: 'none', reason: expect.stringContaining('permission') })
     expect(deliveryPlanFor('working', panes, null)).toMatchObject({ route: 'none' })
+  })
+
+  it('resumes an OpenRouter start on its model, and any other session on the Claude login', () => {
+    const openRouterKey = 'sk-or-v1-exampleKey0123456789'
+    expect(modelEnvironmentFor(null, { OPENROUTER_API_KEY: openRouterKey })).toEqual({})
+    expect(modelEnvironmentFor('openai/gpt-5-mini', { OPENROUTER_API_KEY: openRouterKey })).toMatchObject({
+      ANTHROPIC_AUTH_TOKEN: openRouterKey,
+      ANTHROPIC_MODEL: 'openai/gpt-5-mini',
+    })
   })
 
   it('passes the message to a resumed session as one argument', () => {

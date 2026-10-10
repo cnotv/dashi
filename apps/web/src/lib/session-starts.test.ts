@@ -10,6 +10,7 @@ const startAt = (createdAt: string, overrides: Partial<SessionStart> = {}): Sess
   workflow: 'feature',
   target: 'cloud-routine',
   permissionMode: 'auto',
+  openRouterModel: null,
   note: '',
   state: 'started',
   runnerLabel: null,

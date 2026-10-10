@@ -17,6 +17,8 @@ export interface ChatWorkStart {
 export interface ChatWorkContext {
   sessionState: AgentSessionState | null
   start: ChatWorkStart | null
+  // The OpenRouter model of the board start the session came from, so a resumed session stays on it.
+  openRouterModel: string | null
   // Set for a cloud session, which the runner sends to with claude --cloud instead of reading.
   cloudSessionId: string | null
 }

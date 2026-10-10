@@ -340,6 +340,9 @@ export interface SessionStartRequest {
   workflow: StartWorkflow
   target: StartTarget
   permissionMode: HeadlessPermissionMode
+  // An OpenRouter model slug for an unattended laptop start, run on the laptop's own OpenRouter
+  // key; null runs it on the laptop's Claude login.
+  openRouterModel: string | null
   note: string
 }
 

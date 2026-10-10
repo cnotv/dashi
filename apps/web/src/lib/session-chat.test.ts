@@ -61,6 +61,7 @@ describe('canChatWithStart', () => {
     workflow: 'feature',
     target: 'cloud-routine',
     permissionMode: 'auto',
+    openRouterModel: null,
     note: '',
     state: 'started',
     runnerLabel: null,

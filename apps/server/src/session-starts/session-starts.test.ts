@@ -289,6 +289,32 @@ describe('laptop starts', () => {
     expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ permissionMode: 'bypassPermissions' })))).status).toBe(400)
   })
 
+  it('hands the runner an unattended start on an OpenRouter model, and keeps the model on a retry', async () => {
+    const { app, runnerTokens, startStore } = createTestApp()
+    const { token } = runnerTokens.createToken('Mac mini')
+    const model = 'meta-llama/llama-3.3-70b-instruct:free'
+    const startId = await startIdOf(
+      await app.request(jsonRequest('POST', '/api/session-starts', startBody({ target: 'laptop-headless', openRouterModel: model }))),
+    )
+    expect(await (await app.request(runnerRequest('/claim', token))).json()).toMatchObject({ start: { startId, openRouterModel: model } })
+    startStore.recordOutcome(startId, { state: 'failed', sessionUrl: null, message: 'Set OPENROUTER_API_KEY' })
+    expect(await (await app.request(jsonRequest('POST', `/api/session-starts/${startId}/retry`, {}))).json()).toMatchObject({
+      state: 'queued',
+      openRouterModel: model,
+    })
+  })
+
+  it('runs a start on the Claude login unless it names a model, and only an unattended one on OpenRouter', async () => {
+    const { app } = createTestApp()
+    expect(await (await app.request(jsonRequest('POST', '/api/session-starts', startBody()))).json()).toMatchObject({ openRouterModel: null })
+    const remoteControlResponse = await app.request(jsonRequest('POST', '/api/session-starts', startBody({ openRouterModel: 'openai/gpt-5-mini' })))
+    expect(remoteControlResponse.status).toBe(422)
+    expect(await remoteControlResponse.json()).toEqual({ error: 'Only an unattended laptop session can run on an OpenRouter model' })
+    const headless = { target: 'laptop-headless' }
+    expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ ...headless, openRouterModel: '$(whoami)' })))).status).toBe(400)
+    expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ ...headless, openRouterModel: '--model x' })))).status).toBe(400)
+  })
+
   it('serves the runner script without a sign-in', async () => {
     const { app } = createTestApp({}, { signInRequired: true })
     const scriptResponse = await app.request(getRequest('/api/runner/script'))

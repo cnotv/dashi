@@ -25,7 +25,7 @@ interface StartAttachment {
 }
 
 interface ClaimedStart {
-  start: { startId: string; repository: RepositoryReference; target: StartTarget; permissionMode: PermissionMode }
+  start: { startId: string; repository: RepositoryReference; target: StartTarget; permissionMode: PermissionMode; openRouterModel: string | null }
   prompt: string
   sessionName: string
   attachments: StartAttachment[]
@@ -54,6 +54,7 @@ interface ChatWorkSession {
   sessionState: SessionState | null
   start: ChatWorkStart | null
   cloudSessionId: string | null
+  openRouterModel: string | null
 }
 
 interface ChatWorkDelivery extends ChatWorkSession {
@@ -127,6 +128,10 @@ interface LaunchOutcome {
 
 const laptopTargets: StartTarget[] = ['laptop-remote-control', 'laptop-headless', 'laptop-cloud']
 const permissionModes: PermissionMode[] = ['auto', 'acceptEdits', 'dontAsk']
+// The same pattern as openRouterModelPattern in packages/contracts, repeated because the runner is
+// served as one file. It keeps a model to a slug, so it can never pass for a flag or another variable.
+const openRouterModelPattern = /^~?[a-z0-9][a-z0-9._-]{0,63}\/[A-Za-z0-9._:-]{1,100}$/
+const openRouterBaseUrl = 'https://openrouter.ai/api'
 const defaultPollMilliseconds = 5000
 const cloudCommandTimeoutMilliseconds = 180_000
 const cloudSessionUrlPattern = /https:\/\/claude\.ai\/code\/session_[A-Za-z0-9_-]+/
@@ -183,6 +188,12 @@ const parseAttachments = (attachmentsBody: unknown): StartAttachment[] | null =>
   return attachments.length === attachmentsBody.length ? attachments : null
 }
 
+// A dashboard from before OpenRouter sends no model, which runs on the Claude login like null.
+const openRouterModelOf = (value: unknown): string | null | undefined => {
+  if (value === null || value === undefined) return null
+  return typeof value === 'string' && openRouterModelPattern.test(value) ? value : undefined
+}
+
 /**
  * Reads a claim from the dashboard, checking everything in it that reaches a command line.
  * @param claimBody The parsed JSON the dashboard answered with.
@@ -193,12 +204,14 @@ export const parseClaim = (claimBody: unknown): ClaimedStart | null => {
   const { start, prompt, sessionName } = claimBody
   const { startId, target, permissionMode, repository: repositoryBody } = start
   const attachments = parseAttachments(claimBody.attachments)
-  if (!isRecord(repositoryBody) || attachments === null) return null
+  const openRouterModel = openRouterModelOf(start.openRouterModel)
+  if (!isRecord(repositoryBody) || attachments === null || openRouterModel === undefined) return null
   const repository = { owner: String(repositoryBody.owner), name: String(repositoryBody.name) }
   if (typeof prompt !== 'string' || typeof sessionName !== 'string' || typeof startId !== 'string') return null
   if (!/^[0-9a-f-]{36}$/.test(startId) || !isSafeRepository(repository)) return null
   if (!isOneOf(laptopTargets, target) || !isOneOf(permissionModes, permissionMode)) return null
-  return { start: { startId, repository, target, permissionMode }, prompt, sessionName, attachments }
+  if (openRouterModel !== null && target !== 'laptop-headless') return null
+  return { start: { startId, repository, target, permissionMode, openRouterModel }, prompt, sessionName, attachments }
 }
 
 /**
@@ -275,12 +288,51 @@ export const tmuxSessionNameFor = (claimed: ClaimedStart): string =>
   `agent-${claimed.start.repository.name.replace(/[^A-Za-z0-9-]/g, '-')}-${claimed.start.startId.slice(0, 8)}`
 
 /**
+ * The environment that points Claude Code at an OpenRouter model, with the laptop's own key.
+ * Every model role is set to the one chosen, so no background call goes to a model it did not pick.
+ * @param openRouterModel The model slug, or null for the Claude login.
+ * @param runnerEnvironment The runner's environment, which holds OPENROUTER_API_KEY.
+ * @returns The variables to add; none for the Claude login.
+ */
+export const modelEnvironmentFor = (openRouterModel: string | null, runnerEnvironment: NodeJS.ProcessEnv): Record<string, string> => {
+  if (openRouterModel === null) return {}
+  const openRouterKey = runnerEnvironment.OPENROUTER_API_KEY ?? ''
+  if (openRouterKey === '') {
+    throw new Error("This start runs on OpenRouter: set OPENROUTER_API_KEY in the runner's environment, then retry it")
+  }
+  return {
+    ANTHROPIC_BASE_URL: openRouterBaseUrl,
+    ANTHROPIC_AUTH_TOKEN: openRouterKey,
+    // Empty rather than unset, or Claude Code would sign in to Anthropic with a key of its own.
+    ANTHROPIC_API_KEY: '',
+    ANTHROPIC_MODEL: openRouterModel,
+    ANTHROPIC_DEFAULT_OPUS_MODEL: openRouterModel,
+    ANTHROPIC_DEFAULT_SONNET_MODEL: openRouterModel,
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: openRouterModel,
+  }
+}
+
+/**
+ * The environment a session runs with: the runner's, without the laptop's OpenRouter key, plus
+ * what the start adds. The key reaches only a session on OpenRouter, and only as its auth token,
+ * so no other session, or a script a repository runs inside one, can read it.
+ * @param runnerEnvironment The runner's environment.
+ * @param additions The variables the start adds.
+ * @returns The session's environment.
+ */
+export const sessionEnvironmentFor = (runnerEnvironment: NodeJS.ProcessEnv, additions: Record<string, string>): NodeJS.ProcessEnv => {
+  const withoutOpenRouterKey = Object.fromEntries(Object.entries(runnerEnvironment).filter(([name]) => name !== 'OPENROUTER_API_KEY'))
+  return { ...withoutOpenRouterKey, ...additions }
+}
+
+/**
  * Decides the command that starts a claimed session, by where it should run.
  * @param claimed The claimed start.
  * @param paths Where its clone, worktree and log live.
+ * @param runnerEnvironment The runner's environment, read for the OpenRouter key of an OpenRouter start.
  * @returns The command, its arguments and folder, and how to run it.
  */
-export const launchPlanFor = (claimed: ClaimedStart, paths: RunnerPaths): LaunchPlan => {
+export const launchPlanFor = (claimed: ClaimedStart, paths: RunnerPaths, runnerEnvironment: NodeJS.ProcessEnv): LaunchPlan => {
   const environment = { DASHI_START_ID: claimed.start.startId }
   if (claimed.start.target === 'laptop-cloud') {
     return { mode: 'capture', command: 'claude', args: ['--cloud', claimed.prompt], cwd: paths.clonePath, environment }
@@ -291,7 +343,7 @@ export const launchPlanFor = (claimed: ClaimedStart, paths: RunnerPaths): Launch
       command: 'claude',
       args: ['-p', claimed.prompt, '--permission-mode', claimed.start.permissionMode, '--output-format', 'json'],
       cwd: paths.worktreePath,
-      environment,
+      environment: { ...environment, ...modelEnvironmentFor(claimed.start.openRouterModel, runnerEnvironment) },
     }
   }
   // Remote Control needs a terminal, so the session gets one from tmux; with more than one
@@ -346,8 +398,9 @@ const chatWorkSessionOf = (value: unknown): ChatWorkSession | null => {
   const sessionState = value.sessionState === null ? null : isOneOf(sessionStates, value.sessionState) ? value.sessionState : undefined
   const start = chatWorkStartOf(value.start)
   const cloudSessionId = chatWorkCloudSessionOf(value.cloudSessionId)
-  if (sessionState === undefined || start === undefined || cloudSessionId === undefined) return null
-  return { sessionId: value.sessionId, sessionState, start, cloudSessionId }
+  const openRouterModel = openRouterModelOf(value.openRouterModel)
+  if (sessionState === undefined || start === undefined || cloudSessionId === undefined || openRouterModel === undefined) return null
+  return { sessionId: value.sessionId, sessionState, start, cloudSessionId, openRouterModel }
 }
 
 const chatWorkDeliveryOf = (value: unknown): ChatWorkDelivery | null => {
@@ -608,7 +661,7 @@ const launch = (plan: LaunchPlan, claimed: ClaimedStart, paths: RunnerPaths): La
   if (plan.mode === 'capture') {
     const result = spawnSync(plan.command, plan.args, {
       cwd: plan.cwd,
-      env: { ...process.env, ...plan.environment },
+      env: sessionEnvironmentFor(process.env, plan.environment),
       encoding: 'utf8',
       timeout: cloudCommandTimeoutMilliseconds,
     })
@@ -622,13 +675,14 @@ const launch = (plan: LaunchPlan, claimed: ClaimedStart, paths: RunnerPaths): La
     const logDescriptor = openSync(paths.logPath, 'a')
     spawn(plan.command, plan.args, {
       cwd: plan.cwd,
-      env: { ...process.env, ...plan.environment },
+      env: sessionEnvironmentFor(process.env, plan.environment),
       detached: true,
       stdio: ['ignore', logDescriptor, logDescriptor],
     }).unref()
     return { sessionUrl: null, message: `Running unattended in ${plan.cwd}; its output goes to ${paths.logPath}` }
   }
-  const result = spawnSync(plan.command, plan.args, { encoding: 'utf8' })
+  // A tmux server this starts keeps this environment for every session it later runs.
+  const result = spawnSync(plan.command, plan.args, { encoding: 'utf8', env: sessionEnvironmentFor(process.env, {}) })
   if (result.error) throw new Error('tmux is needed for sessions steered from the phone: brew install tmux')
   if (result.status !== 0) throw new Error(`tmux failed: ${lastCharacters(result.stderr, 500)}`)
   return {
@@ -660,7 +714,7 @@ const startClaimedSession = async (settings: RunnerSettings, claimed: ClaimedSta
     prepareClone(claimed.start, paths.clonePath)
     if (claimed.start.target !== 'laptop-cloud') prepareWorktree(paths)
     writeAttachments(claimed, paths)
-    const outcome = launch(launchPlanFor(withAttachmentPaths(claimed, paths), paths), claimed, paths)
+    const outcome = launch(launchPlanFor(withAttachmentPaths(claimed, paths), paths, process.env), claimed, paths)
     process.stdout.write(`Started ${claimed.sessionName}: ${outcome.message}\n`)
     await reportOutcome(settings, claimed.start.startId, { state: 'started', ...outcome })
   } catch (startError) {
@@ -768,12 +822,14 @@ const typeIntoPane = (paneId: string, text: string): void => {
   runTmux(['send-keys', '-t', paneId, 'Enter'])
 }
 
-const resumeWithMessage = (settings: RunnerSettings, claudeSessionId: string, text: string, directory: string): string => {
+const resumeWithMessage = (settings: RunnerSettings, claudeSessionId: string, delivery: ChatWorkDelivery, directory: string): string => {
+  const environment = sessionEnvironmentFor(process.env, modelEnvironmentFor(delivery.openRouterModel, process.env))
   const logPath = join(settings.runnerHome, 'logs', `chat-${claudeSessionId.slice(0, 8)}.log`)
   mkdirSync(dirname(logPath), { recursive: true })
   const logDescriptor = openSync(logPath, 'a')
-  spawn('claude', resumeArgumentsFor(claudeSessionId, text), {
+  spawn('claude', resumeArgumentsFor(claudeSessionId, delivery.text), {
     cwd: directory,
+    env: environment,
     detached: true,
     stdio: ['ignore', logDescriptor, logDescriptor],
   }).unref()
@@ -782,7 +838,12 @@ const resumeWithMessage = (settings: RunnerSettings, claudeSessionId: string, te
 
 // Needs this machine's claude logged in to the claude.ai account the cloud session belongs to.
 const sendToCloudSession = (cloudSessionId: string, text: string): { state: 'delivered' | 'failed'; message: string | null } => {
-  const result = spawnSync('claude', cloudSendArgumentsFor(cloudSessionId), { input: text, encoding: 'utf8', timeout: cloudSendTimeoutMilliseconds })
+  const result = spawnSync('claude', cloudSendArgumentsFor(cloudSessionId), {
+    input: text,
+    encoding: 'utf8',
+    timeout: cloudSendTimeoutMilliseconds,
+    env: sessionEnvironmentFor(process.env, {}),
+  })
   if (result.error) return { state: 'failed', message: result.error.message }
   return cloudSendOutcomeOf(result.stdout ?? '', result.stderr ?? '')
 }
@@ -804,7 +865,7 @@ const deliverMessage = async (settings: RunnerSettings, delivery: ChatWorkDelive
         return { state: 'delivered', message: null }
       }
       if (plan.route === 'resume' && located !== null) {
-        return { state: 'delivered', message: resumeWithMessage(settings, located.claudeSessionId, delivery.text, plan.directory) }
+        return { state: 'delivered', message: resumeWithMessage(settings, located.claudeSessionId, delivery, plan.directory) }
       }
       if (plan.route === 'resume') return { state: 'failed', message: 'The session is not on this laptop' }
       return { state: 'failed', message: plan.reason }

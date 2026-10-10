@@ -22,7 +22,9 @@ const transcriptReport = (text: string) => ({
 const workStartSchema = z.object({ repositoryName: z.string(), startId: z.string(), target: z.string() }).nullable()
 
 const chatWorkSchema = z.object({
-  sessions: z.array(z.object({ sessionId: z.string(), sessionState: z.string().nullable(), start: workStartSchema })),
+  sessions: z.array(
+    z.object({ sessionId: z.string(), sessionState: z.string().nullable(), start: workStartSchema, openRouterModel: z.string().nullable() }),
+  ),
   deliveries: z.array(
     z.object({
       deliveryId: z.string(),
@@ -30,6 +32,7 @@ const chatWorkSchema = z.object({
       text: z.string(),
       sessionState: z.string().nullable(),
       start: workStartSchema,
+      openRouterModel: z.string().nullable(),
     }),
   ),
 })
@@ -74,7 +77,7 @@ describe('session chat', () => {
       occurredAt: new Date(clock.now).toISOString(),
     })
     await readChat()
-    expect((await takeWork()).sessions).toEqual([{ sessionId, sessionState: 'working', start: null }])
+    expect((await takeWork()).sessions).toEqual([{ sessionId, sessionState: 'working', start: null, openRouterModel: null }])
 
     const report = transcriptReport(`Pushed with ${githubToken}`)
     expect((await app.request(runnerRequest(`/chat/${sessionId}`, token, report))).status).toBe(204)
@@ -101,7 +104,7 @@ describe('session chat', () => {
     const { deliveryId } = z.object({ deliveryId: z.string() }).parse(await queued.json())
 
     expect((await takeWork()).deliveries).toEqual([
-      { deliveryId, sessionId, text: 'Also update the docs', sessionState: null, start: null },
+      { deliveryId, sessionId, text: 'Also update the docs', sessionState: null, start: null, openRouterModel: null },
     ])
     expect((await takeWork()).deliveries).toEqual([])
     expect((await readChat()).deliveries).toMatchObject([{ deliveryId, state: 'sent' }])
@@ -120,7 +123,7 @@ describe('session chat', () => {
     expect((await readChat()).deliveries).toMatchObject([{ state: 'failed', message: 'The runner did not confirm it' }])
   })
 
-  it('opens the chat of a laptop start from the board, which the runner finds by its worktree', async () => {
+  it('opens the chat of a laptop start from the board, which the runner finds by its worktree and resumes on its model', async () => {
     const { app, readChat, takeWork } = setUp()
     const startResponse = await app.request(
       jsonRequest('POST', '/api/session-starts', {
@@ -129,6 +132,7 @@ describe('session chat', () => {
         workflow: 'fix',
         target: 'laptop-headless',
         permissionMode: 'auto',
+        openRouterModel: 'openai/gpt-5-mini',
         note: '',
       }),
     )
@@ -139,9 +143,37 @@ describe('session chat', () => {
     expect((await app.request(jsonRequest('POST', startChatPath, { text: 'Carry on' }))).status).toBe(201)
     const work = await takeWork()
     const start = { repositoryName: 'generative-art', startId, target: 'laptop-headless' }
-    expect(work.sessions).toEqual([{ sessionId: `start-${startId}`, sessionState: null, start }])
-    expect(work.deliveries).toMatchObject([{ sessionId: `start-${startId}`, text: 'Carry on', start }])
+    const openRouterModel = 'openai/gpt-5-mini'
+    expect(work.sessions).toEqual([{ sessionId: `start-${startId}`, sessionState: null, start, openRouterModel }])
+    expect(work.deliveries).toMatchObject([{ sessionId: `start-${startId}`, text: 'Carry on', start, openRouterModel }])
     expect((await readChat()).messages).toEqual([])
+  })
+
+  it("resumes a session opened from its row on the OpenRouter model of the board start it reported", async () => {
+    const { app, activityStore, clock, takeWork } = setUp()
+    const startResponse = await app.request(
+      jsonRequest('POST', '/api/session-starts', {
+        repository: { owner: 'cnotv', name: 'generative-art' },
+        issueNumber: 42,
+        workflow: 'fix',
+        target: 'laptop-headless',
+        openRouterModel: 'openai/gpt-5-mini',
+      }),
+    )
+    const { startId } = z.object({ startId: z.string() }).parse(await startResponse.json())
+    activityStore.recordEvent({
+      sessionId,
+      provider: 'claude',
+      state: 'idle',
+      repository: null,
+      branch: null,
+      title: null,
+      folder: null,
+      origin: { launcher: null, terminal: null, launchingApp: null, billing: null, apiHost: 'openrouter.ai', startId },
+      occurredAt: new Date(clock.now).toISOString(),
+    })
+    expect((await app.request(jsonRequest('POST', chatPath, { text: 'Carry on' }))).status).toBe(201)
+    expect((await takeWork()).deliveries).toMatchObject([{ sessionId, start: null, openRouterModel: 'openai/gpt-5-mini' }])
   })
 
   it('refuses a start that does not exist, and a start id passed as a session', async () => {

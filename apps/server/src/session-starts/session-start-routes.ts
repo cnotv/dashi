@@ -20,6 +20,7 @@ import type { AppEnvironment } from '../app/types.ts'
 import type { DashboardSession } from '../auth/types.ts'
 import { findRepository } from '../repos/load-repositories.ts'
 import { sessionNameFor, sessionPromptFor } from '@dashi/contracts/first-message'
+import { takesOpenRouterModel } from '@dashi/contracts/open-router'
 import { attachmentDeliveryFor, attachmentLimitProblem, attachmentLimits } from './attachments.ts'
 import { routineSettingsBodySchema, runnerReportSchema, sessionStartSubmissionSchema } from './schema.ts'
 import type { MachineTokenStore } from '../machine-tokens/types.ts'
@@ -36,7 +37,7 @@ const runnerSourcePath = 'apps/runner/src/runner.ts'
 const routineTestText =
   "Dashi test run: reply 'Dashi can start this routine' and end the session. Do not change any file, branch, issue or pull request."
 
-type LaunchResult = { ok: true; start: SessionStart } | { ok: false; status: 404 | 412 | 413; error: string }
+type LaunchResult = { ok: true; start: SessionStart } | { ok: false; status: 404 | 412 | 413 | 422; error: string }
 
 // Reached by the laptop runner rather than a browser, so it carries a runner token instead of a
 // sign-in; the session guard lets this prefix through, and the script itself holds no secret.
@@ -108,6 +109,9 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
   ): Promise<LaunchResult> => {
     const repository = repositoryOf(request.repository.owner, request.repository.name)
     if (repository === undefined) return { ok: false, status: 404, error: 'Unknown repository' }
+    if (request.openRouterModel !== null && !takesOpenRouterModel(request.target)) {
+      return { ok: false, status: 422, error: 'Only an unattended laptop session can run on an OpenRouter model' }
+    }
     const limitProblem = attachmentLimitProblem(attachments, request.target)
     if (limitProblem !== null) return { ok: false, status: 413, error: limitProblem }
     const routine = request.target === 'cloud-routine' ? routineOf(repository) : null
@@ -155,10 +159,14 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
     const failedStart = startStore.readStart(context.req.param('startId'))
     if (failedStart === null) return context.json({ error: 'Unknown start' }, 404)
     if (failedStart.state !== 'failed') return context.json({ error: 'Only a failed start can be retried' }, 409)
-    const { repository, issueNumber, pullRequestNumber, workflow, target, permissionMode, note } = failedStart
+    const { repository, issueNumber, pullRequestNumber, workflow, target, permissionMode, openRouterModel, note } = failedStart
     return answerLaunch(
       context,
-      await launchStart({ repository, issueNumber, pullRequestNumber, workflow, target, permissionMode, note }, [], context.get('session')),
+      await launchStart(
+        { repository, issueNumber, pullRequestNumber, workflow, target, permissionMode, openRouterModel, note },
+        [],
+        context.get('session'),
+      ),
     )
   })
 

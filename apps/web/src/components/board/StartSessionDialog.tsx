@@ -5,7 +5,7 @@ import type { IssueSummary, PullRequestSummary, RepositoryReference, SessionStar
 import { useStartChoices } from '@/hooks/useSessionStarts'
 import { useToast } from '@/hooks/useToast'
 import { dashboardApi } from '@/lib/api'
-import { suggestedWorkflowFor } from '@/lib/start-session'
+import { openRouterModelFor, suggestedWorkflowFor } from '@/lib/start-session'
 import { StartChoicesFields } from './StartChoicesFields'
 import { StartedSummary } from './StartedSummary'
 
@@ -28,7 +28,7 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
   const [started, setStarted] = useState<SessionStart | null>(null)
   const [note, setNote] = useState('')
   const initialWorkflow = conflictingPullRequest ? 'conflicts' : suggestedWorkflowFor(issue?.labels ?? [])
-  const { choices, setChoices, options, errorMessage, chosenTarget, chosenAvailability } = useStartChoices(repository, isOpen, initialWorkflow, 0)
+  const { choices, setChoices, options, errorMessage, chosenTarget, chosenAvailability, modelProblem } = useStartChoices(repository, isOpen, initialWorkflow, 0)
   const triggerLabel = conflictingPullRequest ? 'Merge conflict: start a session to fix it' : 'Start a session'
   const dialogTitle = conflictingPullRequest
     ? `Fix the conflicts in #${conflictingPullRequest.number}`
@@ -53,6 +53,7 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
         workflow: choices.workflow,
         target: chosenTarget,
         permissionMode: choices.permissionMode,
+        openRouterModel: openRouterModelFor(choices, chosenTarget),
         note,
         attachments: [],
       })
@@ -106,6 +107,7 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
                 chosenTarget={chosenTarget}
                 chosenAvailability={chosenAvailability}
                 attachmentBytes={0}
+                modelProblem={modelProblem}
                 showsWorkflow={!conflictingPullRequest}
               />
               <label>
@@ -125,7 +127,7 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
                     Cancel
                   </Button>
                 </Dialog.Close>
-                <Button type="submit" loading={isStarting} disabled={chosenAvailability?.isAvailable !== true}>
+                <Button type="submit" loading={isStarting} disabled={chosenAvailability?.isAvailable !== true || modelProblem !== null}>
                   <PlayIcon /> Start
                 </Button>
               </Flex>

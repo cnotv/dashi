@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { StartOptions } from '@dashi/contracts'
 import { runnerLaunchAgentCommands, runnerReviewCommands, runnerSystemdCommands, runnerTryCommands } from './runner-setup'
-import { defaultTargetFor, suggestedWorkflowFor, targetAvailabilityFor } from './start-session'
+import { defaultTargetFor, openRouterModelFor, startModelProblemFor, suggestedWorkflowFor, targetAvailabilityFor } from './start-session'
 
 const onlineRunner = { label: 'Mac mini', lastSeenAt: '2026-09-30T10:00:00Z', isOnline: true }
 const optionsWith = (overrides: Partial<StartOptions>): StartOptions => ({
@@ -52,6 +52,26 @@ describe('defaultTargetFor', () => {
   it('prefers the laptop when its runner is online, then the routine', () => {
     expect(defaultTargetFor(optionsWith({ runners: [onlineRunner], routineConfigured: true }))).toBe('laptop-remote-control')
     expect(defaultTargetFor(optionsWith({ routineConfigured: true }))).toBe('cloud-routine')
+  })
+})
+
+describe('the model a start runs on', () => {
+  const onOpenRouter = { modelSource: 'openrouter' as const, openRouterModel: ' meta-llama/llama-3.3-70b-instruct:free ' }
+
+  it('sends an OpenRouter model only for an unattended laptop start that picked one', () => {
+    expect(openRouterModelFor(onOpenRouter, 'laptop-headless')).toBe('meta-llama/llama-3.3-70b-instruct:free')
+    expect(openRouterModelFor(onOpenRouter, 'laptop-remote-control')).toBeNull()
+    expect(openRouterModelFor(onOpenRouter, 'cloud-routine')).toBeNull()
+    expect(openRouterModelFor({ ...onOpenRouter, modelSource: 'claude-login' }, 'laptop-headless')).toBeNull()
+  })
+
+  it('holds the start back until an OpenRouter model reads as a model slug', () => {
+    expect(startModelProblemFor(onOpenRouter, 'laptop-headless')).toBeNull()
+    expect(startModelProblemFor({ ...onOpenRouter, openRouterModel: '' }, 'laptop-headless')).toBe('Name the OpenRouter model to run on')
+    expect(startModelProblemFor({ ...onOpenRouter, openRouterModel: 'gpt 5' }, 'laptop-headless')).toBe(
+      'An OpenRouter model reads like provider/model, such as openai/gpt-5-mini',
+    )
+    expect(startModelProblemFor({ ...onOpenRouter, openRouterModel: '' }, 'laptop-remote-control')).toBeNull()
   })
 })
 

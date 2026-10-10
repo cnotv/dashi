@@ -9,6 +9,7 @@ import { dashboardApi } from '@/lib/api'
 import { readAttachment } from '@/lib/attachments'
 import { issueBodyFor, issueTitleFrom } from '@/lib/new-issue'
 import { errorMessageOf, parseRepositoryKey, repositoryKey } from '@/lib/presentation'
+import { openRouterModelFor } from '@/lib/start-session'
 import type { PickedAttachment } from '@/lib/types'
 import { StartChoicesFields } from './StartChoicesFields'
 import { StartedSummary } from './StartedSummary'
@@ -56,7 +57,7 @@ export const NewIssueDialog = ({ defaultRepository }: NewIssueDialogProps) => {
   const repositoryKeyShown = chosenRepositoryKey ?? (fallbackRepository ? repositoryKey(fallbackRepository) : '')
   const repository = useMemo(() => parseRepositoryKey(repositoryKeyShown), [repositoryKeyShown])
   const attachmentBytes = pickedAttachments.reduce((total, picked) => total + picked.byteSize, 0)
-  const { choices, setChoices, options, errorMessage, chosenTarget, chosenAvailability } = useStartChoices(
+  const { choices, setChoices, options, errorMessage, chosenTarget, chosenAvailability, modelProblem } = useStartChoices(
     repository ?? { owner: '', name: '' },
     isOpen && repository !== null,
     'feature',
@@ -64,7 +65,7 @@ export const NewIssueDialog = ({ defaultRepository }: NewIssueDialogProps) => {
   )
   const attachmentCountLimit = options?.attachmentLimits.fileCount ?? 0
   const title = issueTitleFrom(text)
-  const canSubmit = repository !== null && title !== '' && chosenTarget !== null && chosenAvailability?.isAvailable === true && !isSubmitting
+  const canSubmit = repository !== null && title !== '' && chosenTarget !== null && chosenAvailability?.isAvailable === true && modelProblem === null && !isSubmitting
 
   const resetForm = (): void => {
     setText('')
@@ -123,6 +124,7 @@ export const NewIssueDialog = ({ defaultRepository }: NewIssueDialogProps) => {
         workflow: choices.workflow,
         target: chosenTarget,
         permissionMode: choices.permissionMode,
+        openRouterModel: openRouterModelFor(choices, chosenTarget),
         note: text.trim(),
         attachments: pickedAttachments.map((picked) => picked.attachment),
       })
@@ -225,6 +227,7 @@ export const NewIssueDialog = ({ defaultRepository }: NewIssueDialogProps) => {
                 chosenTarget={chosenTarget}
                 chosenAvailability={chosenAvailability}
                 attachmentBytes={attachmentBytes}
+                modelProblem={modelProblem}
                 showsWorkflow
               />
               <Flex direction="column" gap="2" className={isDraggingFiles ? 'new-issue-composer new-issue-composer-dropping' : 'new-issue-composer'}>
