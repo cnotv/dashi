@@ -98,6 +98,10 @@ export interface LogoParticle {
   concentration: number
 }
 
+// The board's own column for issues Dashi started a session on that has no pull request yet;
+// GitHub knows nothing of it, so it is the web's alone.
+export type BoardColumnStatus = IssueStatus | 'started-from-dashi'
+
 export interface RepositoryWorkflowSkills {
   repository: RepositoryReference
   status: WorkflowSkillsStatus
@@ -106,10 +110,12 @@ export interface RepositoryWorkflowSkills {
 export interface RepositoryBoardCard {
   card: BoardCard
   repository: RepositoryReference
+  // The newest start Dashi has for the card's issue, kept only in the Started from Dashi column.
+  sessionStart: SessionStart | null
 }
 
 export interface RepositoryBoardColumn {
-  status: IssueStatus
+  status: BoardColumnStatus
   cards: RepositoryBoardCard[]
 }
 
@@ -164,6 +170,7 @@ export interface DashboardApi {
   createIssue: (repository: RepositoryReference, newIssue: NewIssueRequest) => Promise<CreatedIssue>
   readSessionStart: (startId: string) => Promise<SessionStartDetails>
   retrySessionStart: (startId: string) => Promise<SessionStart>
+  discardSessionStart: (startId: string) => Promise<void>
   testRoutine: (repository: RepositoryReference) => Promise<RoutineTestResult>
   readRunnerScriptInfo: () => Promise<ServedScriptInfo>
   readCliScriptInfo: () => Promise<ServedScriptInfo>

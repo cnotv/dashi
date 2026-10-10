@@ -170,6 +170,16 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
     )
   })
 
+  // Drops a start made by mistake, or one that will never run, before any session exists, along
+  // with the attachments a queued one still holds.
+  routes.delete('/session-starts/:startId', (context) => {
+    const startId = context.req.param('startId')
+    if (startStore.readStart(startId) === null) return context.json({ error: 'Unknown start' }, 404)
+    if (!startStore.discardUnstartedStart(startId)) return context.json({ error: 'Only a queued or failed start can be discarded' }, 409)
+    attachmentRelay.take(startId)
+    return context.body(null, 204)
+  })
+
   // Anthropic offers no way to check a routine's token short of running it, so the test is a
   // real, tiny run told to change nothing.
   routes.post('/repositories/:owner/:name/routine/test', async (context) => {

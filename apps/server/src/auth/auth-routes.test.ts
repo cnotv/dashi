@@ -69,6 +69,7 @@ describe('sign-in required', () => {
     expect(statuses).toEqual([401, 401, 401, 401])
     expect((await app.request(jsonRequest('PUT', '/api/secrets/github-token', { value: 'x' }))).status).toBe(401)
     expect((await app.request(jsonRequest('POST', '/api/repositories/cnotv/generative-art/workflow-skills', {}))).status).toBe(401)
+    expect((await app.request(jsonRequest('DELETE', '/api/session-starts/any-start', {}))).status).toBe(401)
   })
 
   it('keeps health and the session state public', async () => {

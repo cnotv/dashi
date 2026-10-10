@@ -339,6 +339,14 @@ browser remembers what you fold.
 Each open pull request gets one card, listing every issue it closes (by a `Closes #n` line or
 by its `<type>/<n>-description` branch). An issue without a pull request has a card of its own.
 
+An issue without a pull request that Dashi started a session on, from its card or the New issue
+dialog, sits in **Started from Dashi**, right after No pull request, newest start first. Its card
+shows the start's state and where it runs, its details with Retry when it failed, its
+conversation and session link once it has them, and Discard for a start that never ran (queued
+or failed): Discard removes it from Dashi before a runner picks it up, and the card goes back to
+No pull request with its Start button. A start a runner is launching, or one that started, stays,
+since usage reads it to tell which sessions Dashi started.
+
 A pull request's checks sit at the card's top right. The card ends in one row of icons, each
 named in its tooltip: a red warning when the branch has a merge conflict, the deploy preview,
 the screenshot and video, the changed files, then Merge and Close. Checks show as a ring with one coloured arc per state (red failed, amber running, green

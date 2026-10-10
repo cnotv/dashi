@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionStart } from '@dashi/contracts'
-import { failureAdviceFor, startsSince } from './session-starts'
+import { canDiscardStart, failureAdviceFor, startsSince } from './session-starts'
 
 const startAt = (createdAt: string, overrides: Partial<SessionStart> = {}): SessionStart => ({
   startId: createdAt,
@@ -19,6 +19,13 @@ const startAt = (createdAt: string, overrides: Partial<SessionStart> = {}): Sess
   createdAt,
   updatedAt: createdAt,
   ...overrides,
+})
+
+describe('canDiscardStart', () => {
+  it('lets only a start that never ran be discarded', () => {
+    const states: SessionStart['state'][] = ['queued', 'claimed', 'started', 'failed']
+    expect(states.map((state) => canDiscardStart(startAt('2026-10-02T17:30:00Z', { state })))).toEqual([true, false, false, true])
+  })
 })
 
 describe('startsSince', () => {
