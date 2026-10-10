@@ -6,6 +6,8 @@ import { createActivityStore } from './activity-store.ts'
 import { buildSessionsOverview, buildTimeline, buildUsageReport, effectiveState, inactiveAfterMilliseconds } from './aggregate.ts'
 import { startFolderNameOf } from './origin.ts'
 import { startFolderNameFor } from '../../../runner/src/runner.ts'
+import { emptyTracker, outcomeOfEvent, outcomeOfPrompt } from '../../../opencode-plugin/src/opencode-reporter.ts'
+import { hookPayloadSchema, otlpMetricsSchema } from './schema.ts'
 import { agentEventFrom, repositoryFromRemote, tokenUsagePointsFrom } from './ingest.ts'
 import type { SessionOrigin, StoredSession, StoredTokenSample, TokenUsagePoint } from './types.ts'
 
@@ -159,6 +161,68 @@ describe('agentEventFrom', () => {
 
   it('treats a detached HEAD as no branch', () => {
     expect(agentEventFrom({ session_id: 's1', hook_event_name: 'Stop' }, { ...headers, branch: 'HEAD' }, at(0))?.branch).toBeNull()
+  })
+})
+
+describe('OpenCode reports', () => {
+  const headers = {
+    provider: 'opencode',
+    branch: 'feat/12-sessions',
+    remote: 'git@github.com:cnotv/dashi.git',
+    cwd: undefined,
+    launcher: undefined,
+    terminal: undefined,
+    app: undefined,
+    billing: undefined,
+    apiHost: undefined,
+    startId: '0123abcd-0000-4000-8000-000000000000',
+  }
+  const eventOf = (report: unknown) => agentEventFrom(hookPayloadSchema.parse(report), headers, at(0))
+  const reportOfEvent = (event: unknown) => outcomeOfEvent(emptyTracker(), event).sessionReport
+
+  it("maps the reporter's session reports to states", () => {
+    const reports = [
+      reportOfEvent({ type: 'session.created', properties: { info: { id: 'ses_1', directory: '/Users/me/code/marbles' } } }),
+      outcomeOfPrompt(emptyTracker(), 'ses_1', [{ type: 'text', text: 'Fix the marbles' }]).sessionReport,
+      reportOfEvent({ type: 'session.status', properties: { sessionID: 'ses_1', status: { type: 'busy' } } }),
+      reportOfEvent({ type: 'session.status', properties: { sessionID: 'ses_1', status: { type: 'retry' } } }),
+      reportOfEvent({ type: 'permission.asked', properties: { sessionID: 'ses_1' } }),
+      reportOfEvent({ type: 'permission.replied', properties: { sessionID: 'ses_1' } }),
+      reportOfEvent({ type: 'session.status', properties: { sessionID: 'ses_1', status: { type: 'idle' } } }),
+      reportOfEvent({ type: 'session.idle', properties: { sessionID: 'ses_1' } }),
+      reportOfEvent({ type: 'session.deleted', properties: { info: { id: 'ses_1' } } }),
+    ]
+    expect(reports.map((report) => eventOf(report)?.state)).toEqual(['idle', 'working', 'working', 'working', 'waiting', 'working', 'idle', 'idle', 'ended'])
+    expect(eventOf(reports[0])).toMatchObject({ sessionId: 'ses_1', provider: 'opencode', folder: 'marbles', repository: { owner: 'cnotv', name: 'dashi' } })
+    expect(eventOf(reports[1])).toMatchObject({ title: 'Fix the marbles', origin: { startId: '0123abcd-0000-4000-8000-000000000000' } })
+  })
+
+  it('ignores an OpenCode report it does not know', () => {
+    expect(eventOf({ type: 'session.status', session_id: 'ses_1', status: 'thinking' })).toBeNull()
+    expect(eventOf({ type: 'session.compacted', session_id: 'ses_1' })).toBeNull()
+    expect(eventOf({ type: 'session.idle' })).toBeNull()
+  })
+
+  it("counts the reporter's token deltas", () => {
+    const { tokenReport } = outcomeOfEvent(emptyTracker(), {
+      type: 'message.updated',
+      properties: {
+        info: {
+          id: 'msg_1',
+          sessionID: 'ses_1',
+          role: 'assistant',
+          providerID: 'openrouter',
+          modelID: 'openai/gpt-5-mini',
+          time: { created: 1, completed: atMilliseconds(3) },
+          tokens: { input: 1200, output: 300, reasoning: 0, cache: { read: 0, write: 40 } },
+        },
+      },
+    })
+    expect(tokenUsagePointsFrom(otlpMetricsSchema.parse(tokenReport), at(9))).toEqual([
+      expect.objectContaining({ sessionId: 'ses_1', model: 'openrouter/openai/gpt-5-mini', tokenType: 'input', value: 1200, isCumulative: false, observedAt: at(3) }),
+      expect.objectContaining({ tokenType: 'output', value: 300 }),
+      expect.objectContaining({ tokenType: 'cacheCreation', value: 40 }),
+    ])
   })
 })
 
@@ -399,6 +463,14 @@ describe('usage by source', () => {
     expect(overview.sessions.map((summary) => [summary.sessionId, summary.triggeredBy, summary.billedThrough])).toEqual([
       ['a', 'CodePilot', 'Anthropic API key'],
       ['b', 'Dashi board (laptop runner)', 'Claude login · me@example.com'],
+    ])
+  })
+
+  it("counts each agent's tokens under its own row", () => {
+    const report = reportOf([session('a'), session('ses_1', { provider: 'opencode' })], [sample('a', 50), sample('ses_1', 30, { account: null })])
+    expect(rowsOf(report.byAgent)).toEqual([
+      ['Claude Code', 1, 50, null],
+      ['OpenCode', 1, 30, null],
     ])
   })
 

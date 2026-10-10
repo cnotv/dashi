@@ -202,7 +202,7 @@ export interface SessionState {
   user: SignedInUser | null
 }
 
-export type AgentProvider = 'claude' | 'codex'
+export type AgentProvider = 'claude' | 'codex' | 'opencode'
 
 // `inactive` is a session that never reported its end but has been silent too long to be
 // running: a closed terminal, a crashed machine.

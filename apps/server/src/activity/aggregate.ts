@@ -14,6 +14,7 @@ import type {
   UsageReport,
 } from '@dashi/contracts'
 import { issueNumberFromBranch } from '../github/status.ts'
+import { agentProviderOf } from './ingest.ts'
 import { billingLabelOf, originNoteOf, triggerLabelerFor } from './origin.ts'
 import type { StoredEvent, StoredSession, StoredTokenSample, UsageSourceLookups } from './types.ts'
 
@@ -164,7 +165,7 @@ const machineRowOf =
     note: null,
   })
 
-const agentLabels: Record<AgentProvider, string> = { claude: 'Claude Code', codex: 'Codex' }
+const agentLabels: Record<AgentProvider, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'OpenCode' }
 
 /**
  * Adds up token usage for all repositories, then by repository, by pull request or branch, by day and by model.
@@ -240,7 +241,11 @@ export const buildUsageReport = (
     codexSessionCount === 0
       ? []
       : [{ sourceKey: 'codex', label: agentLabels.codex, note: 'No token metrics', sessionCount: codexSessionCount, tokens: emptyTokenTotals() }]
-  const byAgent = [...sourceRows(samples, () => 'claude', () => ({ label: agentLabels.claude, note: null })), ...codexRows]
+  const agentOfSample = (sample: StoredTokenSample): AgentProvider => sessionOf(sample)?.provider ?? 'claude'
+  const byAgent = [
+    ...sourceRows(samples, agentOfSample, (sourceKey) => ({ label: agentLabels[agentProviderOf(sourceKey)], note: null })),
+    ...codexRows,
+  ]
 
   return {
     windowStartedAt,

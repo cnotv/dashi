@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
 import { Hono, type Context } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
@@ -8,7 +6,6 @@ import type {
   RoutineSettings,
   RoutineTestResult,
   RunnerPresence,
-  ServedScriptInfo,
   SessionStart,
   SessionStartDetails,
   SessionStartRequest,
@@ -17,6 +14,7 @@ import type {
 } from '@dashi/contracts'
 import { bearerTokenOf, limitTo, readJsonBody } from '../app/http.ts'
 import type { AppEnvironment } from '../app/types.ts'
+import { addServedScriptRoutes } from '../app/served-script.ts'
 import type { DashboardSession } from '../auth/types.ts'
 import { findRepository } from '../repos/load-repositories.ts'
 import { sessionNameFor, sessionPromptFor } from '@dashi/contracts/first-message'
@@ -33,7 +31,6 @@ const createTokenBodySchema = z.object({ label: z.string().trim().min(1).max(80)
 const sessionStartBodyBytes = 12 * 1024 * 1024
 // The routines API refuses a longer text with a bare 400.
 const routineTextCharacters = 65_536
-const runnerSourcePath = 'apps/runner/src/runner.ts'
 const routineTestText =
   "Dashi test run: reply 'Dashi can start this routine' and end the session. Do not change any file, branch, issue or pull request."
 
@@ -234,20 +231,7 @@ export const createRunnerRoutes = ({ startStore, runnerTokens, runnerScriptPath,
 
   const requireRunnerToken = createRunnerTokenGuard(runnerTokens)
 
-  routes.get('/script', async (context) => {
-    context.header('content-type', 'text/plain; charset=utf-8')
-    context.header('content-disposition', 'attachment; filename="runner.ts"')
-    return context.body(await readFile(runnerScriptPath, 'utf8'))
-  })
-
-  routes.get('/script-info', async (context) => {
-    const script = await readFile(runnerScriptPath)
-    return context.json<ServedScriptInfo>({
-      sha256: createHash('sha256').update(script).digest('hex'),
-      byteLength: script.byteLength,
-      sourcePath: runnerSourcePath,
-    })
-  })
+  addServedScriptRoutes(routes, { path: '/script', filePath: runnerScriptPath, fileName: 'runner.ts', sourcePath: 'apps/runner/src/runner.ts' })
 
   routes.post('/claim', requireRunnerToken, (context) => {
     const start = startStore.claimNextLaptopStart(context.get('runnerLabel'))

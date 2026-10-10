@@ -168,7 +168,7 @@ export const sessionStateColors: Record<AgentSessionState, RadixColor> = {
   ended: 'gray',
 }
 
-export const providerLabels: Record<AgentProvider, string> = { claude: 'Claude', codex: 'Codex' }
+export const providerLabels: Record<AgentProvider, string> = { claude: 'Claude', codex: 'Codex', opencode: 'OpenCode' }
 
 const compactNumberFormat = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 const fullNumberFormat = new Intl.NumberFormat('en')

@@ -1,12 +1,13 @@
 import { z } from 'zod'
 
 // Claude Code hooks send `session_id` and `hook_event_name`; Codex's `notify` sends `type`
-// and `thread-id`. A cloud session's prompt and final replies are kept in memory for its chat;
+// and `thread-id`; Dashi's OpenCode reporter sends `type`, `session_id` and a session `status`. A cloud session's prompt and final replies are kept in memory for its chat;
 // anything else in the payload is dropped, not stored.
 export const hookPayloadSchema = z.object({
   session_id: z.string().min(1).max(200).optional(),
   hook_event_name: z.string().max(100).optional(),
   type: z.string().max(100).optional(),
+  status: z.string().max(40).optional(),
   'thread-id': z.string().min(1).max(200).optional(),
   prompt: z.string().optional(),
   last_assistant_message: z.string().optional(),

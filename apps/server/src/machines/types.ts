@@ -21,4 +21,5 @@ export interface MachineRouteDependencies {
   ingestTokens: MachineTokenStore
   runnerTokens: MachineTokenStore
   cliScriptPath: string
+  openCodeReporterPath: string
 }

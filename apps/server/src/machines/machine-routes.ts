@@ -1,26 +1,23 @@
-import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
 import { Hono } from 'hono'
-import type { MachineIdentity, MachineTokenKind, MachineTokenSummary, PairingDescription, PairingPoll, ServedScriptInfo } from '@dashi/contracts'
+import type { MachineIdentity, MachineTokenKind, MachineTokenSummary, PairingDescription, PairingPoll } from '@dashi/contracts'
 import { bearerTokenOf, limitTo, readJsonBody } from '../app/http.ts'
 import type { AppEnvironment } from '../app/types.ts'
+import { addServedScriptRoutes } from '../app/served-script.ts'
 import { pairingApprovalSchema, pairingRequestSchema } from './schema.ts'
 import type { MachineRouteDependencies } from './types.ts'
 
-const cliSourcePath = 'apps/cli/src/dashi.ts'
-
 // Reached by the CLI rather than a browser, so these carry no sign-in: making a pairing and
 // polling it with the secret only its CLI holds, a machine checking or revoking its own token,
-// and the CLI file itself. Approving a pairing is not among them.
+// and the files the CLI installs: itself and the OpenCode reporter. Approving a pairing is not among them.
 export const machineApiPathPrefixes = ['/api/pairings', '/api/machine/', '/api/cli/']
 
 /**
  * Builds the routes that connect a machine: the pairing a CLI asks for and the person approves,
- * a machine's view of its own tokens, and the CLI file with its hash.
- * @param dependencies The pairing relay, both token stores and where the CLI file is.
+ * a machine's view of its own tokens, and the files the CLI installs, each with its hash.
+ * @param dependencies The pairing relay, both token stores and where the CLI and OpenCode reporter files are.
  * @returns The routes, mounted under /api.
  */
-export const createMachineRoutes = ({ pairingRelay, ingestTokens, runnerTokens, cliScriptPath }: MachineRouteDependencies) => {
+export const createMachineRoutes = ({ pairingRelay, ingestTokens, runnerTokens, cliScriptPath, openCodeReporterPath }: MachineRouteDependencies) => {
   const routes = new Hono<AppEnvironment>()
 
   const tokenOf = (authorizationHeader: string | undefined): { kind: MachineTokenKind; token: MachineTokenSummary } | null => {
@@ -74,15 +71,12 @@ export const createMachineRoutes = ({ pairingRelay, ingestTokens, runnerTokens, 
     return context.body(null, 204)
   })
 
-  routes.get('/cli/script', async (context) => {
-    context.header('content-type', 'text/plain; charset=utf-8')
-    context.header('content-disposition', 'attachment; filename="dashi.ts"')
-    return context.body(await readFile(cliScriptPath, 'utf8'))
-  })
-
-  routes.get('/cli/script-info', async (context) => {
-    const script = await readFile(cliScriptPath)
-    return context.json<ServedScriptInfo>({ sha256: createHash('sha256').update(script).digest('hex'), byteLength: script.byteLength, sourcePath: cliSourcePath })
+  addServedScriptRoutes(routes, { path: '/cli/script', filePath: cliScriptPath, fileName: 'dashi.ts', sourcePath: 'apps/cli/src/dashi.ts' })
+  addServedScriptRoutes(routes, {
+    path: '/cli/opencode-reporter',
+    filePath: openCodeReporterPath,
+    fileName: 'opencode-reporter.ts',
+    sourcePath: 'apps/opencode-plugin/src/opencode-reporter.ts',
   })
 
   return routes
