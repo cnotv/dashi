@@ -1,5 +1,8 @@
 import type { IssueLabel, StartOptions, StartTarget, StartWorkflow } from '@dashi/contracts'
-import type { StartTargetAvailability } from './types'
+import { openRouterModelPattern, takesOpenRouterModel } from '@dashi/contracts/open-router'
+import type { StartChoices, StartTargetAvailability } from './types'
+
+type ModelChoices = Pick<StartChoices, 'modelSource' | 'openRouterModel'>
 
 const workflowByLabel: Record<string, StartWorkflow> = {
   bug: 'fix',
@@ -63,4 +66,28 @@ export const targetAvailabilityFor = (target: StartTarget, options: StartOptions
 export const defaultTargetFor = (options: StartOptions): StartTarget => {
   if (options.runners.some((runner) => runner.isOnline)) return 'laptop-remote-control'
   return options.routineConfigured ? 'cloud-routine' : 'laptop-remote-control'
+}
+
+const isOnOpenRouter = (choices: ModelChoices, target: StartTarget): boolean => choices.modelSource === 'openrouter' && takesOpenRouterModel(target)
+
+/**
+ * The OpenRouter model a start sends, when it runs on one.
+ * @param choices What the dialog's model fields hold.
+ * @param target Where the session would run; only an unattended laptop start can use OpenRouter.
+ * @returns The model slug, or null for the Claude login.
+ */
+export const openRouterModelFor = (choices: ModelChoices, target: StartTarget): string | null =>
+  isOnOpenRouter(choices, target) ? choices.openRouterModel.trim() : null
+
+/**
+ * Says what keeps a start's model choice from being sent.
+ * @param choices What the dialog's model fields hold.
+ * @param target Where the session would run.
+ * @returns What to fix, or null when the start can go.
+ */
+export const startModelProblemFor = (choices: ModelChoices, target: StartTarget): string | null => {
+  const openRouterModel = openRouterModelFor(choices, target)
+  if (openRouterModel === null) return null
+  if (openRouterModel === '') return 'Name the OpenRouter model to run on'
+  return openRouterModelPattern.test(openRouterModel) ? null : 'An OpenRouter model reads like provider/model, such as openai/gpt-5-mini'
 }

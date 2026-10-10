@@ -7,13 +7,14 @@ import {
   cliPathsFor,
   dashboardUrlFrom,
   doctorReport,
-  installedRunnerTokenOf,
+  installedRunnerSettingOf,
   isSupportedNode,
   launchAgentStartSteps,
   mergeClaudeSettings,
   parseArguments,
   platformOf,
   readSettingsFile,
+  runnerOpenRouterKeyOf,
   runnerServiceFilesFor,
   settingsChangesOf,
   withoutDashiSettings,
@@ -22,6 +23,7 @@ import {
 const dashboardUrl = 'https://dash.example.com'
 const ingestToken = 'dashi_ingest_0123456789abcdef'
 const runnerToken = 'dashi_runner_fedcba9876543210'
+const openRouterKey = 'sk-or-v1-0123456789abcdef'
 
 describe('parseArguments', () => {
   it('splits the command, its positionals and its flags', () => {
@@ -128,16 +130,20 @@ describe('readSettingsFile', () => {
     expect(readSettingsFile(settingsPath)).toMatch(/not a JSON object/)
   })
 
-  it('finds the runner token an install left on either platform', () => {
+  it('finds the runner token and OpenRouter key an install left on either platform', () => {
     const paths = cliPathsFor(state.folder, undefined)
-    const input = { dashboardUrl, runnerToken, nodePath: '/usr/bin/node', searchPath: '/usr/bin:/bin' }
-    expect(installedRunnerTokenOf('linux', paths)).toBeNull()
+    const input = { dashboardUrl, runnerToken, openRouterKey, nodePath: '/usr/bin/node', searchPath: '/usr/bin:/bin' }
+    expect(installedRunnerSettingOf('linux', paths, 'DASHI_RUNNER_TOKEN')).toBeNull()
     const [environmentFile] = runnerServiceFilesFor('linux', paths, input)
     const [plist] = runnerServiceFilesFor('macos', paths, input)
-    writeFileSync(join(state.folder, 'runner.env'), environmentFile?.content ?? '')
-    expect(installedRunnerTokenOf('linux', { ...paths, runnerEnvPath: join(state.folder, 'runner.env') })).toBe(runnerToken)
-    writeFileSync(join(state.folder, 'runner.plist'), plist?.content ?? '')
-    expect(installedRunnerTokenOf('macos', { ...paths, launchAgentPath: join(state.folder, 'runner.plist') })).toBe(runnerToken)
+    const linuxPaths = { ...paths, runnerEnvPath: join(state.folder, 'runner.env') }
+    const macosPaths = { ...paths, launchAgentPath: join(state.folder, 'runner.plist') }
+    writeFileSync(linuxPaths.runnerEnvPath, environmentFile?.content ?? '')
+    expect(installedRunnerSettingOf('linux', linuxPaths, 'DASHI_RUNNER_TOKEN')).toBe(runnerToken)
+    expect(installedRunnerSettingOf('linux', linuxPaths, 'OPENROUTER_API_KEY')).toBe(openRouterKey)
+    writeFileSync(macosPaths.launchAgentPath, plist?.content ?? '')
+    expect(installedRunnerSettingOf('macos', macosPaths, 'DASHI_RUNNER_TOKEN')).toBe(runnerToken)
+    expect(installedRunnerSettingOf('macos', macosPaths, 'OPENROUTER_API_KEY')).toBe(openRouterKey)
   })
 })
 
@@ -156,7 +162,7 @@ describe('launchAgentStartSteps', () => {
 
 describe('runnerServiceFilesFor', () => {
   const paths = cliPathsFor('/home/dev', undefined)
-  const input = { dashboardUrl, runnerToken, nodePath: '/opt/node/bin/node', searchPath: '/opt/node/bin:/usr/bin:/bin' }
+  const input = { dashboardUrl, runnerToken, openRouterKey: null, nodePath: '/opt/node/bin/node', searchPath: '/opt/node/bin:/usr/bin:/bin' }
 
   it('keeps the token out of the systemd unit, in its own env file', () => {
     const files = runnerServiceFilesFor('linux', paths, input)
@@ -176,9 +182,30 @@ describe('runnerServiceFilesFor', () => {
     expect(plist?.content).toContain('<key>PATH</key><string>/opt/node/bin:/usr/bin:/bin</string>')
   })
 
+  it("gives the runner the laptop's OpenRouter key, in the env file or the login agent, never the unit", () => {
+    const files = runnerServiceFilesFor('linux', paths, { ...input, openRouterKey })
+    expect(files.find((file) => file.path === paths.runnerEnvPath)?.content).toBe(
+      `DASHI_URL=${dashboardUrl}\nDASHI_RUNNER_TOKEN=${runnerToken}\nOPENROUTER_API_KEY=${openRouterKey}\n`,
+    )
+    expect(files.find((file) => file.path.endsWith('dashi-runner.service'))?.content).not.toContain(openRouterKey)
+    const [plist] = runnerServiceFilesFor('macos', paths, { ...input, openRouterKey })
+    expect(plist?.content).toContain(`<key>OPENROUTER_API_KEY</key><string>${openRouterKey}</string>`)
+    expect(runnerServiceFilesFor('macos', paths, input)[0]?.content).not.toContain('OPENROUTER_API_KEY')
+  })
+
   it('escapes what XML would read as markup', () => {
     const [plist] = runnerServiceFilesFor('macos', cliPathsFor('/Users/a&b', undefined), input)
     expect(plist?.content).toContain('/Users/a&amp;b/dashi/runner.ts')
+  })
+})
+
+describe('runnerOpenRouterKeyOf', () => {
+  it("takes the shell's key, then the one an install left, and only a key that cannot break the file it goes in", () => {
+    expect(runnerOpenRouterKeyOf(openRouterKey, 'sk-or-v1-older')).toBe(openRouterKey)
+    expect(runnerOpenRouterKeyOf(undefined, 'sk-or-v1-older')).toBe('sk-or-v1-older')
+    expect(runnerOpenRouterKeyOf('', null)).toBeNull()
+    expect(runnerOpenRouterKeyOf('sk-or\nDASHI_URL=https://evil', null)).toBeNull()
+    expect(runnerOpenRouterKeyOf('sk-or</string>', null)).toBeNull()
   })
 })
 

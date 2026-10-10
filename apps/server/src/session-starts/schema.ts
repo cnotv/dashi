@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { openRouterModelPattern } from '@dashi/contracts/open-router'
 
 // GitHub's own limits on owner and repository names; nothing else can become a clone path.
 const repositorySchema = z.object({
@@ -15,6 +16,7 @@ export const sessionStartRequestSchema = z.object({
   workflow: startWorkflowSchema,
   target: z.enum(['laptop-remote-control', 'laptop-headless', 'laptop-cloud', 'cloud-routine']),
   permissionMode: z.enum(['auto', 'acceptEdits', 'dontAsk']).default('auto'),
+  openRouterModel: z.string().regex(openRouterModelPattern).nullable().default(null),
   note: z.string().trim().max(20000).default(''),
 })
 

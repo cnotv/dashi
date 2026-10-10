@@ -107,6 +107,10 @@ export const StartDetailsDrawer = ({ start, onClose, onRetried }: StartDetailsDr
               </DataList.Value>
             </DataList.Item>
             <DataList.Item>
+              <DataList.Label>Model</DataList.Label>
+              <DataList.Value>{start.openRouterModel === null ? 'Claude login' : `OpenRouter: ${start.openRouterModel}`}</DataList.Value>
+            </DataList.Item>
+            <DataList.Item>
               <DataList.Label>Started</DataList.Label>
               <DataList.Value>{new Date(start.createdAt).toLocaleString()}</DataList.Value>
             </DataList.Item>

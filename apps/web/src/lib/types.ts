@@ -43,10 +43,16 @@ import type {
   VaultState,
 } from '@dashi/contracts'
 
+// What an unattended laptop start runs on: the laptop's Claude login, or an OpenRouter model on the laptop's own key.
+export type StartModelSource = 'claude-login' | 'openrouter'
+
 export interface StartChoices {
   workflow: StartWorkflow
   target: StartTarget | null
   permissionMode: HeadlessPermissionMode
+  modelSource: StartModelSource
+  // As typed; read through openRouterModelFor before it is sent.
+  openRouterModel: string
 }
 
 export interface PickedAttachment {

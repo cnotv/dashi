@@ -231,19 +231,32 @@ export const readSettingsFile = (settingsPath: string): JsonObject | string => {
 const xmlEscaped = (text: string): string =>
   text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
 
+// Plain key characters only, so a key can neither end its line in the env file nor its string in the plist.
+const openRouterKeyPattern = /^[A-Za-z0-9_-]{8,512}$/
+
+/**
+ * The OpenRouter key the runner gets, for the sessions started from the board on an OpenRouter
+ * model: the one in this shell, else the one an earlier install left.
+ * @param shellKey OPENROUTER_API_KEY in this shell.
+ * @param installedKey The key the installed runner has.
+ * @returns The key, or null when there is none fit to write.
+ */
+export const runnerOpenRouterKeyOf = (shellKey: string | undefined, installedKey: string | null): string | null =>
+  [shellKey, installedKey].find((key) => key !== undefined && key !== null && openRouterKeyPattern.test(key)) ?? null
+
 /**
  * The files that run the laptop runner as a service: a login agent on macOS, whose plist carries
  * its token as launchd has no env files; a systemd user service on Linux, whose token sits in its
- * own file. Both readable by this user only.
+ * own file. Both readable by this user only. The OpenRouter key, when there is one, goes beside the token.
  * @param platform The platform.
  * @param paths Where the files go.
- * @param input The dashboard, the runner token, node's path and the PATH the runner needs.
+ * @param input The dashboard, the runner token, the OpenRouter key, node's path and the PATH the runner needs.
  * @returns The files to write.
  */
 export const runnerServiceFilesFor = (
   platform: Platform,
   paths: CliPaths,
-  input: { dashboardUrl: string; runnerToken: string; nodePath: string; searchPath: string },
+  input: { dashboardUrl: string; runnerToken: string; openRouterKey: string | null; nodePath: string; searchPath: string },
 ): RunnerFile[] => {
   if (platform === 'macos') {
     const plist = [
@@ -255,6 +268,7 @@ export const runnerServiceFilesFor = (
       '  <key>EnvironmentVariables</key><dict>',
       `    <key>DASHI_URL</key><string>${xmlEscaped(input.dashboardUrl)}</string>`,
       `    <key>DASHI_RUNNER_TOKEN</key><string>${xmlEscaped(input.runnerToken)}</string>`,
+      ...(input.openRouterKey === null ? [] : [`    <key>OPENROUTER_API_KEY</key><string>${xmlEscaped(input.openRouterKey)}</string>`]),
       `    <key>PATH</key><string>${xmlEscaped(input.searchPath)}</string>`,
       '  </dict>',
       '  <key>RunAtLoad</key><true/>',
@@ -282,7 +296,8 @@ export const runnerServiceFilesFor = (
     'WantedBy=default.target',
     '',
   ].join('\n')
-  const environmentFile = `DASHI_URL=${input.dashboardUrl}\nDASHI_RUNNER_TOKEN=${input.runnerToken}\n`
+  const openRouterLine = input.openRouterKey === null ? '' : `OPENROUTER_API_KEY=${input.openRouterKey}\n`
+  const environmentFile = `DASHI_URL=${input.dashboardUrl}\nDASHI_RUNNER_TOKEN=${input.runnerToken}\n${openRouterLine}`
   return [
     { path: paths.runnerEnvPath, content: environmentFile },
     { path: paths.systemdUnitPath, content: unit },
@@ -290,20 +305,19 @@ export const runnerServiceFilesFor = (
 }
 
 /**
- * Finds the runner token an earlier install left, in the plist on macOS or the env file on Linux.
+ * Finds a variable an earlier install gave the runner, in the plist on macOS or the env file on Linux.
  * @param platform The platform.
  * @param paths Where the files are.
- * @returns The token, or null when there is no runner installed.
+ * @param name The variable: the runner token, or the OpenRouter key.
+ * @returns Its value, or null when the runner is not installed or has no such variable.
  */
-export const installedRunnerTokenOf = (platform: Platform, paths: CliPaths): string | null => {
+export const installedRunnerSettingOf = (platform: Platform, paths: CliPaths, name: 'DASHI_RUNNER_TOKEN' | 'OPENROUTER_API_KEY'): string | null => {
   const sourcePath = platform === 'macos' ? paths.launchAgentPath : paths.runnerEnvPath
   if (!existsSync(sourcePath)) return null
   const content = readFileSync(sourcePath, 'utf8')
-  const tokenMatch =
-    platform === 'macos'
-      ? /<key>DASHI_RUNNER_TOKEN<\/key><string>([^<]+)<\/string>/.exec(content)
-      : /^DASHI_RUNNER_TOKEN=(.+)$/m.exec(content)
-  return tokenMatch?.[1] ?? null
+  const settingMatch =
+    platform === 'macos' ? new RegExp(`<key>${name}</key><string>([^<]+)</string>`).exec(content) : new RegExp(`^${name}=(.+)$`, 'm').exec(content)
+  return settingMatch?.[1] ?? null
 }
 
 /**
@@ -527,16 +541,23 @@ const installRunner = async (platform: Platform, paths: CliPaths, dashboardUrl: 
   const sha256 = await downloadChecked(dashboardUrl, '/api/runner/script', paths.runnerScriptPath)
   say(`ok   downloaded the runner, SHA-256 ${sha256}`)
   const nodePath = process.execPath
-  runnerServiceFilesFor(platform, paths, { dashboardUrl, runnerToken, nodePath, searchPath: runnerSearchPath(nodePath) }).forEach((file) =>
-    writePrivateFile(file.path, file.content),
+  const openRouterKey = runnerOpenRouterKeyOf(process.env.OPENROUTER_API_KEY, installedRunnerSettingOf(platform, paths, 'OPENROUTER_API_KEY'))
+  runnerServiceFilesFor(platform, paths, { dashboardUrl, runnerToken, openRouterKey, nodePath, searchPath: runnerSearchPath(nodePath) }).forEach(
+    (file) => writePrivateFile(file.path, file.content),
   )
   startRunnerService(platform, paths)
+  say(openRouterStatusLine(openRouterKey !== null))
   say(
     platform === 'macos'
       ? `ok   the runner starts with the Mac; its log is ${paths.runnerLogPath}`
       : `ok   the runner runs as the ${systemdUnitName} user service; its log is journalctl --user -u ${systemdUnitName}\n     to keep it running after you log out: loginctl enable-linger $USER`,
   )
 }
+
+const openRouterStatusLine = (hasOpenRouterKey: boolean): string =>
+  hasOpenRouterKey
+    ? 'ok   the runner has OPENROUTER_API_KEY, for unattended starts on an OpenRouter model'
+    : '     starts on an OpenRouter model need OPENROUTER_API_KEY: export it, then run dashi runner install'
 
 const uninstallRunner = (platform: Platform, paths: CliPaths): void => {
   if (platform === 'macos') {
@@ -616,7 +637,7 @@ const doctor = async (platform: Platform, paths: CliPaths): Promise<void> => {
   const dashboardUrl = readDashboardUrl(paths)
   const settings = readSettingsFile(paths.claudeSettingsPath)
   const ingestToken = ingestTokenOf(paths)
-  const runnerToken = installedRunnerTokenOf(platform, paths)
+  const runnerToken = installedRunnerSettingOf(platform, paths, 'DASHI_RUNNER_TOKEN')
   const pluginEnabled = typeof settings !== 'string' && objectAt(settings, 'enabledPlugins')[workflowPlugin] === true
   const health = await requestJson(`${dashboardUrl}/api/health`).catch(() => null)
   const runnerState =
@@ -643,13 +664,15 @@ const doctor = async (platform: Platform, paths: CliPaths): Promise<void> => {
         ]),
   ]
   say(doctorReport(results))
+  // Informational only: a machine that never starts on OpenRouter needs no key.
+  if (runnerToken !== null) say(openRouterStatusLine(installedRunnerSettingOf(platform, paths, 'OPENROUTER_API_KEY') !== null))
   if (results.some((result) => !result.passed)) process.exitCode = 1
 }
 
 const runnerCommand = async (parsed: ParsedArguments, platform: Platform, paths: CliPaths): Promise<void> => {
   const action = parsed.positionals[0] ?? 'status'
   if (action === 'install') {
-    const runnerToken = installedRunnerTokenOf(platform, paths)
+    const runnerToken = installedRunnerSettingOf(platform, paths, 'DASHI_RUNNER_TOKEN')
     if (runnerToken === null) throw new Error('No runner token on this machine yet; run dashi connect <url> --runner')
     await installRunner(platform, paths, readDashboardUrl(paths), runnerToken)
     return
@@ -676,14 +699,14 @@ const update = async (platform: Platform, paths: CliPaths): Promise<void> => {
   const cliPath = fileURLToPath(import.meta.url)
   const cliHash = await downloadChecked(dashboardUrl, '/api/cli/script', cliPath)
   say(`ok   updated dashi, SHA-256 ${cliHash}`)
-  const runnerToken = installedRunnerTokenOf(platform, paths)
+  const runnerToken = installedRunnerSettingOf(platform, paths, 'DASHI_RUNNER_TOKEN')
   if (runnerToken !== null) await installRunner(platform, paths, dashboardUrl, runnerToken)
 }
 
 const disconnect = async (parsed: ParsedArguments, platform: Platform, paths: CliPaths): Promise<void> => {
   const dashboardUrl = readDashboardUrl(paths)
   if (!(await confirm(`Revoke this machine's tokens on ${dashboardUrl} and remove what dashi connect set up?`, parsed.flags))) return
-  const tokens = [ingestTokenOf(paths), installedRunnerTokenOf(platform, paths)].filter((token) => token !== null)
+  const tokens = [ingestTokenOf(paths), installedRunnerSettingOf(platform, paths, 'DASHI_RUNNER_TOKEN')].filter((token) => token !== null)
   await Promise.all(
     tokens.map((token) =>
       requestJson(`${dashboardUrl}/api/machine/whoami`, {
@@ -698,7 +721,7 @@ const disconnect = async (parsed: ParsedArguments, platform: Platform, paths: Cl
     writePrivateFile(paths.claudeSettingsPath, `${JSON.stringify(withoutDashiSettings(settings), null, 2)}\n`)
     say(`ok   removed the dashboard's variables from ${paths.claudeSettingsPath}`)
   }
-  if (installedRunnerTokenOf(platform, paths) !== null) uninstallRunner(platform, paths)
+  if (installedRunnerSettingOf(platform, paths, 'DASHI_RUNNER_TOKEN') !== null) uninstallRunner(platform, paths)
   rmSync(paths.configPath, { force: true })
 }
 

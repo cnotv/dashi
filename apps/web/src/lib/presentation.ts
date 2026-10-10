@@ -10,7 +10,7 @@ import type {
   StartTarget,
   StartWorkflow,
 } from '@dashi/contracts'
-import type { GateRingGroup, RadixColor } from './types'
+import type { GateRingGroup, RadixColor, StartModelSource } from './types'
 
 export const issueStatusLabels: Record<IssueStatus, string> = {
   'no-pull-request': 'No pull request',
@@ -84,6 +84,13 @@ export const startTargetLabels: Record<StartTarget, { name: string; description:
 export const startTargetOrder: StartTarget[] = ['laptop-remote-control', 'laptop-headless', 'laptop-cloud', 'cloud-routine']
 
 export const startWorkflowOrder: StartWorkflow[] = ['feature', 'fix', 'refactor', 'docs', 'design', '3d', 'security', 'tests', 'chore', 'research']
+
+export const startModelSourceOrder: StartModelSource[] = ['claude-login', 'openrouter']
+
+export const startModelSourceLabels: Record<StartModelSource, string> = {
+  'claude-login': 'Claude login',
+  openrouter: 'OpenRouter',
+}
 
 export const permissionModeOrder: HeadlessPermissionMode[] = ['auto', 'acceptEdits', 'dontAsk']
 

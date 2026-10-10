@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./src/types.ts",
-    "./first-message": "./src/first-message.ts"
+    "./first-message": "./src/first-message.ts",
+    "./open-router": "./src/open-router.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p .",

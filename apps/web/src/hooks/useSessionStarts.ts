@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { RepositoryReference, StartOptions, StartWorkflow } from '@dashi/contracts'
 import { dashboardApi } from '@/lib/api'
 import { errorMessageOf } from '@/lib/presentation'
-import { defaultTargetFor, targetAvailabilityFor } from '@/lib/start-session'
+import { defaultTargetFor, startModelProblemFor, targetAvailabilityFor } from '@/lib/start-session'
 import type { StartChoices } from '@/lib/types'
 import { usePolledResource } from './usePolledResource'
 
@@ -48,12 +48,19 @@ export const useStartOptions = (repository: RepositoryReference, isOpen: boolean
  * @param isOpen Whether the dialog is open; the options are read only while it is.
  * @param initialWorkflow The workflow picked to begin with.
  * @param attachmentBytes The size of the files attached to the start.
- * @returns The choices, their setter, the options, the chosen place and its availability.
+ * @returns The choices, their setter, the options, the chosen place and its availability, and what keeps the chosen model from being sent.
  */
 export const useStartChoices = (repository: RepositoryReference, isOpen: boolean, initialWorkflow: StartWorkflow, attachmentBytes: number) => {
-  const [choices, setChoices] = useState<StartChoices>({ workflow: initialWorkflow, target: null, permissionMode: 'auto' })
+  const [choices, setChoices] = useState<StartChoices>({
+    workflow: initialWorkflow,
+    target: null,
+    permissionMode: 'auto',
+    modelSource: 'claude-login',
+    openRouterModel: '',
+  })
   const { options, errorMessage } = useStartOptions(repository, isOpen)
   const chosenTarget = choices.target ?? (options ? defaultTargetFor(options) : null)
   const chosenAvailability = chosenTarget && options ? targetAvailabilityFor(chosenTarget, options, attachmentBytes) : null
-  return { choices, setChoices, options, errorMessage, chosenTarget, chosenAvailability }
+  const modelProblem = chosenTarget ? startModelProblemFor(choices, chosenTarget) : null
+  return { choices, setChoices, options, errorMessage, chosenTarget, chosenAvailability, modelProblem }
 }

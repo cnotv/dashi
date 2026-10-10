@@ -135,7 +135,8 @@ and add a GitHub token: fine-grained, on the repositories in `config/repos.json`
 
 A Netlify personal access token for the board's Netlify button is stored the same way. So are API
 keys for Anthropic, OpenAI and OpenRouter, kept for sessions that are not on a subscription,
-though no session uses them yet.
+though no session uses them yet. A start on an OpenRouter model uses the laptop's own key, never this
+one (see [Run on an OpenRouter model](#run-on-an-openrouter-model)).
 
 Each credential's dialog links to the page where that token or key is created. The question mark beside each credential opens **How
 Dashi uses it**, which lists what Dashi does with it, every API call it makes, the permissions the token
@@ -303,7 +304,8 @@ here. A laptop session's conversation lives on the laptop, so it needs the lapto
 - A message goes into a session running in tmux (every steerable start from Dashi does), pasted
   into its pane and sent. An unattended start takes one once its transcript has been quiet for a
   minute, by being resumed. An ended session is resumed unattended with
-  `claude --resume <id> -p <message>`, its output going to `~/dashi/logs`. A session
+  `claude --resume <id> -p <message>`, its output going to `~/dashi/logs`, on the OpenRouter model
+  of the start it came from, if any. A session
   waiting on a permission, or running in a plain terminal, can't take one, and the drawer says
   why.
 
@@ -374,7 +376,7 @@ issue leaves something out, and pick where it runs:
 | Where                              | What happens                                                                                                          | Needs                                     |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | Laptop, steered from the phone     | The runner starts `claude --remote-control` in tmux, in a fresh worktree of the repository; open it in the Claude app | The laptop runner, and tmux 3.2 or later  |
-| Laptop, unattended                 | The runner starts `claude -p` in a fresh worktree with the permission mode you pick; its hooks report it here         | The laptop runner                         |
+| Laptop, unattended                 | The runner starts `claude -p` in a fresh worktree with the permission mode and model you pick; its hooks report it here | The laptop runner                         |
 | Claude cloud, sent from the laptop | The runner runs `claude --cloud` in its clone and reports the claude.ai link back                                     | The laptop runner, logged in to claude.ai |
 | Claude cloud routine               | The dashboard fires the repository's routine through the routines API; works with the laptop off                      | A routine for the repository              |
 
@@ -396,6 +398,26 @@ lists the starts inside its time window, with the session's link or what the run
 row's details icon opens the start in full: where it ran, its links, the first message the session
 was sent, and for a failed one what the error means and a **Retry**, which starts it again as a new
 start with the same request (without attachments, which are never kept).
+
+### Run on an OpenRouter model
+
+An unattended laptop start can run on any [OpenRouter model](https://openrouter.ai/models) instead
+of the laptop's Claude login: pick **OpenRouter** under **Model** in the Start dialog and type the
+model's slug, such as `openai/gpt-5-mini`; one ending in `:free` costs nothing. Only unattended
+starts can: Remote Control needs a claude.ai login, and a cloud session runs in Anthropic's cloud.
+
+The runner starts Claude Code with the environment
+[OpenRouter documents](https://openrouter.ai/docs/guides/guides/claude-code-integration):
+`ANTHROPIC_BASE_URL=https://openrouter.ai/api`, the key as `ANTHROPIC_AUTH_TOKEN`, an empty
+`ANTHROPIC_API_KEY`, and the model as `ANTHROPIC_MODEL` and every default model, so no background
+call goes elsewhere. The key is the laptop's own `OPENROUTER_API_KEY`: the dashboard sends only
+the model, and the key reaches Claude Code through its environment, never an argument.
+
+To give the runner the key, export `OPENROUTER_API_KEY` in the shell and run `dashi runner install`
+(or `dashi connect`); it goes into the runner's plist or `~/dashi/runner.env` beside the runner token,
+and later installs and `dashi update` keep it. `dashi doctor` says whether the runner has one. A
+start on OpenRouter without it fails and says so. Usage lists these sessions as billed through
+OpenRouter, from the session's `ANTHROPIC_BASE_URL`.
 
 ### New issue
 
