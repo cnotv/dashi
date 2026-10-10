@@ -26,8 +26,9 @@ export interface SessionChatRouteDependencies {
 const unknownSessionError = { error: 'Unknown session' }
 const startChatIdPrefix = 'start-'
 
+// An OpenCode start keeps its conversation in OpenCode's own store, which the runner does not read.
 const chatStartOf = (start: SessionStart): ChatWorkStart | null =>
-  start.target === 'laptop-remote-control' || start.target === 'laptop-headless'
+  start.agent === 'claude' && (start.target === 'laptop-remote-control' || start.target === 'laptop-headless')
     ? { repositoryName: start.repository.name, startId: start.startId, target: start.target }
     : null
 

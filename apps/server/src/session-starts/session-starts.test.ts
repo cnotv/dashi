@@ -315,6 +315,29 @@ describe('laptop starts', () => {
     expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ ...headless, openRouterModel: '--model x' })))).status).toBe(400)
   })
 
+  it('hands the runner an unattended OpenCode start, and runs every other start on Claude Code', async () => {
+    const { app, runnerTokens } = createTestApp()
+    const { token } = runnerTokens.createToken('Mac mini')
+    expect(await (await app.request(jsonRequest('POST', '/api/session-starts', startBody()))).json()).toMatchObject({ agent: 'claude' })
+    await app.request(runnerRequest('/claim', token))
+    const startId = await startIdOf(
+      await app.request(
+        jsonRequest('POST', '/api/session-starts', startBody({ target: 'laptop-headless', agent: 'opencode', openRouterModel: 'openai/gpt-5-mini' })),
+      ),
+    )
+    expect(await (await app.request(runnerRequest('/claim', token))).json()).toMatchObject({
+      start: { startId, agent: 'opencode', openRouterModel: 'openai/gpt-5-mini' },
+    })
+  })
+
+  it('refuses OpenCode anywhere but an unattended laptop start, and an agent it does not know', async () => {
+    const { app } = createTestApp()
+    const steerable = await app.request(jsonRequest('POST', '/api/session-starts', startBody({ agent: 'opencode' })))
+    expect(steerable.status).toBe(422)
+    expect(await steerable.json()).toEqual({ error: 'Only an unattended laptop session can run on OpenCode' })
+    expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ target: 'laptop-headless', agent: 'codex' })))).status).toBe(400)
+  })
+
   it('serves the runner script without a sign-in', async () => {
     const { app } = createTestApp({}, { signInRequired: true })
     const scriptResponse = await app.request(getRequest('/api/runner/script'))

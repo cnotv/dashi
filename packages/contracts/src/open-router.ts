@@ -5,6 +5,14 @@ import type { StartTarget } from './types.ts'
 export const openRouterModelPattern = /^~?[a-z0-9][a-z0-9._-]{0,63}\/[A-Za-z0-9._:-]{1,100}$/
 
 /**
+ * Tells whether a start can run on OpenCode: only an unattended laptop start, since OpenCode has no
+ * Remote Control and never runs in Claude's cloud.
+ * @param target Where the session would run.
+ * @returns True for an unattended laptop start.
+ */
+export const takesOpenCode = (target: StartTarget): boolean => target === 'laptop-headless'
+
+/**
  * Tells whether a start can run on an OpenRouter model. Remote Control needs a claude.ai login, and
  * a cloud session runs in Anthropic's cloud, so only an unattended laptop start can.
  * @param target Where the session would run.

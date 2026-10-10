@@ -16,6 +16,7 @@ import {
   sessionStateColors,
   sessionStateLabels,
 } from '@/lib/presentation'
+import { canChatWithSession } from '@/lib/session-chat'
 import { layoutSessionTimeline, sessionDetail, sessionLabel, sessionOriginLine, sessionStateOrder } from '@/lib/session-timeline'
 import { formatTickTime, SessionTimelineAxis, SessionTimelineTrack, timelineLegendEntries } from './SessionTimeline'
 
@@ -26,18 +27,19 @@ const sessionColumns = (now: number, onOpenChat: (session: AgentSessionSummary) 
     columnHelper.display({
       id: 'chat',
       header: '',
-      cell: ({ row }) => (
-        <Tooltip content="Open the conversation">
-          <IconButton
-            size="1"
-            variant="ghost"
-            aria-label={`Chat with ${sessionLabel(row.original)}`}
-            onClick={() => onOpenChat(row.original)}
-          >
-            <ChatBubbleIcon />
-          </IconButton>
-        </Tooltip>
-      ),
+      cell: ({ row }) =>
+        canChatWithSession(row.original) && (
+          <Tooltip content="Open the conversation">
+            <IconButton
+              size="1"
+              variant="ghost"
+              aria-label={`Chat with ${sessionLabel(row.original)}`}
+              onClick={() => onOpenChat(row.original)}
+            >
+              <ChatBubbleIcon />
+            </IconButton>
+          </Tooltip>
+        ),
     }),
     columnHelper.accessor((session) => sessionLabel(session), {
       id: 'session',
@@ -126,7 +128,7 @@ export const SessionsTable = ({ overview, isStale, onOpenChat }: SessionsTablePr
             <Text size="2" weight="medium">
               Sessions over time
             </Text>
-            <SourceTags sourceIds={['claude-code-hooks', 'codex-notify', 'claude-code-otel']} note="Tokens: Claude Code only" />
+            <SourceTags sourceIds={['claude-code-hooks', 'codex-notify', 'opencode-reporter', 'claude-code-otel']} note="Tokens: Claude Code and OpenCode" />
           </Flex>
           <ChartLegend entries={timelineLegendEntries} />
         </Flex>

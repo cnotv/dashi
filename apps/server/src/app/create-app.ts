@@ -178,6 +178,7 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnvironment> =
       ingestTokens: activity.ingestTokens,
       runnerTokens: dependencies.sessionStarts.runnerTokens,
       cliScriptPath: dependencies.cliScriptPath,
+      openCodeReporterPath: dependencies.openCodeReporterPath,
     }),
   )
   app.route('/api/runner', createRunnerChatRoutes(sessionChatDependencies))

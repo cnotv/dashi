@@ -54,8 +54,9 @@ export const useStartChoices = (repository: RepositoryReference, isOpen: boolean
   const [choices, setChoices] = useState<StartChoices>({
     workflow: initialWorkflow,
     target: null,
+    agent: 'claude',
     permissionMode: 'auto',
-    modelSource: 'claude-login',
+    modelSource: 'default',
     openRouterModel: '',
   })
   const { options, errorMessage } = useStartOptions(repository, isOpen)

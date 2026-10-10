@@ -92,4 +92,20 @@ describe('the CLI file', () => {
     expect(script).toContain('dashi connect')
     expect(info).toEqual({ sha256: createHash('sha256').update(script).digest('hex'), byteLength: Buffer.byteLength(script), sourcePath: 'apps/cli/src/dashi.ts' })
   })
+
+  it('serves the OpenCode reporter the same way, for dashi connect to install', async () => {
+    const { app } = createTestApp({}, { signInRequired: true })
+    const reporterResponse = await app.request(getRequest('/api/cli/opencode-reporter'))
+    expect(reporterResponse.headers.get('content-disposition')).toBe('attachment; filename="opencode-reporter.ts"')
+    const reporter = await reporterResponse.text()
+    const info = z
+      .object({ sha256: z.string(), byteLength: z.number(), sourcePath: z.string() })
+      .parse(await (await app.request(getRequest('/api/cli/opencode-reporter-info'))).json())
+    expect(reporter).toContain('export const DashiReporter')
+    expect(info).toEqual({
+      sha256: createHash('sha256').update(reporter).digest('hex'),
+      byteLength: Buffer.byteLength(reporter),
+      sourcePath: 'apps/opencode-plugin/src/opencode-reporter.ts',
+    })
+  })
 })

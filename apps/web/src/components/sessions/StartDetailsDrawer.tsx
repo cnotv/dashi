@@ -6,7 +6,7 @@ import { subjectUrlOf } from '@dashi/contracts/first-message'
 import { usePolledResource } from '@/hooks/usePolledResource'
 import { useToast } from '@/hooks/useToast'
 import { dashboardApi } from '@/lib/api'
-import { sessionStartStateColors, sessionStartStateLabels, startTargetLabels } from '@/lib/presentation'
+import { sessionStartStateColors, sessionStartStateLabels, startAgentLabels, startModelSourceLabels, startTargetLabels } from '@/lib/presentation'
 import { failureAdviceFor, routinesPageUrl } from '@/lib/session-starts'
 
 interface StartDetailsDrawerProps {
@@ -107,8 +107,14 @@ export const StartDetailsDrawer = ({ start, onClose, onRetried }: StartDetailsDr
               </DataList.Value>
             </DataList.Item>
             <DataList.Item>
+              <DataList.Label>Agent</DataList.Label>
+              <DataList.Value>{startAgentLabels[start.agent]}</DataList.Value>
+            </DataList.Item>
+            <DataList.Item>
               <DataList.Label>Model</DataList.Label>
-              <DataList.Value>{start.openRouterModel === null ? 'Claude login' : `OpenRouter: ${start.openRouterModel}`}</DataList.Value>
+              <DataList.Value>
+                {start.openRouterModel === null ? startModelSourceLabels[start.agent].default : `OpenRouter: ${start.openRouterModel}`}
+              </DataList.Value>
             </DataList.Item>
             <DataList.Item>
               <DataList.Label>Started</DataList.Label>

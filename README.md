@@ -1,7 +1,7 @@
 # Dashi
 
 Dashi is a dashboard for coding-agent work across
-repositories: the Claude Code and Codex sessions running now and the tokens they spend, the
+repositories: the Claude Code, Codex and OpenCode sessions running now and the tokens they spend, the
 issues and their pull requests with check gates, screenshots and videos, and buttons to merge,
 close, and start a session from the phone, on your laptop or in Claude's cloud. Credentials are
 saved from the UI and stored encrypted, and the shared agent instructions come from
@@ -185,6 +185,7 @@ sends.
 | --- | --- | --- | --- |
 | [Claude Code hooks](https://code.claude.com/docs/en/hooks) | `SessionStart`, `UserPromptSubmit`, `Notification`, `Stop` and `SessionEnd`, with the session id, git remote, branch, folder and first prompt; from a cloud session, every prompt and final reply | `POST /api/events` | Session rows, states, timeline; the branch that Usage groups by; a cloud session's chat |
 | [Codex `notify`](https://developers.openai.com/codex/config-advanced) | `agent-turn-complete`, with the thread id and first input message | `POST /api/events` | Codex session rows and states |
+| [OpenCode plugin events](https://opencode.ai/docs/plugins/), through Dashi's reporter | Session created, busy, idle, asking a permission and deleted, the first prompt's first line, and each finished answer's tokens by model | `POST /api/events`, `POST /api/telemetry/v1/metrics` | OpenCode session rows, states and tokens |
 | [Claude Code OpenTelemetry](https://code.claude.com/docs/en/monitoring-usage) | The `claude_code.token.usage` counter, per session, model and token type, over OTLP/HTTP JSON | `POST /api/telemetry/v1/metrics` | Every token count, on Sessions and Usage |
 | [GitHub GraphQL API](https://docs.github.com/en/graphql) | Issues and pull requests, for the board | Fetched by the server | The pull request of a branch on Usage, read from boards already fetched |
 | [Claude Code routines](https://code.claude.com/docs/en/routines) | A session started on claude.ai | Called by the server | Cloud starts in Started from the board |
@@ -192,7 +193,7 @@ sends.
 | [Workflow plugin hook](https://github.com/cnotv/agent-base#what-the-reporter-sends) | What launched each session and what pays for it, as kinds: entrypoint, terminal, launching app, billing kind, API host, Dashi start id; the cloud session it runs in | `POST /api/events` headers | Triggered by and Billed through on Usage and Sessions; which start a cloud chat belongs to |
 | [Dashi machine token](#set-up-a-machine-with-the-dashi-cli) | Which connected machine sent a report | Every ingest request | By machine on Usage |
 
-Codex sends no token metrics, so Codex sessions show n/a for tokens, and Usage lists them under By agent with no tokens.
+Codex sends no token metrics, so Codex sessions show n/a for tokens, and Usage lists them under By agent with no tokens. OpenCode's reporter sends each answer's tokens, so OpenCode sessions count like Claude Code's.
 
 ### Where the tokens were spent
 
@@ -214,8 +215,8 @@ on the Sessions page, show the same "triggered by" and "billed through" labels.
   - Amazon Bedrock, Google Vertex AI or Microsoft Foundry.
   - For Codex: an OpenAI API key or a ChatGPT login.
 - **By machine:** the connected machine whose ingest token reported the tokens.
-- **By agent:** Claude Code and Codex. Codex sends no token metrics, so its sessions are counted
-  with no tokens.
+- **By agent:** Claude Code, OpenCode and Codex. Codex sends no token metrics, so its sessions are
+  counted with no tokens.
 
 Triggered by and billed through come from the workflow plugin's status hook (0.5.0 or later). It
 runs inside every session and reads them from the session's environment:
@@ -252,7 +253,8 @@ and no package to install.
    with the tokens shortened, and asks before writing them. These are the same keys as the
    manual snippet. It keeps a copy of the old file, leaves every other key alone, and refuses
    to touch a file that isn't valid JSON.
-4. Installs the `workflow` plugin, then, if ticked, the laptop runner. The runner is checked
+4. Installs the `workflow` plugin, OpenCode's reporter when `opencode` is installed (see
+   [OpenCode](#opencode)), then, if ticked, the laptop runner. The runner is checked
    against its own hash and installed as the macOS login agent or the Linux systemd user
    service described under [The laptop runner](#the-laptop-runner).
 5. Confirms the dashboard accepts each token.
@@ -376,7 +378,7 @@ issue leaves something out, and pick where it runs:
 | Where                              | What happens                                                                                                          | Needs                                     |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | Laptop, steered from the phone     | The runner starts `claude --remote-control` in tmux, in a fresh worktree of the repository; open it in the Claude app | The laptop runner, and tmux 3.2 or later  |
-| Laptop, unattended                 | The runner starts `claude -p` in a fresh worktree with the permission mode and model you pick; its hooks report it here | The laptop runner                         |
+| Laptop, unattended                 | The runner starts `claude -p`, or `opencode run`, in a fresh worktree with the permission mode and model you pick; its hooks report it here | The laptop runner                         |
 | Claude cloud, sent from the laptop | The runner runs `claude --cloud` in its clone and reports the claude.ai link back                                     | The laptop runner, logged in to claude.ai |
 | Claude cloud routine               | The dashboard fires the repository's routine through the routines API; works with the laptop off                      | A routine for the repository              |
 
@@ -418,6 +420,31 @@ To give the runner the key, export `OPENROUTER_API_KEY` in the shell and run `da
 and later installs and `dashi update` keep it. `dashi doctor` says whether the runner has one. A
 start on OpenRouter without it fails and says so. Usage lists these sessions as billed through
 OpenRouter, from the session's `ANTHROPIC_BASE_URL`.
+
+### OpenCode
+
+[OpenCode](https://opencode.ai) sessions show on Sessions and Usage beside Claude Code's, and an
+unattended laptop start can run on OpenCode instead: pick **OpenCode** under **Agent** in the Start
+dialog. Its model is OpenCode's own default, or an OpenRouter model (`--model openrouter/<slug>`)
+on the laptop's `OPENROUTER_API_KEY`, as above. OpenCode's permission settings decide what it may
+do; **Auto** adds `--auto`, which approves what those settings do not deny. OpenCode has no
+Remote Control and Dashi cannot read its conversation, so it is not offered for steerable or cloud
+starts, and its sessions have no chat.
+
+The reporting comes from Dashi's OpenCode reporter, `apps/opencode-plugin/src/opencode-reporter.ts`,
+which `dashi connect` and `dashi update` install wherever `opencode` is on the PATH:
+
+- The reporter is downloaded from `/api/cli/opencode-reporter`, checked against the hash at
+  `/api/cli/opencode-reporter-info`, and saved as `~/dashi/opencode-reporter.ts`.
+- `~/.config/opencode/plugins/dashi.ts` (under `$XDG_CONFIG_HOME` when set) is a one-line plugin
+  that loads it, and `~/dashi/opencode.json` (mode 600) holds the dashboard's address and the
+  machine's ingest token.
+- It sends each session's state and its first prompt's first line to `/api/events`, and each
+  finished answer's tokens to `/api/telemetry/v1/metrics`, as deltas. A subagent's session counts
+  toward the session that started it. It never sends the conversation, and a report that fails
+  is dropped rather than holding OpenCode up.
+
+`dashi doctor` checks the three files, and `dashi disconnect` removes them.
 
 ### New issue
 

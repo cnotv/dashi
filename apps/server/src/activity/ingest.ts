@@ -12,7 +12,8 @@ import type {
 import type { CloudHookMessage } from '../session-chat/types.ts'
 import { sessionBillingOf } from './origin.ts'
 
-const tokenUsageMetricName = 'claude_code.token.usage'
+// Claude Code's own counter, and the one Dashi's OpenCode reporter sends.
+const tokenUsageMetricNames = ['claude_code.token.usage', 'dashi.token.usage']
 const tokenTypes: TokenType[] = ['input', 'output', 'cacheRead', 'cacheCreation']
 const cumulativeTemporalities = [2, 'AGGREGATION_TEMPORALITY_CUMULATIVE']
 
@@ -38,10 +39,34 @@ export const repositoryFromRemote = (remote: string | undefined): RepositoryRefe
   return remoteMatch?.[1] && remoteMatch[2] ? { owner: remoteMatch[1], name: remoteMatch[2] } : null
 }
 
-const providerFrom = (value: string | undefined): AgentProvider => (value === 'codex' ? 'codex' : 'claude')
+const stateByOpenCodeReport: Record<string, AgentSessionState> = {
+  'session.created': 'idle',
+  'chat.message': 'working',
+  'session.idle': 'idle',
+  'permission.asked': 'waiting',
+  'permission.replied': 'working',
+  'session.deleted': 'ended',
+}
+
+// OpenCode retries a failed model call on its own, so a retry is still work in progress.
+const stateByOpenCodeStatus: Record<string, AgentSessionState> = { busy: 'working', retry: 'working', idle: 'idle' }
+
+/**
+ * Reads an agent's name as the hooks, the store and the usage rows spell it; anything else is Claude Code,
+ * the agent that reported before the others could.
+ * @param value The name.
+ * @returns The agent.
+ */
+export const agentProviderOf = (value: string | undefined): AgentProvider => (value === 'codex' || value === 'opencode' ? value : 'claude')
+
+const openCodeStateFor = (payload: HookPayload): AgentSessionState | null => {
+  if (payload.type === 'session.status') return payload.status === undefined ? null : (stateByOpenCodeStatus[payload.status] ?? null)
+  return payload.type === undefined ? null : (stateByOpenCodeReport[payload.type] ?? null)
+}
 
 const stateFor = (provider: AgentProvider, payload: HookPayload): AgentSessionState | null => {
   if (provider === 'codex') return payload.type === 'agent-turn-complete' ? 'idle' : null
+  if (provider === 'opencode') return openCodeStateFor(payload)
   return payload.hook_event_name === undefined ? null : (stateByClaudeHookEvent[payload.hook_event_name] ?? null)
 }
 
@@ -91,14 +116,14 @@ const originFrom = (headers: HookHeaders): SessionOrigin => {
 }
 
 /**
- * Turns a Claude Code hook or Codex notification into a session event.
+ * Turns a Claude Code hook, a Codex notification or an OpenCode report into a session event.
  * @param payload The hook's JSON body.
  * @param headers The provider, branch and remote the hook sent alongside it.
  * @param occurredAt When the event arrived.
  * @returns The event, or null for a hook that says nothing about the session's state.
  */
 export const agentEventFrom = (payload: HookPayload, headers: HookHeaders, occurredAt: string): AgentEvent | null => {
-  const provider = providerFrom(headers.provider)
+  const provider = agentProviderOf(headers.provider)
   const sessionId = provider === 'codex' ? payload['thread-id'] : payload.session_id
   const state = stateFor(provider, payload)
   if (sessionId === undefined || state === null) return null
@@ -165,7 +190,7 @@ export const tokenUsagePointsFrom = (request: OtlpMetricsRequest, receivedAt: st
   request.resourceMetrics.flatMap((resourceMetric) =>
     resourceMetric.scopeMetrics.flatMap((scopeMetric) =>
       scopeMetric.metrics
-        .filter((metric) => metric.name === tokenUsageMetricName && metric.sum !== undefined)
+        .filter((metric) => tokenUsageMetricNames.includes(metric.name) && metric.sum !== undefined)
         .flatMap((metric) => {
           const isCumulative = cumulativeTemporalities.includes(metric.sum?.aggregationTemporality ?? 0)
           return (metric.sum?.dataPoints ?? []).flatMap((dataPoint): TokenUsagePoint[] => {

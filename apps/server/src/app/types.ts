@@ -19,6 +19,7 @@ export interface AppDependencies {
   createNetlifyFetcher: (token: string) => NetlifyFetcher
   mediaCacheDirectory: string
   cliScriptPath: string
+  openCodeReporterPath: string
   allowedHostNames: string[]
   boardCacheMilliseconds: number
   now: () => number
@@ -30,4 +31,13 @@ export interface AppEnvironment {
 
 export interface ReceivedRestRequest extends GithubRestRequest {
   path: string
+}
+
+// One of Dashi's files a machine downloads: the route it is served at, where it is on disk, the
+// name it is saved under, and its path in the repository, shown so it can be read before it runs.
+export interface ServedScript {
+  path: string
+  filePath: string
+  fileName: string
+  sourcePath: string
 }

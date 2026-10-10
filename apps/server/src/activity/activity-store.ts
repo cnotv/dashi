@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { AgentProvider, AgentSessionState } from '@dashi/contracts'
+import type { AgentSessionState } from '@dashi/contracts'
+import { agentProviderOf } from './ingest.ts'
 import { sessionBillingOf } from './origin.ts'
 import type { ActivityStore, AgentEvent, StoredEvent, StoredSession, StoredTokenSample, TokenType, TokenUsagePoint } from './types.ts'
 
@@ -50,7 +51,6 @@ const createSchema = (database: DatabaseSync): void => {
 const agentSessionStates: AgentSessionState[] = ['working', 'waiting', 'idle', 'ended', 'inactive']
 const tokenTypes: TokenType[] = ['input', 'output', 'cacheRead', 'cacheCreation']
 
-const toProvider = (value: string): AgentProvider => (value === 'codex' ? 'codex' : 'claude')
 const toState = (value: string): AgentSessionState => agentSessionStates.find((state) => state === value) ?? 'idle'
 const toTokenType = (value: string): TokenType => tokenTypes.find((tokenType) => tokenType === value) ?? 'input'
 
@@ -63,7 +63,7 @@ const toStoredSession = (row: Record<string, unknown>): StoredSession => {
   const name = readOptionalText(row, 'repository_name')
   return {
     sessionId: readText(row, 'session_id'),
-    provider: toProvider(readText(row, 'provider')),
+    provider: agentProviderOf(readText(row, 'provider')),
     repository: owner !== null && name !== null ? { owner, name } : null,
     branch: readOptionalText(row, 'branch'),
     title: readOptionalText(row, 'title'),

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { StartOptions } from '@dashi/contracts'
 import { runnerLaunchAgentCommands, runnerReviewCommands, runnerSystemdCommands, runnerTryCommands } from './runner-setup'
-import { defaultTargetFor, openRouterModelFor, startModelProblemFor, suggestedWorkflowFor, targetAvailabilityFor } from './start-session'
+import { agentFor, choicesWithAgent, defaultTargetFor, openRouterModelFor, startModelProblemFor, suggestedWorkflowFor, targetAvailabilityFor } from './start-session'
 
 const onlineRunner = { label: 'Mac mini', lastSeenAt: '2026-09-30T10:00:00Z', isOnline: true }
 const optionsWith = (overrides: Partial<StartOptions>): StartOptions => ({
@@ -55,6 +55,24 @@ describe('defaultTargetFor', () => {
   })
 })
 
+describe('agentFor', () => {
+  it('runs OpenCode only on an unattended laptop start that picked it', () => {
+    expect(agentFor({ agent: 'opencode' }, 'laptop-headless')).toBe('opencode')
+    expect(agentFor({ agent: 'opencode' }, 'laptop-remote-control')).toBe('claude')
+    expect(agentFor({ agent: 'opencode' }, 'cloud-routine')).toBe('claude')
+    expect(agentFor({ agent: 'claude' }, 'laptop-headless')).toBe('claude')
+  })
+})
+
+describe('choicesWithAgent', () => {
+  it("keeps the permission mode when the new agent has it, and falls back to auto when it does not", () => {
+    const choices = { workflow: 'fix' as const, target: null, agent: 'claude' as const, permissionMode: 'acceptEdits' as const, modelSource: 'default' as const, openRouterModel: '' }
+    expect(choicesWithAgent(choices, 'opencode')).toMatchObject({ agent: 'opencode', permissionMode: 'auto' })
+    expect(choicesWithAgent({ ...choices, permissionMode: 'dontAsk' }, 'opencode')).toMatchObject({ permissionMode: 'dontAsk' })
+    expect(choicesWithAgent({ ...choices, agent: 'opencode', permissionMode: 'dontAsk' }, 'claude')).toMatchObject({ agent: 'claude', permissionMode: 'dontAsk' })
+  })
+})
+
 describe('the model a start runs on', () => {
   const onOpenRouter = { modelSource: 'openrouter' as const, openRouterModel: ' meta-llama/llama-3.3-70b-instruct:free ' }
 
@@ -62,7 +80,7 @@ describe('the model a start runs on', () => {
     expect(openRouterModelFor(onOpenRouter, 'laptop-headless')).toBe('meta-llama/llama-3.3-70b-instruct:free')
     expect(openRouterModelFor(onOpenRouter, 'laptop-remote-control')).toBeNull()
     expect(openRouterModelFor(onOpenRouter, 'cloud-routine')).toBeNull()
-    expect(openRouterModelFor({ ...onOpenRouter, modelSource: 'claude-login' }, 'laptop-headless')).toBeNull()
+    expect(openRouterModelFor({ ...onOpenRouter, modelSource: 'default' }, 'laptop-headless')).toBeNull()
   })
 
   it('holds the start back until an OpenRouter model reads as a model slug', () => {

@@ -15,6 +15,7 @@ export const sessionStartRequestSchema = z.object({
   pullRequestNumber: z.number().int().positive().nullable().default(null),
   workflow: startWorkflowSchema,
   target: z.enum(['laptop-remote-control', 'laptop-headless', 'laptop-cloud', 'cloud-routine']),
+  agent: z.enum(['claude', 'opencode']).default('claude'),
   permissionMode: z.enum(['auto', 'acceptEdits', 'dontAsk']).default('auto'),
   openRouterModel: z.string().regex(openRouterModelPattern).nullable().default(null),
   note: z.string().trim().max(20000).default(''),

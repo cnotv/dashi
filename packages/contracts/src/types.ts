@@ -202,7 +202,7 @@ export interface SessionState {
   user: SignedInUser | null
 }
 
-export type AgentProvider = 'claude' | 'codex'
+export type AgentProvider = 'claude' | 'codex' | 'opencode'
 
 // `inactive` is a session that never reported its end but has been silent too long to be
 // running: a closed terminal, a crashed machine.
@@ -331,6 +331,9 @@ export type StartTarget = 'laptop-remote-control' | 'laptop-headless' | 'laptop-
 
 export type HeadlessPermissionMode = 'auto' | 'acceptEdits' | 'dontAsk'
 
+// The agent a start runs: Claude Code anywhere, OpenCode only unattended on the laptop.
+export type StartAgent = Exclude<AgentProvider, 'codex'>
+
 export type SessionStartState = 'queued' | 'claimed' | 'started' | 'failed'
 
 export interface SessionStartRequest {
@@ -339,6 +342,7 @@ export interface SessionStartRequest {
   pullRequestNumber: number | null
   workflow: StartWorkflow
   target: StartTarget
+  agent: StartAgent
   permissionMode: HeadlessPermissionMode
   // An OpenRouter model slug for an unattended laptop start, run on the laptop's own OpenRouter
   // key; null runs it on the laptop's Claude login.

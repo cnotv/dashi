@@ -42,6 +42,15 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@22.20.4)(jiti@2.7.0)(lightningcss@1.32.0)
 
+  apps/opencode-plugin:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.18.0
+        version: 22.20.4
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@22.20.4)(jiti@2.7.0)(lightningcss@1.32.0)
+
   apps/runner:
     devDependencies:
       '@types/node':

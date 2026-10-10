@@ -9,6 +9,7 @@ const startAt = (createdAt: string, overrides: Partial<SessionStart> = {}): Sess
   pullRequestNumber: null,
   workflow: 'feature',
   target: 'cloud-routine',
+  agent: 'claude',
   permissionMode: 'auto',
   openRouterModel: null,
   note: '',

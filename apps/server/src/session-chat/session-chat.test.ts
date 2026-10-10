@@ -176,6 +176,21 @@ describe('session chat', () => {
     expect((await takeWork()).deliveries).toMatchObject([{ sessionId, start: null, openRouterModel: 'openai/gpt-5-mini' }])
   })
 
+  it('has no chat for an OpenCode start, whose conversation is not a Claude transcript', async () => {
+    const { app } = setUp()
+    const startResponse = await app.request(
+      jsonRequest('POST', '/api/session-starts', {
+        repository: { owner: 'cnotv', name: 'generative-art' },
+        issueNumber: 42,
+        workflow: 'fix',
+        target: 'laptop-headless',
+        agent: 'opencode',
+      }),
+    )
+    const { startId } = z.object({ startId: z.string() }).parse(await startResponse.json())
+    expect((await app.request(getRequest(`/api/session-starts/${startId}/chat`))).status).toBe(404)
+  })
+
   it('refuses a start that does not exist, and a start id passed as a session', async () => {
     const { app } = setUp()
     expect((await app.request(getRequest('/api/session-starts/0123abcd-0000-4000-8000-000000000000/chat'))).status).toBe(404)

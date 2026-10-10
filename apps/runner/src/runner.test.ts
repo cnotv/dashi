@@ -54,6 +54,13 @@ describe('parseClaim', () => {
     expect(parseClaim({ start: null })).toBeNull()
   })
 
+  it('reads the agent, Claude Code unless the dashboard says OpenCode, and OpenCode only unattended', () => {
+    expect(claimOf().start.agent).toBe('claude')
+    expect(claimOf({ target: 'laptop-headless', agent: 'opencode' }).start.agent).toBe('opencode')
+    expect(parseClaim(claimBody({ agent: 'opencode' }))).toBeNull()
+    expect(parseClaim(claimBody({ target: 'laptop-headless', agent: 'codex' }))).toBeNull()
+  })
+
   it('reads an OpenRouter model only for an unattended start, and only as a model slug', () => {
     const headless = { target: 'laptop-headless' }
     expect(claimOf().start.openRouterModel).toBeNull()
@@ -143,6 +150,30 @@ describe('launchPlanFor', () => {
 
   it('refuses an OpenRouter start when the laptop has no OpenRouter key', () => {
     expect(() => launchPlanFor(claimOf({ target: 'laptop-headless', openRouterModel: 'openai/gpt-5-mini' }), paths, {})).toThrow(
+      'OPENROUTER_API_KEY',
+    )
+  })
+
+  it('runs an unattended OpenCode start with opencode run, auto-approving only in auto mode', () => {
+    const plan = launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode' }), paths, {})
+    expect(plan).toMatchObject({ mode: 'detached', command: 'opencode', cwd: paths.worktreePath, environment: { DASHI_START_ID: startId } })
+    expect(plan.args).toEqual(['run', '--title=generative-art #42 fix', '--auto', claimOf().prompt])
+    const asked = launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode', permissionMode: 'dontAsk' }), paths, {})
+    expect(asked.args).toEqual(['run', '--title=generative-art #42 fix', claimOf().prompt])
+    const dashedName = launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode', repository: { owner: 'cnotv', name: '--auto' } }), paths, {})
+    expect(dashedName.args.filter((argument) => argument === '--auto')).toEqual(['--auto'])
+  })
+
+  it("runs OpenCode on an OpenRouter model with the laptop's key under OpenCode's own name for it", () => {
+    const openRouterKey = 'sk-or-v1-exampleKey0123456789'
+    const plan = launchPlanFor(
+      claimOf({ target: 'laptop-headless', agent: 'opencode', openRouterModel: 'openai/gpt-5-mini' }),
+      paths,
+      { OPENROUTER_API_KEY: openRouterKey },
+    )
+    expect(plan.args.slice(0, 2)).toEqual(['run', '--model=openrouter/openai/gpt-5-mini'])
+    expect(plan.environment).toEqual({ DASHI_START_ID: startId, OPENROUTER_API_KEY: openRouterKey })
+    expect(() => launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode', openRouterModel: 'openai/gpt-5-mini' }), paths, {})).toThrow(
       'OPENROUTER_API_KEY',
     )
   })
