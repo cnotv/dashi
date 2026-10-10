@@ -60,7 +60,8 @@ or ask whether the two should become one pull request.
 The title ends with the issue number, as `feat: <summary> (#6)`, so GitHub links it to the
 issue; fix an existing title with `gh pr edit --title`. Only the title carries the number,
 never a commit. The body follows the repository's `.github/pull_request_template.md` and
-starts with `Closes #<issue-number>`.
+starts with `Closes #<issue-number>`. It ends with its own content: no session link and no
+Claude Code footer, in the body or in any commit, as the Git rules say.
 
 **Open with In short**: three to five bullets for a reader who reads nothing else — what
 changed, why it matters, the one core idea, how to see it. Then write only what the diff
