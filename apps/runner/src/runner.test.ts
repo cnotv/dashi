@@ -157,9 +157,11 @@ describe('launchPlanFor', () => {
   it('runs an unattended OpenCode start with opencode run, auto-approving only in auto mode', () => {
     const plan = launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode' }), paths, {})
     expect(plan).toMatchObject({ mode: 'detached', command: 'opencode', cwd: paths.worktreePath, environment: { DASHI_START_ID: startId } })
-    expect(plan.args).toEqual(['run', '--title', 'generative-art #42 fix', '--auto', claimOf().prompt])
+    expect(plan.args).toEqual(['run', '--title=generative-art #42 fix', '--auto', claimOf().prompt])
     const asked = launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode', permissionMode: 'dontAsk' }), paths, {})
-    expect(asked.args).toEqual(['run', '--title', 'generative-art #42 fix', claimOf().prompt])
+    expect(asked.args).toEqual(['run', '--title=generative-art #42 fix', claimOf().prompt])
+    const dashedName = launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode', repository: { owner: 'cnotv', name: '--auto' } }), paths, {})
+    expect(dashedName.args.filter((argument) => argument === '--auto')).toEqual(['--auto'])
   })
 
   it("runs OpenCode on an OpenRouter model with the laptop's key under OpenCode's own name for it", () => {
@@ -169,7 +171,7 @@ describe('launchPlanFor', () => {
       paths,
       { OPENROUTER_API_KEY: openRouterKey },
     )
-    expect(plan.args.slice(0, 3)).toEqual(['run', '--model', 'openrouter/openai/gpt-5-mini'])
+    expect(plan.args.slice(0, 2)).toEqual(['run', '--model=openrouter/openai/gpt-5-mini'])
     expect(plan.environment).toEqual({ DASHI_START_ID: startId, OPENROUTER_API_KEY: openRouterKey })
     expect(() => launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode', openRouterModel: 'openai/gpt-5-mini' }), paths, {})).toThrow(
       'OPENROUTER_API_KEY',

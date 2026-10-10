@@ -66,8 +66,8 @@ export const UsageView = () => {
           ))}
         </SegmentedControl.Root>
         <SourceTags
-          sourceIds={['claude-code-otel']}
-          note="Every repository together, Claude Code sessions only: Codex sends no token metrics. Subscription sessions have no per-token price."
+          sourceIds={['claude-code-otel', 'opencode-reporter']}
+          note="Every repository together, Claude Code and OpenCode sessions: Codex sends no token metrics. Subscription sessions have no per-token price."
         />
       </Flex>
 
@@ -119,8 +119,8 @@ export const UsageView = () => {
             />
             <UsageBarList
               title="By agent"
-              description="Claude Code reports its tokens; Codex sends none, so its sessions are counted without them."
-              sources={<SourceTags sourceIds={['claude-code-hooks', 'codex-notify', 'claude-code-otel']} />}
+              description="Claude Code and OpenCode report their tokens; Codex sends none, so its sessions are counted without them."
+              sources={<SourceTags sourceIds={['claude-code-hooks', 'codex-notify', 'opencode-reporter', 'claude-code-otel']} />}
               rows={sourceRows(report.byAgent)}
               grandTotal={report.totals.total}
               isStale={isStale}

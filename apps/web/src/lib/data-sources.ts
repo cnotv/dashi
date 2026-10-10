@@ -12,6 +12,12 @@ export const dataSources: Record<DataSourceId, DataSource> = {
     description: 'Codex runs its notify command when a turn completes, which posts agent-turn-complete to /api/events.',
     docsUrl: 'https://developers.openai.com/codex/config-advanced',
   },
+  'opencode-reporter': {
+    label: 'OpenCode reporter',
+    description:
+      "Dashi's OpenCode plugin posts each session's state and first prompt to /api/events, and each finished answer's tokens to /api/telemetry/v1/metrics. It never sends the conversation.",
+    docsUrl: 'https://github.com/cnotv/dashi#opencode',
+  },
   'claude-code-otel': {
     label: 'Claude Code OpenTelemetry',
     description:

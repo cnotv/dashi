@@ -110,7 +110,7 @@ export const permissionModeLabels: Record<StartAgent, Record<HeadlessPermissionM
     dontAsk: 'Only tools already allowed in settings',
   },
   opencode: {
-    auto: "Auto: approve what OpenCode's settings do not deny",
+    auto: 'Auto: approve all but what is denied',
     acceptEdits: "Only what OpenCode's settings allow",
     dontAsk: "Only what OpenCode's settings allow",
   },

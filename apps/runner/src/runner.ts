@@ -351,9 +351,9 @@ const openCodePlanFor = (claimed: ClaimedStart, paths: RunnerPaths, runnerEnviro
     command: 'opencode',
     args: [
       'run',
-      ...(openRouterModel === null ? [] : ['--model', `openrouter/${openRouterModel}`]),
-      '--title',
-      claimed.sessionName,
+      // Joined to their flags, so a value that starts with a dash can never pass for a flag of its own.
+      ...(openRouterModel === null ? [] : [`--model=openrouter/${openRouterModel}`]),
+      `--title=${claimed.sessionName}`,
       ...(permissionMode === 'auto' ? ['--auto'] : []),
       claimed.prompt,
     ],

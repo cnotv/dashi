@@ -245,6 +245,7 @@ export interface ChatSubject {
 export type DataSourceId =
   | 'claude-code-hooks'
   | 'codex-notify'
+  | 'opencode-reporter'
   | 'claude-code-otel'
   | 'github-graphql'
   | 'claude-code-routines'

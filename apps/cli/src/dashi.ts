@@ -1,7 +1,7 @@
 // dashi: connects this machine to a Dashi dashboard in one command. `dashi connect <url>` pairs
 // with the dashboard (you approve a short code there, so no token is ever pasted), merges the
-// reporting settings into Claude Code's user settings, installs the workflow plugin and, when
-// asked, the laptop runner. `dashi doctor` checks all of it again. It needs Node 22.18 or later
+// reporting settings into Claude Code's user settings, installs the workflow plugin, OpenCode's
+// reporter when OpenCode is installed and, when asked, the laptop runner. `dashi doctor` checks all of it again. It needs Node 22.18 or later
 // and runs every command as an argument list, never through a shell.
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -29,6 +29,9 @@ interface CliPaths {
   launchAgentPath: string
   systemdUnitPath: string
   runnerLogPath: string
+  openCodeReporterPath: string
+  openCodeReporterConfigPath: string
+  openCodePluginPath: string
 }
 
 interface RunnerFile {
@@ -71,7 +74,7 @@ const usage = `dashi: connect this machine to a Dashi dashboard
   dashi connect <url> [--runner | --no-runner] [--yes]   pair, set up Claude Code, optionally the runner
   dashi doctor                                           check everything connect set up
   dashi runner install | uninstall | status | logs       the laptop runner on its own
-  dashi update                                           download the latest CLI and runner, checked by hash
+  dashi update                                           download the latest CLI, runner and OpenCode reporter, checked by hash
   dashi disconnect [--yes]                               revoke this machine's tokens and undo connect
 `
 
@@ -102,9 +105,10 @@ export const platformOf = (nodePlatform: string): Platform | null => {
  * Works out where everything connect writes lives, under the given home.
  * @param home The user's home folder.
  * @param claudeConfigDirectory Claude Code's config folder when CLAUDE_CONFIG_DIR sets one.
+ * @param xdgConfigHome XDG_CONFIG_HOME when set, which moves OpenCode's config folder along with it.
  * @returns The paths.
  */
-export const cliPathsFor = (home: string, claudeConfigDirectory: string | undefined): CliPaths => {
+export const cliPathsFor = (home: string, claudeConfigDirectory: string | undefined, xdgConfigHome: string | undefined): CliPaths => {
   const dashiHome = join(home, 'dashi')
   return {
     home,
@@ -116,8 +120,29 @@ export const cliPathsFor = (home: string, claudeConfigDirectory: string | undefi
     launchAgentPath: join(home, 'Library', 'LaunchAgents', `${launchAgentLabel}.plist`),
     systemdUnitPath: join(home, '.config', 'systemd', 'user', `${systemdUnitName}.service`),
     runnerLogPath: join(dashiHome, 'runner.log'),
+    openCodeReporterPath: join(dashiHome, 'opencode-reporter.ts'),
+    openCodeReporterConfigPath: join(dashiHome, 'opencode.json'),
+    openCodePluginPath: join(xdgConfigHome ?? join(home, '.config'), 'opencode', 'plugins', 'dashi.ts'),
   }
 }
+
+/**
+ * The file put in OpenCode's plugin folder: it re-exports the reporter from where the CLI saved
+ * it, so the reporter's helpers, which are exports too, never sit where OpenCode loads plugins.
+ * @param reporterPath Where the reporter was saved.
+ * @returns The file's contents.
+ */
+export const openCodePluginFileFor = (reporterPath: string): string =>
+  `// Installed by dashi connect; dashi disconnect removes it. The reporter it loads was checked by hash.\nexport { DashiReporter } from ${JSON.stringify(reporterPath)}\n`
+
+/**
+ * The reporter's config: where to report, and the machine's ingest token, which can only report.
+ * @param dashboardUrl The dashboard.
+ * @param ingestToken The ingest token Claude Code reports with too.
+ * @returns The file's contents.
+ */
+export const openCodeReporterConfigFor = (dashboardUrl: string, ingestToken: string): string =>
+  `${JSON.stringify({ dashboardUrl, ingestToken }, null, 2)}\n`
 
 /**
  * Normalises a dashboard address: https unless it is local, and without a trailing slash.
@@ -559,6 +584,33 @@ const openRouterStatusLine = (hasOpenRouterKey: boolean): string =>
     ? 'ok   the runner has OPENROUTER_API_KEY, for unattended starts on an OpenRouter model'
     : '     starts on an OpenRouter model need OPENROUTER_API_KEY: export it, then run dashi runner install'
 
+const installOpenCodeReporter = async (paths: CliPaths, dashboardUrl: string, ingestToken: string): Promise<void> => {
+  const sha256 = await downloadChecked(dashboardUrl, '/api/cli/opencode-reporter', paths.openCodeReporterPath)
+  writePrivateFile(paths.openCodeReporterConfigPath, openCodeReporterConfigFor(dashboardUrl, ingestToken))
+  mkdirSync(dirname(paths.openCodePluginPath), { recursive: true })
+  writeFileSync(paths.openCodePluginPath, openCodePluginFileFor(paths.openCodeReporterPath), { mode: 0o644 })
+  say(`ok   OpenCode reports here through ${paths.openCodePluginPath}, its reporter SHA-256 ${sha256}`)
+}
+
+// OpenCode is optional: its reporter goes in only where it is installed, and later updates keep it current.
+const installOpenCodeReporterIfUsed = async (paths: CliPaths, dashboardUrl: string, ingestToken: string | null): Promise<void> => {
+  if (findOnPath('opencode') === null || ingestToken === null) return
+  await installOpenCodeReporter(paths, dashboardUrl, ingestToken)
+}
+
+const openCodeReporterFilesOf = (paths: CliPaths): string[] => [paths.openCodePluginPath, paths.openCodeReporterPath, paths.openCodeReporterConfigPath]
+
+const removeOpenCodeReporter = (paths: CliPaths): void => {
+  if (!existsSync(paths.openCodePluginPath)) return
+  openCodeReporterFilesOf(paths).forEach((filePath) => rmSync(filePath, { force: true }))
+  say('ok   removed the OpenCode reporter')
+}
+
+const openCodeReporterCheck = (paths: CliPaths): CheckResult => {
+  const isInstalled = openCodeReporterFilesOf(paths).every((filePath) => existsSync(filePath))
+  return { name: 'OpenCode reporter installed', passed: isInstalled, detail: isInstalled ? '' : 'run dashi update' }
+}
+
 const uninstallRunner = (platform: Platform, paths: CliPaths): void => {
   if (platform === 'macos') {
     runQuietly('launchctl', ['bootout', `gui/${process.getuid?.() ?? ''}/${launchAgentLabel}`])
@@ -625,6 +677,7 @@ const connect = async (parsed: ParsedArguments, platform: Platform, paths: CliPa
 
   await writeClaudeSettings(paths, dashboardUrl, paired.ingestToken, parsed.flags)
   installPlugin()
+  await installOpenCodeReporterIfUsed(paths, dashboardUrl, paired.ingestToken)
   if (paired.runnerToken !== null) await installRunner(platform, paths, dashboardUrl, paired.runnerToken)
   else if (withRunner) say('     the runner was not ticked when approving; run dashi connect again with --runner to add it')
 
@@ -655,6 +708,7 @@ const doctor = async (platform: Platform, paths: CliPaths): Promise<void> => {
       detail: ingestToken === null ? `run dashi connect ${dashboardUrl}` : '',
     },
     { name: `${workflowPlugin} plugin enabled`, passed: pluginEnabled, detail: pluginEnabled ? '' : `run claude plugin install ${workflowPlugin}` },
+    ...(findOnPath('opencode') === null ? [] : [openCodeReporterCheck(paths)]),
     ...(ingestToken === null ? [] : [await whoami(dashboardUrl, ingestToken)]),
     ...(runnerToken === null
       ? []
@@ -699,6 +753,7 @@ const update = async (platform: Platform, paths: CliPaths): Promise<void> => {
   const cliPath = fileURLToPath(import.meta.url)
   const cliHash = await downloadChecked(dashboardUrl, '/api/cli/script', cliPath)
   say(`ok   updated dashi, SHA-256 ${cliHash}`)
+  await installOpenCodeReporterIfUsed(paths, dashboardUrl, ingestTokenOf(paths))
   const runnerToken = installedRunnerSettingOf(platform, paths, 'DASHI_RUNNER_TOKEN')
   if (runnerToken !== null) await installRunner(platform, paths, dashboardUrl, runnerToken)
 }
@@ -722,6 +777,7 @@ const disconnect = async (parsed: ParsedArguments, platform: Platform, paths: Cl
     say(`ok   removed the dashboard's variables from ${paths.claudeSettingsPath}`)
   }
   if (installedRunnerSettingOf(platform, paths, 'DASHI_RUNNER_TOKEN') !== null) uninstallRunner(platform, paths)
+  removeOpenCodeReporter(paths)
   rmSync(paths.configPath, { force: true })
 }
 
@@ -733,7 +789,7 @@ const main = async (argv: string[]): Promise<void> => {
   }
   const platform = platformOf(process.platform)
   if (platform === null) throw new Error(`dashi supports macOS and Linux; this is ${process.platform}`)
-  const paths = cliPathsFor(homedir(), process.env.CLAUDE_CONFIG_DIR)
+  const paths = cliPathsFor(homedir(), process.env.CLAUDE_CONFIG_DIR, process.env.XDG_CONFIG_HOME)
   if (parsed.command === 'connect') return connect(parsed, platform, paths)
   if (parsed.command === 'doctor') return doctor(platform, paths)
   if (parsed.command === 'runner') return runnerCommand(parsed, platform, paths)

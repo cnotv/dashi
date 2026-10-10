@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { parseReporterSettings } from '../../opencode-plugin/src/opencode-reporter.ts'
 import {
   claudeSettingsFor,
   cliPathsFor,
@@ -11,6 +12,8 @@ import {
   isSupportedNode,
   launchAgentStartSteps,
   mergeClaudeSettings,
+  openCodePluginFileFor,
+  openCodeReporterConfigFor,
   parseArguments,
   platformOf,
   readSettingsFile,
@@ -131,7 +134,7 @@ describe('readSettingsFile', () => {
   })
 
   it('finds the runner token and OpenRouter key an install left on either platform', () => {
-    const paths = cliPathsFor(state.folder, undefined)
+    const paths = cliPathsFor(state.folder, undefined, undefined)
     const input = { dashboardUrl, runnerToken, openRouterKey, nodePath: '/usr/bin/node', searchPath: '/usr/bin:/bin' }
     expect(installedRunnerSettingOf('linux', paths, 'DASHI_RUNNER_TOKEN')).toBeNull()
     const [environmentFile] = runnerServiceFilesFor('linux', paths, input)
@@ -161,7 +164,7 @@ describe('launchAgentStartSteps', () => {
 })
 
 describe('runnerServiceFilesFor', () => {
-  const paths = cliPathsFor('/home/dev', undefined)
+  const paths = cliPathsFor('/home/dev', undefined, undefined)
   const input = { dashboardUrl, runnerToken, openRouterKey: null, nodePath: '/opt/node/bin/node', searchPath: '/opt/node/bin:/usr/bin:/bin' }
 
   it('keeps the token out of the systemd unit, in its own env file', () => {
@@ -194,7 +197,7 @@ describe('runnerServiceFilesFor', () => {
   })
 
   it('escapes what XML would read as markup', () => {
-    const [plist] = runnerServiceFilesFor('macos', cliPathsFor('/Users/a&b', undefined), input)
+    const [plist] = runnerServiceFilesFor('macos', cliPathsFor('/Users/a&b', undefined, undefined), input)
     expect(plist?.content).toContain('/Users/a&amp;b/dashi/runner.ts')
   })
 })
@@ -211,8 +214,29 @@ describe('runnerOpenRouterKeyOf', () => {
 
 describe('cliPathsFor', () => {
   it('follows CLAUDE_CONFIG_DIR when it is set', () => {
-    expect(cliPathsFor('/home/dev', undefined).claudeSettingsPath).toBe('/home/dev/.claude/settings.json')
-    expect(cliPathsFor('/home/dev', '/srv/claude').claudeSettingsPath).toBe('/srv/claude/settings.json')
+    expect(cliPathsFor('/home/dev', undefined, undefined).claudeSettingsPath).toBe('/home/dev/.claude/settings.json')
+    expect(cliPathsFor('/home/dev', '/srv/claude', undefined).claudeSettingsPath).toBe('/srv/claude/settings.json')
+  })
+
+  it("puts the OpenCode plugin in OpenCode's global plugin folder, following XDG_CONFIG_HOME", () => {
+    const paths = cliPathsFor('/home/dev', undefined, undefined)
+    expect(paths.openCodePluginPath).toBe('/home/dev/.config/opencode/plugins/dashi.ts')
+    expect(paths.openCodeReporterPath).toBe('/home/dev/dashi/opencode-reporter.ts')
+    expect(paths.openCodeReporterConfigPath).toBe('/home/dev/dashi/opencode.json')
+    expect(cliPathsFor('/home/dev', undefined, '/srv/config').openCodePluginPath).toBe('/srv/config/opencode/plugins/dashi.ts')
+  })
+})
+
+describe('the OpenCode reporter files', () => {
+  it('writes a plugin that exports only the reporter, from where the CLI saved it', () => {
+    expect(openCodePluginFileFor('/Users/me "quoted"/dashi/opencode-reporter.ts')).toContain(
+      'export { DashiReporter } from "/Users/me \\"quoted\\"/dashi/opencode-reporter.ts"',
+    )
+    expect(openCodePluginFileFor('/home/dev/dashi/opencode-reporter.ts').match(/^export /gm)).toHaveLength(1)
+  })
+
+  it('writes a config the reporter reads', () => {
+    expect(parseReporterSettings(openCodeReporterConfigFor(dashboardUrl, 'adi_ingest'))).toEqual({ dashboardUrl, ingestToken: 'adi_ingest' })
   })
 })
 

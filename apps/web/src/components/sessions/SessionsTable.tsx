@@ -128,7 +128,7 @@ export const SessionsTable = ({ overview, isStale, onOpenChat }: SessionsTablePr
             <Text size="2" weight="medium">
               Sessions over time
             </Text>
-            <SourceTags sourceIds={['claude-code-hooks', 'codex-notify', 'claude-code-otel']} note="Tokens: Claude Code only" />
+            <SourceTags sourceIds={['claude-code-hooks', 'codex-notify', 'opencode-reporter', 'claude-code-otel']} note="Tokens: Claude Code and OpenCode" />
           </Flex>
           <ChartLegend entries={timelineLegendEntries} />
         </Flex>
