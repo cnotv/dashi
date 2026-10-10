@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url'
 
 type StartTarget = 'laptop-remote-control' | 'laptop-headless' | 'laptop-cloud'
 type PermissionMode = 'auto' | 'acceptEdits' | 'dontAsk'
+type StartAgent = 'claude' | 'opencode'
 
 interface RepositoryReference {
   owner: string
@@ -25,7 +26,14 @@ interface StartAttachment {
 }
 
 interface ClaimedStart {
-  start: { startId: string; repository: RepositoryReference; target: StartTarget; permissionMode: PermissionMode; openRouterModel: string | null }
+  start: {
+    startId: string
+    repository: RepositoryReference
+    target: StartTarget
+    agent: StartAgent
+    permissionMode: PermissionMode
+    openRouterModel: string | null
+  }
   prompt: string
   sessionName: string
   attachments: StartAttachment[]
@@ -128,6 +136,7 @@ interface LaunchOutcome {
 
 const laptopTargets: StartTarget[] = ['laptop-remote-control', 'laptop-headless', 'laptop-cloud']
 const permissionModes: PermissionMode[] = ['auto', 'acceptEdits', 'dontAsk']
+const startAgents: StartAgent[] = ['claude', 'opencode']
 // The same pattern as openRouterModelPattern in packages/contracts, repeated because the runner is
 // served as one file. It keeps a model to a slug, so it can never pass for a flag or another variable.
 const openRouterModelPattern = /^~?[a-z0-9][a-z0-9._-]{0,63}\/[A-Za-z0-9._:-]{1,100}$/
@@ -205,13 +214,15 @@ export const parseClaim = (claimBody: unknown): ClaimedStart | null => {
   const { startId, target, permissionMode, repository: repositoryBody } = start
   const attachments = parseAttachments(claimBody.attachments)
   const openRouterModel = openRouterModelOf(start.openRouterModel)
-  if (!isRecord(repositoryBody) || attachments === null || openRouterModel === undefined) return null
+  // A dashboard from before OpenCode sends no agent, which is Claude Code.
+  const agent = start.agent ?? 'claude'
+  if (!isRecord(repositoryBody) || attachments === null || openRouterModel === undefined || !isOneOf(startAgents, agent)) return null
   const repository = { owner: String(repositoryBody.owner), name: String(repositoryBody.name) }
   if (typeof prompt !== 'string' || typeof sessionName !== 'string' || typeof startId !== 'string') return null
   if (!/^[0-9a-f-]{36}$/.test(startId) || !isSafeRepository(repository)) return null
   if (!isOneOf(laptopTargets, target) || !isOneOf(permissionModes, permissionMode)) return null
-  if (openRouterModel !== null && target !== 'laptop-headless') return null
-  return { start: { startId, repository, target, permissionMode, openRouterModel }, prompt, sessionName, attachments }
+  if ((openRouterModel !== null || agent === 'opencode') && target !== 'laptop-headless') return null
+  return { start: { startId, repository, target, agent, permissionMode, openRouterModel }, prompt, sessionName, attachments }
 }
 
 /**
@@ -287,6 +298,14 @@ export const newestTranscriptOf = (files: TranscriptFile[]): TranscriptFile | nu
 export const tmuxSessionNameFor = (claimed: ClaimedStart): string =>
   `agent-${claimed.start.repository.name.replace(/[^A-Za-z0-9-]/g, '-')}-${claimed.start.startId.slice(0, 8)}`
 
+const openRouterKeyOf = (runnerEnvironment: NodeJS.ProcessEnv): string => {
+  const openRouterKey = runnerEnvironment.OPENROUTER_API_KEY ?? ''
+  if (openRouterKey === '') {
+    throw new Error("This start runs on OpenRouter: set OPENROUTER_API_KEY in the runner's environment, then retry it")
+  }
+  return openRouterKey
+}
+
 /**
  * The environment that points Claude Code at an OpenRouter model, with the laptop's own key.
  * Every model role is set to the one chosen, so no background call goes to a model it did not pick.
@@ -296,10 +315,7 @@ export const tmuxSessionNameFor = (claimed: ClaimedStart): string =>
  */
 export const modelEnvironmentFor = (openRouterModel: string | null, runnerEnvironment: NodeJS.ProcessEnv): Record<string, string> => {
   if (openRouterModel === null) return {}
-  const openRouterKey = runnerEnvironment.OPENROUTER_API_KEY ?? ''
-  if (openRouterKey === '') {
-    throw new Error("This start runs on OpenRouter: set OPENROUTER_API_KEY in the runner's environment, then retry it")
-  }
+  const openRouterKey = openRouterKeyOf(runnerEnvironment)
   return {
     ANTHROPIC_BASE_URL: openRouterBaseUrl,
     ANTHROPIC_AUTH_TOKEN: openRouterKey,
@@ -325,6 +341,30 @@ export const sessionEnvironmentFor = (runnerEnvironment: NodeJS.ProcessEnv, addi
   return { ...withoutOpenRouterKey, ...additions }
 }
 
+// OpenCode reads OPENROUTER_API_KEY itself for its openrouter provider, so the key goes back under
+// that name, to an OpenRouter start only. OpenCode's own permission settings decide what it may
+// do; auto mode adds --auto, which approves what those settings do not deny.
+const openCodePlanFor = (claimed: ClaimedStart, paths: RunnerPaths, runnerEnvironment: NodeJS.ProcessEnv): LaunchPlan => {
+  const { openRouterModel, permissionMode, startId } = claimed.start
+  return {
+    mode: 'detached',
+    command: 'opencode',
+    args: [
+      'run',
+      ...(openRouterModel === null ? [] : ['--model', `openrouter/${openRouterModel}`]),
+      '--title',
+      claimed.sessionName,
+      ...(permissionMode === 'auto' ? ['--auto'] : []),
+      claimed.prompt,
+    ],
+    cwd: paths.worktreePath,
+    environment: {
+      DASHI_START_ID: startId,
+      ...(openRouterModel === null ? {} : { OPENROUTER_API_KEY: openRouterKeyOf(runnerEnvironment) }),
+    },
+  }
+}
+
 /**
  * Decides the command that starts a claimed session, by where it should run.
  * @param claimed The claimed start.
@@ -337,6 +377,7 @@ export const launchPlanFor = (claimed: ClaimedStart, paths: RunnerPaths, runnerE
   if (claimed.start.target === 'laptop-cloud') {
     return { mode: 'capture', command: 'claude', args: ['--cloud', claimed.prompt], cwd: paths.clonePath, environment }
   }
+  if (claimed.start.target === 'laptop-headless' && claimed.start.agent === 'opencode') return openCodePlanFor(claimed, paths, runnerEnvironment)
   if (claimed.start.target === 'laptop-headless') {
     return {
       mode: 'detached',
@@ -671,6 +712,10 @@ const launch = (plan: LaunchPlan, claimed: ClaimedStart, paths: RunnerPaths): La
     return { sessionUrl, message: 'Running in Claude cloud' }
   }
   if (plan.mode === 'detached') {
+    // A detached child reports a missing program only after the start was reported as started.
+    if (spawnSync(plan.command, ['--version'], { encoding: 'utf8', timeout: 15_000 }).error) {
+      throw new Error(`${plan.command} is not installed on this laptop, or not on the runner's PATH`)
+    }
     mkdirSync(dirname(paths.logPath), { recursive: true })
     const logDescriptor = openSync(paths.logPath, 'a')
     spawn(plan.command, plan.args, {

@@ -26,6 +26,7 @@ describe('createDemoApi', () => {
       pullRequestNumber: null,
       workflow: 'feature',
       target: 'laptop-remote-control',
+      agent: 'claude',
       permissionMode: 'auto',
       openRouterModel: null,
       note: 'In the corner.',

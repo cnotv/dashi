@@ -18,7 +18,7 @@ import { addServedScriptRoutes } from '../app/served-script.ts'
 import type { DashboardSession } from '../auth/types.ts'
 import { findRepository } from '../repos/load-repositories.ts'
 import { sessionNameFor, sessionPromptFor } from '@dashi/contracts/first-message'
-import { takesOpenRouterModel } from '@dashi/contracts/open-router'
+import { takesOpenCode, takesOpenRouterModel } from '@dashi/contracts/open-router'
 import { attachmentDeliveryFor, attachmentLimitProblem, attachmentLimits } from './attachments.ts'
 import { routineSettingsBodySchema, runnerReportSchema, sessionStartSubmissionSchema } from './schema.ts'
 import type { MachineTokenStore } from '../machine-tokens/types.ts'
@@ -106,6 +106,9 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
   ): Promise<LaunchResult> => {
     const repository = repositoryOf(request.repository.owner, request.repository.name)
     if (repository === undefined) return { ok: false, status: 404, error: 'Unknown repository' }
+    if (request.agent === 'opencode' && !takesOpenCode(request.target)) {
+      return { ok: false, status: 422, error: 'Only an unattended laptop session can run on OpenCode' }
+    }
     if (request.openRouterModel !== null && !takesOpenRouterModel(request.target)) {
       return { ok: false, status: 422, error: 'Only an unattended laptop session can run on an OpenRouter model' }
     }
@@ -156,11 +159,11 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
     const failedStart = startStore.readStart(context.req.param('startId'))
     if (failedStart === null) return context.json({ error: 'Unknown start' }, 404)
     if (failedStart.state !== 'failed') return context.json({ error: 'Only a failed start can be retried' }, 409)
-    const { repository, issueNumber, pullRequestNumber, workflow, target, permissionMode, openRouterModel, note } = failedStart
+    const { repository, issueNumber, pullRequestNumber, workflow, target, agent, permissionMode, openRouterModel, note } = failedStart
     return answerLaunch(
       context,
       await launchStart(
-        { repository, issueNumber, pullRequestNumber, workflow, target, permissionMode, openRouterModel, note },
+        { repository, issueNumber, pullRequestNumber, workflow, target, agent, permissionMode, openRouterModel, note },
         [],
         context.get('session'),
       ),

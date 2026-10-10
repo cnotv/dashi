@@ -1,4 +1,5 @@
 import type {
+  AgentProvider,
   ChatMessage,
   SessionStart,
   AgentSessionState,
@@ -120,7 +121,24 @@ const sampleSessions: SampleSession[] = [
     triggeredBy: 'VS Code',
     billedThrough: 'OpenRouter',
   },
+  {
+    sessionId: 'ses_demo-opencode',
+    repositoryIndex: 0,
+    branch: 'chore/11-tidy-the-config',
+    title: 'Tidy the config files',
+    folder: 'example-demo0011',
+    issueNumber: 11,
+    changes: [[45, 'idle'], [44, 'working'], [12, 'idle']],
+    tokens: tokensOf(18_400, 3_900, 61_000, 0),
+    triggeredBy: 'Dashi board (laptop runner)',
+    billedThrough: 'Not reported',
+  },
 ]
+
+const providerOfSample = (sample: SampleSession): AgentProvider => {
+  if (sample.sessionId.includes('codex')) return 'codex'
+  return sample.sessionId.includes('opencode') ? 'opencode' : 'claude'
+}
 
 const repositoryAt = (repositoryIndex: number | null) =>
   repositoryIndex === null ? null : (sampleRepositories[repositoryIndex] ?? null)
@@ -146,7 +164,7 @@ const summaryOf = (sample: SampleSession, now: number): AgentSessionSummary => {
   const lastChange = sample.changes.at(-1)
   return {
     sessionId: sample.sessionId,
-    provider: sample.sessionId.includes('codex') ? 'codex' : 'claude',
+    provider: providerOfSample(sample),
     repository: repositoryAt(sample.repositoryIndex),
     branch: sample.branch,
     title: sample.title,
@@ -251,7 +269,8 @@ export const sampleUsageReport = (days: number, now: number): UsageReport => {
       { sourceKey: 'demo-runner', label: 'Mac mini', note: null, sessionCount: 6, tokens: scaled(0.3) },
     ],
     byAgent: [
-      { sourceKey: 'claude', label: 'Claude Code', note: null, sessionCount: 23, tokens: scaled(1) },
+      { sourceKey: 'claude', label: 'Claude Code', note: null, sessionCount: 22, tokens: scaled(0.96) },
+      { sourceKey: 'opencode', label: 'OpenCode', note: null, sessionCount: 1, tokens: scaled(0.04) },
       { sourceKey: 'codex', label: 'Codex', note: 'No token metrics', sessionCount: 2, tokens: tokensOf(0, 0, 0, 0) },
     ],
   }
@@ -281,6 +300,7 @@ export const sampleSessionStarts = (now: number): SessionStart[] => [
     pullRequestNumber: null,
     workflow: 'feature',
     target: 'cloud-routine',
+    agent: 'claude',
     permissionMode: 'auto',
     openRouterModel: null,
     note: '',
@@ -298,6 +318,7 @@ export const sampleSessionStarts = (now: number): SessionStart[] => [
     pullRequestNumber: null,
     workflow: 'feature',
     target: 'cloud-routine',
+    agent: 'claude',
     permissionMode: 'auto',
     openRouterModel: null,
     note: '',
@@ -315,6 +336,7 @@ export const sampleSessionStarts = (now: number): SessionStart[] => [
     pullRequestNumber: null,
     workflow: 'fix',
     target: 'laptop-remote-control',
+    agent: 'claude',
     permissionMode: 'auto',
     openRouterModel: null,
     note: 'Only the physics step.',
@@ -326,12 +348,31 @@ export const sampleSessionStarts = (now: number): SessionStart[] => [
     updatedAt: minutesBefore(now, 60 * 30),
   },
   {
+    startId: 'demo-start-opencode',
+    repository: { owner: 'cnotv', name: 'example' },
+    issueNumber: 11,
+    pullRequestNumber: null,
+    workflow: 'chore',
+    target: 'laptop-headless',
+    agent: 'opencode',
+    permissionMode: 'auto',
+    openRouterModel: 'qwen/qwen3-coder:free',
+    note: '',
+    state: 'started',
+    runnerLabel: 'Mac mini',
+    sessionUrl: null,
+    message: 'Running unattended in ~/dashi/worktrees/example-demo0011; its output goes to ~/dashi/logs/example-demo0011.log',
+    createdAt: minutesBefore(now, 45),
+    updatedAt: minutesBefore(now, 45),
+  },
+  {
     startId: 'demo-start-openrouter',
     repository: { owner: 'cnotv', name: 'example' },
     issueNumber: 9,
     pullRequestNumber: null,
     workflow: 'docs',
     target: 'laptop-headless',
+    agent: 'claude',
     permissionMode: 'acceptEdits',
     openRouterModel: 'meta-llama/llama-3.3-70b-instruct:free',
     note: '',

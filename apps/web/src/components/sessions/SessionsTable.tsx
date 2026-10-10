@@ -16,6 +16,7 @@ import {
   sessionStateColors,
   sessionStateLabels,
 } from '@/lib/presentation'
+import { canChatWithSession } from '@/lib/session-chat'
 import { layoutSessionTimeline, sessionDetail, sessionLabel, sessionOriginLine, sessionStateOrder } from '@/lib/session-timeline'
 import { formatTickTime, SessionTimelineAxis, SessionTimelineTrack, timelineLegendEntries } from './SessionTimeline'
 
@@ -26,18 +27,19 @@ const sessionColumns = (now: number, onOpenChat: (session: AgentSessionSummary) 
     columnHelper.display({
       id: 'chat',
       header: '',
-      cell: ({ row }) => (
-        <Tooltip content="Open the conversation">
-          <IconButton
-            size="1"
-            variant="ghost"
-            aria-label={`Chat with ${sessionLabel(row.original)}`}
-            onClick={() => onOpenChat(row.original)}
-          >
-            <ChatBubbleIcon />
-          </IconButton>
-        </Tooltip>
-      ),
+      cell: ({ row }) =>
+        canChatWithSession(row.original) && (
+          <Tooltip content="Open the conversation">
+            <IconButton
+              size="1"
+              variant="ghost"
+              aria-label={`Chat with ${sessionLabel(row.original)}`}
+              onClick={() => onOpenChat(row.original)}
+            >
+              <ChatBubbleIcon />
+            </IconButton>
+          </Tooltip>
+        ),
     }),
     columnHelper.accessor((session) => sessionLabel(session), {
       id: 'session',

@@ -9,7 +9,7 @@ import { dashboardApi } from '@/lib/api'
 import { readAttachment } from '@/lib/attachments'
 import { issueBodyFor, issueTitleFrom } from '@/lib/new-issue'
 import { errorMessageOf, parseRepositoryKey, repositoryKey } from '@/lib/presentation'
-import { openRouterModelFor } from '@/lib/start-session'
+import { agentFor, openRouterModelFor } from '@/lib/start-session'
 import type { PickedAttachment } from '@/lib/types'
 import { StartChoicesFields } from './StartChoicesFields'
 import { StartedSummary } from './StartedSummary'
@@ -123,6 +123,7 @@ export const NewIssueDialog = ({ defaultRepository }: NewIssueDialogProps) => {
         pullRequestNumber: null,
         workflow: choices.workflow,
         target: chosenTarget,
+        agent: agentFor(choices, chosenTarget),
         permissionMode: choices.permissionMode,
         openRouterModel: openRouterModelFor(choices, chosenTarget),
         note: text.trim(),

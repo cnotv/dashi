@@ -1,5 +1,6 @@
 import type {
   AgentSessionState,
+  StartAgent,
   ChatDelivery,
   ChatMessage,
   Board,
@@ -43,12 +44,15 @@ import type {
   VaultState,
 } from '@dashi/contracts'
 
-// What an unattended laptop start runs on: the laptop's Claude login, or an OpenRouter model on the laptop's own key.
-export type StartModelSource = 'claude-login' | 'openrouter'
+// What an unattended laptop start runs on: the agent's own default (the laptop's Claude login, or OpenCode's
+// configured model), or an OpenRouter model on the laptop's own key.
+export type StartModelSource = 'default' | 'openrouter'
 
 export interface StartChoices {
   workflow: StartWorkflow
   target: StartTarget | null
+  // Read through agentFor: only an unattended laptop start can run OpenCode.
+  agent: StartAgent
   permissionMode: HeadlessPermissionMode
   modelSource: StartModelSource
   // As typed; read through openRouterModelFor before it is sent.

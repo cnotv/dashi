@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ChatDelivery, SessionChat, SessionStart } from '@dashi/contracts'
-import { canChatWithStart, chatTimelineOf } from './session-chat'
+import { canChatWithSession, canChatWithStart, chatTimelineOf } from './session-chat'
 
 const delivery = (overrides: Partial<ChatDelivery>): ChatDelivery => ({
   deliveryId: 'd1',
@@ -60,6 +60,7 @@ describe('canChatWithStart', () => {
     pullRequestNumber: null,
     workflow: 'feature',
     target: 'cloud-routine',
+    agent: 'claude',
     permissionMode: 'auto',
     openRouterModel: null,
     note: '',
@@ -79,7 +80,16 @@ describe('canChatWithStart', () => {
     expect(canChatWithStart({ ...start, state: 'failed' })).toBe(false)
   })
 
-  it('opens a started laptop start, which the runner reads', () => {
+  it('opens a started laptop start, which the runner reads, unless OpenCode runs it', () => {
     expect(canChatWithStart({ ...start, target: 'laptop-headless', sessionUrl: null })).toBe(true)
+    expect(canChatWithStart({ ...start, target: 'laptop-headless', sessionUrl: null, agent: 'opencode' })).toBe(false)
+  })
+})
+
+describe('canChatWithSession', () => {
+  it('opens only a Claude Code session, the one agent whose conversation Dashi can read', () => {
+    expect(canChatWithSession({ provider: 'claude' })).toBe(true)
+    expect(canChatWithSession({ provider: 'opencode' })).toBe(false)
+    expect(canChatWithSession({ provider: 'codex' })).toBe(false)
   })
 })

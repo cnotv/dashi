@@ -7,6 +7,7 @@ import type {
   IssueStatus,
   RepositoryReference,
   SessionStartState,
+  StartAgent,
   StartTarget,
   StartWorkflow,
 } from '@dashi/contracts'
@@ -85,19 +86,34 @@ export const startTargetOrder: StartTarget[] = ['laptop-remote-control', 'laptop
 
 export const startWorkflowOrder: StartWorkflow[] = ['feature', 'fix', 'refactor', 'docs', 'design', '3d', 'security', 'tests', 'chore', 'research']
 
-export const startModelSourceOrder: StartModelSource[] = ['claude-login', 'openrouter']
+export const startAgentOrder: StartAgent[] = ['claude', 'opencode']
 
-export const startModelSourceLabels: Record<StartModelSource, string> = {
-  'claude-login': 'Claude login',
-  openrouter: 'OpenRouter',
+export const startAgentLabels: Record<StartAgent, string> = { claude: 'Claude Code', opencode: 'OpenCode' }
+
+export const startModelSourceOrder: StartModelSource[] = ['default', 'openrouter']
+
+export const startModelSourceLabels: Record<StartAgent, Record<StartModelSource, string>> = {
+  claude: { default: 'Claude login', openrouter: 'OpenRouter' },
+  opencode: { default: "OpenCode's default", openrouter: 'OpenRouter' },
 }
 
-export const permissionModeOrder: HeadlessPermissionMode[] = ['auto', 'acceptEdits', 'dontAsk']
+// OpenCode has no edits-only mode: its own permission settings decide, and --auto approves what they do not deny.
+export const permissionModeOrders: Record<StartAgent, HeadlessPermissionMode[]> = {
+  claude: ['auto', 'acceptEdits', 'dontAsk'],
+  opencode: ['auto', 'dontAsk'],
+}
 
-export const permissionModeLabels: Record<HeadlessPermissionMode, string> = {
-  auto: 'Auto: a classifier approves safe actions',
-  acceptEdits: 'Accept edits: file changes only',
-  dontAsk: 'Only tools already allowed in settings',
+export const permissionModeLabels: Record<StartAgent, Record<HeadlessPermissionMode, string>> = {
+  claude: {
+    auto: 'Auto: a classifier approves safe actions',
+    acceptEdits: 'Accept edits: file changes only',
+    dontAsk: 'Only tools already allowed in settings',
+  },
+  opencode: {
+    auto: "Auto: approve what OpenCode's settings do not deny",
+    acceptEdits: "Only what OpenCode's settings allow",
+    dontAsk: "Only what OpenCode's settings allow",
+  },
 }
 
 export const sessionStartStateColors: Record<SessionStartState, RadixColor> = {

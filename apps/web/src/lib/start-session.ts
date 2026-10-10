@@ -1,5 +1,6 @@
-import type { IssueLabel, StartOptions, StartTarget, StartWorkflow } from '@dashi/contracts'
-import { openRouterModelPattern, takesOpenRouterModel } from '@dashi/contracts/open-router'
+import type { IssueLabel, StartAgent, StartOptions, StartTarget, StartWorkflow } from '@dashi/contracts'
+import { openRouterModelPattern, takesOpenCode, takesOpenRouterModel } from '@dashi/contracts/open-router'
+import { permissionModeOrders } from './presentation'
 import type { StartChoices, StartTargetAvailability } from './types'
 
 type ModelChoices = Pick<StartChoices, 'modelSource' | 'openRouterModel'>
@@ -91,3 +92,25 @@ export const startModelProblemFor = (choices: ModelChoices, target: StartTarget)
   if (openRouterModel === '') return 'Name the OpenRouter model to run on'
   return openRouterModelPattern.test(openRouterModel) ? null : 'An OpenRouter model reads like provider/model, such as openai/gpt-5-mini'
 }
+
+/**
+ * The agent a start runs: OpenCode when it was picked and the place can run it, else Claude Code.
+ * @param choices What the dialog's agent field holds.
+ * @param choices.agent The agent picked.
+ * @param target Where the session would run; only an unattended laptop start can run OpenCode.
+ * @returns The agent to send.
+ */
+export const agentFor = ({ agent }: Pick<StartChoices, 'agent'>, target: StartTarget): StartAgent =>
+  agent === 'opencode' && takesOpenCode(target) ? 'opencode' : 'claude'
+
+/**
+ * Switches a start dialog's agent, keeping the permission mode when the new agent offers it.
+ * @param choices What the dialog holds.
+ * @param agent The agent picked.
+ * @returns The choices with the agent, and a permission mode that agent has.
+ */
+export const choicesWithAgent = (choices: StartChoices, agent: StartAgent): StartChoices => ({
+  ...choices,
+  agent,
+  permissionMode: permissionModeOrders[agent].includes(choices.permissionMode) ? choices.permissionMode : 'auto',
+})

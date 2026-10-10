@@ -5,7 +5,7 @@ import type { IssueSummary, PullRequestSummary, RepositoryReference, SessionStar
 import { useStartChoices } from '@/hooks/useSessionStarts'
 import { useToast } from '@/hooks/useToast'
 import { dashboardApi } from '@/lib/api'
-import { openRouterModelFor, suggestedWorkflowFor } from '@/lib/start-session'
+import { agentFor, openRouterModelFor, suggestedWorkflowFor } from '@/lib/start-session'
 import { StartChoicesFields } from './StartChoicesFields'
 import { StartedSummary } from './StartedSummary'
 
@@ -52,6 +52,7 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
         pullRequestNumber: conflictingPullRequest?.number ?? null,
         workflow: choices.workflow,
         target: chosenTarget,
+        agent: agentFor(choices, chosenTarget),
         permissionMode: choices.permissionMode,
         openRouterModel: openRouterModelFor(choices, chosenTarget),
         note,

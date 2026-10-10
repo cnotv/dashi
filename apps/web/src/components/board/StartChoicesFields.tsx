@@ -2,14 +2,16 @@ import { Callout, Flex, Link, RadioCards, SegmentedControl, Select, Text, TextFi
 import type { StartOptions, StartTarget } from '@dashi/contracts'
 import {
   permissionModeLabels,
-  permissionModeOrder,
+  permissionModeOrders,
+  startAgentLabels,
+  startAgentOrder,
   startModelSourceLabels,
   startModelSourceOrder,
   startTargetLabels,
   startTargetOrder,
   startWorkflowOrder,
 } from '@/lib/presentation'
-import { targetAvailabilityFor } from '@/lib/start-session'
+import { choicesWithAgent, targetAvailabilityFor } from '@/lib/start-session'
 import type { StartChoices, StartTargetAvailability } from '@/lib/types'
 
 interface StartChoicesFieldsProps {
@@ -26,52 +28,94 @@ interface StartChoicesFieldsProps {
 
 const openRouterModelsUrl = 'https://openrouter.ai/models'
 
-const ModelFields = ({ choices, onChange, modelProblem }: Pick<StartChoicesFieldsProps, 'choices' | 'onChange' | 'modelProblem'>) => (
-  <Flex direction="column" gap="2">
-    <Text size="2" weight="medium">
-      Model
+type UnattendedFieldsProps = Pick<StartChoicesFieldsProps, 'choices' | 'onChange' | 'modelProblem'>
+
+const OpenRouterModelField = ({ choices, onChange, modelProblem }: UnattendedFieldsProps) => (
+  <>
+    <TextField.Root
+      aria-label="OpenRouter model"
+      placeholder="openai/gpt-5-mini"
+      autoCapitalize="none"
+      autoCorrect="off"
+      spellCheck={false}
+      value={choices.openRouterModel}
+      onChange={(changeEvent) => onChange({ ...choices, openRouterModel: changeEvent.target.value })}
+    />
+    <Text size="1" color="gray">
+      Runs on the laptop&apos;s own OPENROUTER_API_KEY, which the runner needs in its environment.{' '}
+      <Link href={openRouterModelsUrl} target="_blank" rel="noopener noreferrer">
+        Browse models
+      </Link>
+      ; one ending in :free costs nothing.
     </Text>
-    <SegmentedControl.Root
-      value={choices.modelSource}
-      onValueChange={(value) => onChange({ ...choices, modelSource: startModelSourceOrder.find((source) => source === value) ?? 'claude-login' })}
-    >
-      {startModelSourceOrder.map((source) => (
-        <SegmentedControl.Item key={source} value={source}>
-          {startModelSourceLabels[source]}
-        </SegmentedControl.Item>
-      ))}
-    </SegmentedControl.Root>
-    {choices.modelSource === 'openrouter' && (
-      <>
-        <TextField.Root
-          aria-label="OpenRouter model"
-          placeholder="openai/gpt-5-mini"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          value={choices.openRouterModel}
-          onChange={(changeEvent) => onChange({ ...choices, openRouterModel: changeEvent.target.value })}
-        />
-        <Text size="1" color="gray">
-          Runs on the laptop&apos;s own OPENROUTER_API_KEY, which the runner needs in its environment.{' '}
-          <Link href={openRouterModelsUrl} target="_blank" rel="noopener noreferrer">
-            Browse models
-          </Link>
-          ; one ending in :free costs nothing.
-        </Text>
-        {modelProblem && (
-          <Text size="1" color="red">
-            {modelProblem}
-          </Text>
-        )}
-      </>
+    {modelProblem && (
+      <Text size="1" color="red">
+        {modelProblem}
+      </Text>
     )}
-  </Flex>
+  </>
+)
+
+// What only an unattended laptop session asks: the agent that runs it, what it may do on its own, and its model.
+const UnattendedFields = ({ choices, onChange, modelProblem }: UnattendedFieldsProps) => (
+  <>
+    <Flex direction="column" gap="2">
+      <Text size="2" weight="medium">
+        Agent
+      </Text>
+      <SegmentedControl.Root
+        value={choices.agent}
+        onValueChange={(value) => onChange(choicesWithAgent(choices, startAgentOrder.find((agent) => agent === value) ?? 'claude'))}
+      >
+        {startAgentOrder.map((agent) => (
+          <SegmentedControl.Item key={agent} value={agent}>
+            {startAgentLabels[agent]}
+          </SegmentedControl.Item>
+        ))}
+      </SegmentedControl.Root>
+    </Flex>
+    <label>
+      <Text as="div" size="2" mb="1" weight="medium">
+        Permissions
+      </Text>
+      <Select.Root
+        value={choices.permissionMode}
+        onValueChange={(value) =>
+          onChange({ ...choices, permissionMode: permissionModeOrders[choices.agent].find((permissionMode) => permissionMode === value) ?? 'auto' })
+        }
+      >
+        <Select.Trigger />
+        <Select.Content>
+          {permissionModeOrders[choices.agent].map((permissionMode) => (
+            <Select.Item key={permissionMode} value={permissionMode}>
+              {permissionModeLabels[choices.agent][permissionMode]}
+            </Select.Item>
+          ))}
+        </Select.Content>
+      </Select.Root>
+    </label>
+    <Flex direction="column" gap="2">
+      <Text size="2" weight="medium">
+        Model
+      </Text>
+      <SegmentedControl.Root
+        value={choices.modelSource}
+        onValueChange={(value) => onChange({ ...choices, modelSource: startModelSourceOrder.find((source) => source === value) ?? 'default' })}
+      >
+        {startModelSourceOrder.map((source) => (
+          <SegmentedControl.Item key={source} value={source}>
+            {startModelSourceLabels[choices.agent][source]}
+          </SegmentedControl.Item>
+        ))}
+      </SegmentedControl.Root>
+      {choices.modelSource === 'openrouter' && <OpenRouterModelField choices={choices} onChange={onChange} modelProblem={modelProblem} />}
+    </Flex>
+  </>
 )
 
 /**
  * The choices every start dialog asks for: the workflow, where the session runs, and for an
- * unattended laptop session its permission mode and the model it runs on.
+ * unattended laptop session the agent, its permission mode and the model it runs on.
  */
 export const StartChoicesFields = ({
   choices,
@@ -141,28 +185,6 @@ export const StartChoicesFields = ({
         </Text>
       )}
     </Flex>
-    {chosenTarget === 'laptop-headless' && (
-      <label>
-        <Text as="div" size="2" mb="1" weight="medium">
-          Permissions
-        </Text>
-        <Select.Root
-          value={choices.permissionMode}
-          onValueChange={(value) =>
-            onChange({ ...choices, permissionMode: permissionModeOrder.find((permissionMode) => permissionMode === value) ?? 'auto' })
-          }
-        >
-          <Select.Trigger />
-          <Select.Content>
-            {permissionModeOrder.map((permissionMode) => (
-              <Select.Item key={permissionMode} value={permissionMode}>
-                {permissionModeLabels[permissionMode]}
-              </Select.Item>
-            ))}
-          </Select.Content>
-        </Select.Root>
-      </label>
-    )}
-    {chosenTarget === 'laptop-headless' && <ModelFields choices={choices} onChange={onChange} modelProblem={modelProblem} />}
+    {chosenTarget === 'laptop-headless' && <UnattendedFields choices={choices} onChange={onChange} modelProblem={modelProblem} />}
   </>
 )
