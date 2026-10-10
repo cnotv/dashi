@@ -313,6 +313,19 @@ export const modelEnvironmentFor = (openRouterModel: string | null, runnerEnviro
 }
 
 /**
+ * The environment a session runs with: the runner's, without the laptop's OpenRouter key, plus
+ * what the start adds. The key reaches only a session on OpenRouter, and only as its auth token,
+ * so no other session, or a script a repository runs inside one, can read it.
+ * @param runnerEnvironment The runner's environment.
+ * @param additions The variables the start adds.
+ * @returns The session's environment.
+ */
+export const sessionEnvironmentFor = (runnerEnvironment: NodeJS.ProcessEnv, additions: Record<string, string>): NodeJS.ProcessEnv => {
+  const withoutOpenRouterKey = Object.fromEntries(Object.entries(runnerEnvironment).filter(([name]) => name !== 'OPENROUTER_API_KEY'))
+  return { ...withoutOpenRouterKey, ...additions }
+}
+
+/**
  * Decides the command that starts a claimed session, by where it should run.
  * @param claimed The claimed start.
  * @param paths Where its clone, worktree and log live.
@@ -648,7 +661,7 @@ const launch = (plan: LaunchPlan, claimed: ClaimedStart, paths: RunnerPaths): La
   if (plan.mode === 'capture') {
     const result = spawnSync(plan.command, plan.args, {
       cwd: plan.cwd,
-      env: { ...process.env, ...plan.environment },
+      env: sessionEnvironmentFor(process.env, plan.environment),
       encoding: 'utf8',
       timeout: cloudCommandTimeoutMilliseconds,
     })
@@ -662,13 +675,14 @@ const launch = (plan: LaunchPlan, claimed: ClaimedStart, paths: RunnerPaths): La
     const logDescriptor = openSync(paths.logPath, 'a')
     spawn(plan.command, plan.args, {
       cwd: plan.cwd,
-      env: { ...process.env, ...plan.environment },
+      env: sessionEnvironmentFor(process.env, plan.environment),
       detached: true,
       stdio: ['ignore', logDescriptor, logDescriptor],
     }).unref()
     return { sessionUrl: null, message: `Running unattended in ${plan.cwd}; its output goes to ${paths.logPath}` }
   }
-  const result = spawnSync(plan.command, plan.args, { encoding: 'utf8' })
+  // A tmux server this starts keeps this environment for every session it later runs.
+  const result = spawnSync(plan.command, plan.args, { encoding: 'utf8', env: sessionEnvironmentFor(process.env, {}) })
   if (result.error) throw new Error('tmux is needed for sessions steered from the phone: brew install tmux')
   if (result.status !== 0) throw new Error(`tmux failed: ${lastCharacters(result.stderr, 500)}`)
   return {
@@ -809,7 +823,7 @@ const typeIntoPane = (paneId: string, text: string): void => {
 }
 
 const resumeWithMessage = (settings: RunnerSettings, claudeSessionId: string, delivery: ChatWorkDelivery, directory: string): string => {
-  const environment = { ...process.env, ...modelEnvironmentFor(delivery.openRouterModel, process.env) }
+  const environment = sessionEnvironmentFor(process.env, modelEnvironmentFor(delivery.openRouterModel, process.env))
   const logPath = join(settings.runnerHome, 'logs', `chat-${claudeSessionId.slice(0, 8)}.log`)
   mkdirSync(dirname(logPath), { recursive: true })
   const logDescriptor = openSync(logPath, 'a')
@@ -824,7 +838,12 @@ const resumeWithMessage = (settings: RunnerSettings, claudeSessionId: string, de
 
 // Needs this machine's claude logged in to the claude.ai account the cloud session belongs to.
 const sendToCloudSession = (cloudSessionId: string, text: string): { state: 'delivered' | 'failed'; message: string | null } => {
-  const result = spawnSync('claude', cloudSendArgumentsFor(cloudSessionId), { input: text, encoding: 'utf8', timeout: cloudSendTimeoutMilliseconds })
+  const result = spawnSync('claude', cloudSendArgumentsFor(cloudSessionId), {
+    input: text,
+    encoding: 'utf8',
+    timeout: cloudSendTimeoutMilliseconds,
+    env: sessionEnvironmentFor(process.env, {}),
+  })
   if (result.error) return { state: 'failed', message: result.error.message }
   return cloudSendOutcomeOf(result.stdout ?? '', result.stderr ?? '')
 }

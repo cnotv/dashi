@@ -14,6 +14,7 @@ import {
   parseTmuxPanes,
   readRunnerSettings,
   resumeArgumentsFor,
+  sessionEnvironmentFor,
   runnerPathsFor,
   summariseTranscript,
   tmuxSessionNameFor,
@@ -129,6 +130,15 @@ describe('launchPlanFor', () => {
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'openai/gpt-5-mini',
     })
     expect(plan.args.join(' ')).not.toContain(openRouterKey)
+  })
+
+  it('keeps the OpenRouter key out of every session but as the auth token of one on OpenRouter', () => {
+    const openRouterKey = 'sk-or-v1-exampleKey0123456789'
+    const runnerEnvironment = { PATH: '/usr/bin', OPENROUTER_API_KEY: openRouterKey }
+    expect(sessionEnvironmentFor(runnerEnvironment, { DASHI_START_ID: startId })).toEqual({ PATH: '/usr/bin', DASHI_START_ID: startId })
+    const onOpenRouter = sessionEnvironmentFor(runnerEnvironment, modelEnvironmentFor('openai/gpt-5-mini', runnerEnvironment))
+    expect(onOpenRouter.OPENROUTER_API_KEY).toBeUndefined()
+    expect(onOpenRouter.ANTHROPIC_AUTH_TOKEN).toBe(openRouterKey)
   })
 
   it('refuses an OpenRouter start when the laptop has no OpenRouter key', () => {
