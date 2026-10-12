@@ -5,7 +5,8 @@
   "exports": {
     ".": "./src/types.ts",
     "./first-message": "./src/first-message.ts",
-    "./open-router": "./src/open-router.ts"
+    "./open-router": "./src/open-router.ts",
+    "./opencode-models": "./src/opencode-models.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p .",

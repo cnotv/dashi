@@ -29,6 +29,7 @@ describe('createDemoApi', () => {
       agent: 'claude',
       permissionMode: 'auto',
       openRouterModel: null,
+      opencodeModel: null,
       note: 'In the corner.',
       attachments: [screenshot],
     })

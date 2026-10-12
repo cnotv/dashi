@@ -1,5 +1,6 @@
 import { Callout, Flex, Link, RadioCards, SegmentedControl, Select, Text, TextField } from '@radix-ui/themes'
 import type { StartOptions, StartTarget } from '@dashi/contracts'
+import { openCodeModels } from '@dashi/contracts/opencode-models'
 import {
   permissionModeLabels,
   permissionModeOrders,
@@ -48,7 +49,33 @@ const OpenRouterModelField = ({ choices, onChange, modelProblem }: UnattendedFie
       </Link>
       ; one ending in :free costs nothing.
     </Text>
-    {modelProblem && (
+    {modelProblem && choices.modelSource === 'openrouter' && (
+      <Text size="1" color="red">
+        {modelProblem}
+      </Text>
+    )}
+  </>
+)
+
+const OpenCodeModelField = ({ choices, onChange, modelProblem }: UnattendedFieldsProps) => (
+  <>
+    <Select.Root
+      value={choices.opencodeModel}
+      onValueChange={(value) => onChange({ ...choices, opencodeModel: value })}
+    >
+      <Select.Trigger placeholder="Pick a model" />
+      <Select.Content>
+        {openCodeModels.map((model) => (
+          <Select.Item key={model.id} value={model.id}>
+            {model.name}
+          </Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
+    <Text size="1" color="gray">
+      Runs on OpenCode&apos;s own provider at no cost, without an API key.
+    </Text>
+    {modelProblem && choices.modelSource === 'opencode' && (
       <Text size="1" color="red">
         {modelProblem}
       </Text>
@@ -109,6 +136,7 @@ const UnattendedFields = ({ choices, onChange, modelProblem }: UnattendedFieldsP
         ))}
       </SegmentedControl.Root>
       {choices.modelSource === 'openrouter' && <OpenRouterModelField choices={choices} onChange={onChange} modelProblem={modelProblem} />}
+      {choices.modelSource === 'opencode' && <OpenCodeModelField choices={choices} onChange={onChange} modelProblem={modelProblem} />}
     </Flex>
   </>
 )

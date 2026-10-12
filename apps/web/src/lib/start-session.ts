@@ -1,9 +1,9 @@
 import type { IssueLabel, StartAgent, StartOptions, StartTarget, StartWorkflow } from '@dashi/contracts'
-import { openRouterModelPattern, takesOpenCode, takesOpenRouterModel } from '@dashi/contracts/open-router'
+import { openRouterModelPattern, opencodeModelPattern, takesOpenCode, takesOpenRouterModel } from '@dashi/contracts/open-router'
 import { permissionModeOrders } from './presentation'
 import type { StartChoices, StartTargetAvailability } from './types'
 
-type ModelChoices = Pick<StartChoices, 'modelSource' | 'openRouterModel'>
+type ModelChoices = Pick<StartChoices, 'modelSource' | 'openRouterModel' | 'opencodeModel'>
 
 const workflowByLabel: Record<string, StartWorkflow> = {
   bug: 'fix',
@@ -71,6 +71,8 @@ export const defaultTargetFor = (options: StartOptions): StartTarget => {
 
 const isOnOpenRouter = (choices: ModelChoices, target: StartTarget): boolean => choices.modelSource === 'openrouter' && takesOpenRouterModel(target)
 
+const isOnOpenCodeModel = (choices: ModelChoices, target: StartTarget): boolean => choices.modelSource === 'opencode' && takesOpenCode(target)
+
 /**
  * The OpenRouter model a start sends, when it runs on one.
  * @param choices What the dialog's model fields hold.
@@ -81,6 +83,15 @@ export const openRouterModelFor = (choices: ModelChoices, target: StartTarget): 
   isOnOpenRouter(choices, target) ? choices.openRouterModel.trim() : null
 
 /**
+ * The OpenCode provider model a start sends, when it runs on one.
+ * @param choices What the dialog's model fields hold.
+ * @param target Where the session would run; only an unattended laptop start can use an OpenCode model.
+ * @returns The model slug, or null for OpenCode's default.
+ */
+export const opencodeModelFor = (choices: ModelChoices, target: StartTarget): string | null =>
+  isOnOpenCodeModel(choices, target) ? choices.opencodeModel.trim() : null
+
+/**
  * Says what keeps a start's model choice from being sent.
  * @param choices What the dialog's model fields hold.
  * @param target Where the session would run.
@@ -88,9 +99,16 @@ export const openRouterModelFor = (choices: ModelChoices, target: StartTarget): 
  */
 export const startModelProblemFor = (choices: ModelChoices, target: StartTarget): string | null => {
   const openRouterModel = openRouterModelFor(choices, target)
-  if (openRouterModel === null) return null
-  if (openRouterModel === '') return 'Name the OpenRouter model to run on'
-  return openRouterModelPattern.test(openRouterModel) ? null : 'An OpenRouter model reads like provider/model, such as openai/gpt-5-mini'
+  if (openRouterModel !== null) {
+    if (openRouterModel === '') return 'Name the OpenRouter model to run on'
+    return openRouterModelPattern.test(openRouterModel) ? null : 'An OpenRouter model reads like provider/model, such as openai/gpt-5-mini'
+  }
+  const opencodeModel = opencodeModelFor(choices, target)
+  if (opencodeModel !== null) {
+    if (opencodeModel === '') return 'Pick an OpenCode model to run on'
+    return opencodeModelPattern.test(opencodeModel) ? null : 'An OpenCode model reads like opencode/model, such as opencode/longcat-2.5-preview-free'
+  }
+  return null
 }
 
 /**

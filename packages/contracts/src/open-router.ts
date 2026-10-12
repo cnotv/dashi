@@ -4,6 +4,9 @@ import type { StartTarget } from './types.ts'
 // or ~anthropic/claude-sonnet-latest. It becomes an environment value, never an argument.
 export const openRouterModelPattern = /^~?[a-z0-9][a-z0-9._-]{0,63}\/[A-Za-z0-9._:-]{1,100}$/
 
+// An OpenCode provider model slug such as opencode/longcat-2.5-preview-free.
+export const opencodeModelPattern = /^opencode\/[a-z0-9][a-z0-9._-]{0,63}$/
+
 /**
  * Tells whether a start can run on OpenCode: only an unattended laptop start, since OpenCode has no
  * Remote Control and never runs in Claude's cloud.

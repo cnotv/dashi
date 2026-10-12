@@ -69,6 +69,17 @@ describe('parseClaim', () => {
     expect(parseClaim(claimBody({ ...headless, openRouterModel: '--dangerously-skip-permissions' }))).toBeNull()
     expect(parseClaim(claimBody({ ...headless, openRouterModel: 'a/b\nANTHROPIC_BASE_URL=https://evil' }))).toBeNull()
   })
+
+  it('reads an OpenCode model only for an unattended start, and only as a model slug', () => {
+    const headless = { target: 'laptop-headless' }
+    expect(claimOf().start.opencodeModel).toBeNull()
+    expect(claimOf({ ...headless, opencodeModel: 'opencode/longcat-2.5-preview-free' }).start.opencodeModel).toBe(
+      'opencode/longcat-2.5-preview-free',
+    )
+    expect(parseClaim(claimBody({ opencodeModel: 'opencode/longcat-2.5-preview-free' }))).toBeNull()
+    expect(parseClaim(claimBody({ ...headless, opencodeModel: 'openai/gpt-5-mini' }))).toBeNull()
+    expect(parseClaim(claimBody({ ...headless, opencodeModel: '--model x' }))).toBeNull()
+  })
 })
 
 describe('attachments', () => {
@@ -176,6 +187,16 @@ describe('launchPlanFor', () => {
     expect(() => launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode', openRouterModel: 'openai/gpt-5-mini' }), paths, {})).toThrow(
       'OPENROUTER_API_KEY',
     )
+  })
+
+  it("runs OpenCode on an OpenCode provider model with no key of its own", () => {
+    const plan = launchPlanFor(
+      claimOf({ target: 'laptop-headless', agent: 'opencode', opencodeModel: 'opencode/longcat-2.5-preview-free' }),
+      paths,
+      {},
+    )
+    expect(plan.args.slice(0, 2)).toEqual(['run', '--model=opencode/longcat-2.5-preview-free'])
+    expect(plan.environment).toEqual({ DASHI_START_ID: startId })
   })
 
   it('sends a cloud session from the clone itself', () => {

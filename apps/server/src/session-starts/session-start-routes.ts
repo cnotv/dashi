@@ -112,6 +112,9 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
     if (request.openRouterModel !== null && !takesOpenRouterModel(request.target)) {
       return { ok: false, status: 422, error: 'Only an unattended laptop session can run on an OpenRouter model' }
     }
+    if (request.opencodeModel !== null && !takesOpenCode(request.target)) {
+      return { ok: false, status: 422, error: 'Only an unattended laptop session can run on an OpenCode model' }
+    }
     const limitProblem = attachmentLimitProblem(attachments, request.target)
     if (limitProblem !== null) return { ok: false, status: 413, error: limitProblem }
     const routine = request.target === 'cloud-routine' ? routineOf(repository) : null
@@ -159,11 +162,11 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
     const failedStart = startStore.readStart(context.req.param('startId'))
     if (failedStart === null) return context.json({ error: 'Unknown start' }, 404)
     if (failedStart.state !== 'failed') return context.json({ error: 'Only a failed start can be retried' }, 409)
-    const { repository, issueNumber, pullRequestNumber, workflow, target, agent, permissionMode, openRouterModel, note } = failedStart
+    const { repository, issueNumber, pullRequestNumber, workflow, target, agent, permissionMode, openRouterModel, opencodeModel, note } = failedStart
     return answerLaunch(
       context,
       await launchStart(
-        { repository, issueNumber, pullRequestNumber, workflow, target, agent, permissionMode, openRouterModel, note },
+        { repository, issueNumber, pullRequestNumber, workflow, target, agent, permissionMode, openRouterModel, opencodeModel, note },
         [],
         context.get('session'),
       ),

@@ -315,6 +315,36 @@ describe('laptop starts', () => {
     expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ ...headless, openRouterModel: '--model x' })))).status).toBe(400)
   })
 
+  it('hands the runner an unattended start on an OpenCode model, and keeps the model on a retry', async () => {
+    const { app, runnerTokens, startStore } = createTestApp()
+    const { token } = runnerTokens.createToken('Mac mini')
+    const model = 'opencode/longcat-2.5-preview-free'
+    const startId = await startIdOf(
+      await app.request(jsonRequest('POST', '/api/session-starts', startBody({ target: 'laptop-headless', opencodeModel: model }))),
+    )
+    expect(await (await app.request(runnerRequest('/claim', token))).json()).toMatchObject({ start: { startId, opencodeModel: model } })
+    startStore.recordOutcome(startId, { state: 'failed', sessionUrl: null, message: 'Model unavailable' })
+    expect(await (await app.request(jsonRequest('POST', `/api/session-starts/${startId}/retry`, {}))).json()).toMatchObject({
+      state: 'queued',
+      opencodeModel: model,
+    })
+  })
+
+  it('runs a start on the default model unless it names an OpenCode one, and only an unattended one on it', async () => {
+    const { app } = createTestApp()
+    expect(await (await app.request(jsonRequest('POST', '/api/session-starts', startBody()))).json()).toMatchObject({ opencodeModel: null })
+    const remoteControlResponse = await app.request(
+      jsonRequest('POST', '/api/session-starts', startBody({ opencodeModel: 'opencode/longcat-2.5-preview-free' })),
+    )
+    expect(remoteControlResponse.status).toBe(422)
+    expect(await remoteControlResponse.json()).toEqual({ error: 'Only an unattended laptop session can run on an OpenCode model' })
+    const headless = { target: 'laptop-headless' }
+    expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ ...headless, opencodeModel: 'openai/gpt-5-mini' })))).status).toBe(
+      400,
+    )
+    expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ ...headless, opencodeModel: '--model x' })))).status).toBe(400)
+  })
+
   it('hands the runner an unattended OpenCode start, and runs every other start on Claude Code', async () => {
     const { app, runnerTokens } = createTestApp()
     const { token } = runnerTokens.createToken('Mac mini')

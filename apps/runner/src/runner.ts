@@ -33,6 +33,7 @@ interface ClaimedStart {
     agent: StartAgent
     permissionMode: PermissionMode
     openRouterModel: string | null
+    opencodeModel: string | null
   }
   prompt: string
   sessionName: string
@@ -203,6 +204,13 @@ const openRouterModelOf = (value: unknown): string | null | undefined => {
   return typeof value === 'string' && openRouterModelPattern.test(value) ? value : undefined
 }
 
+// An OpenCode provider model slug, or null for OpenCode's default.
+const opencodeModelPattern = /^opencode\/[a-z0-9][a-z0-9._-]{0,63}$/
+const opencodeModelOf = (value: unknown): string | null | undefined => {
+  if (value === null || value === undefined) return null
+  return typeof value === 'string' && opencodeModelPattern.test(value) ? value : undefined
+}
+
 /**
  * Reads a claim from the dashboard, checking everything in it that reaches a command line.
  * @param claimBody The parsed JSON the dashboard answered with.
@@ -214,15 +222,16 @@ export const parseClaim = (claimBody: unknown): ClaimedStart | null => {
   const { startId, target, permissionMode, repository: repositoryBody } = start
   const attachments = parseAttachments(claimBody.attachments)
   const openRouterModel = openRouterModelOf(start.openRouterModel)
+  const opencodeModel = opencodeModelOf(start.opencodeModel)
   // A dashboard from before OpenCode sends no agent, which is Claude Code.
   const agent = start.agent ?? 'claude'
-  if (!isRecord(repositoryBody) || attachments === null || openRouterModel === undefined || !isOneOf(startAgents, agent)) return null
+  if (!isRecord(repositoryBody) || attachments === null || openRouterModel === undefined || opencodeModel === undefined || !isOneOf(startAgents, agent)) return null
   const repository = { owner: String(repositoryBody.owner), name: String(repositoryBody.name) }
   if (typeof prompt !== 'string' || typeof sessionName !== 'string' || typeof startId !== 'string') return null
   if (!/^[0-9a-f-]{36}$/.test(startId) || !isSafeRepository(repository)) return null
   if (!isOneOf(laptopTargets, target) || !isOneOf(permissionModes, permissionMode)) return null
-  if ((openRouterModel !== null || agent === 'opencode') && target !== 'laptop-headless') return null
-  return { start: { startId, repository, target, agent, permissionMode, openRouterModel }, prompt, sessionName, attachments }
+  if ((openRouterModel !== null || opencodeModel !== null || agent === 'opencode') && target !== 'laptop-headless') return null
+  return { start: { startId, repository, target, agent, permissionMode, openRouterModel, opencodeModel }, prompt, sessionName, attachments }
 }
 
 /**
@@ -345,14 +354,15 @@ export const sessionEnvironmentFor = (runnerEnvironment: NodeJS.ProcessEnv, addi
 // that name, to an OpenRouter start only. OpenCode's own permission settings decide what it may
 // do; auto mode adds --auto, which approves what those settings do not deny.
 const openCodePlanFor = (claimed: ClaimedStart, paths: RunnerPaths, runnerEnvironment: NodeJS.ProcessEnv): LaunchPlan => {
-  const { openRouterModel, permissionMode, startId } = claimed.start
+  const { openRouterModel, opencodeModel, permissionMode, startId } = claimed.start
   return {
     mode: 'detached',
     command: 'opencode',
     args: [
       'run',
       // Joined to their flags, so a value that starts with a dash can never pass for a flag of its own.
-      ...(openRouterModel === null ? [] : [`--model=openrouter/${openRouterModel}`]),
+      ...(openRouterModel !== null ? [`--model=openrouter/${openRouterModel}`] : []),
+      ...(opencodeModel !== null ? [`--model=${opencodeModel}`] : []),
       `--title=${claimed.sessionName}`,
       ...(permissionMode === 'auto' ? ['--auto'] : []),
       claimed.prompt,
@@ -360,7 +370,7 @@ const openCodePlanFor = (claimed: ClaimedStart, paths: RunnerPaths, runnerEnviro
     cwd: paths.worktreePath,
     environment: {
       DASHI_START_ID: startId,
-      ...(openRouterModel === null ? {} : { OPENROUTER_API_KEY: openRouterKeyOf(runnerEnvironment) }),
+      ...(openRouterModel !== null ? { OPENROUTER_API_KEY: openRouterKeyOf(runnerEnvironment) } : {}),
     },
   }
 }

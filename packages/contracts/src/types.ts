@@ -347,6 +347,8 @@ export interface SessionStartRequest {
   // An OpenRouter model slug for an unattended laptop start, run on the laptop's own OpenRouter
   // key; null runs it on the laptop's Claude login.
   openRouterModel: string | null
+  // An OpenCode provider model slug for an unattended laptop start; null uses OpenCode's default.
+  opencodeModel: string | null
   note: string
 }
 

@@ -90,11 +90,11 @@ export const startAgentOrder: StartAgent[] = ['claude', 'opencode']
 
 export const startAgentLabels: Record<StartAgent, string> = { claude: 'Claude Code', opencode: 'OpenCode' }
 
-export const startModelSourceOrder: StartModelSource[] = ['default', 'openrouter']
+export const startModelSourceOrder: StartModelSource[] = ['default', 'openrouter', 'opencode']
 
 export const startModelSourceLabels: Record<StartAgent, Record<StartModelSource, string>> = {
-  claude: { default: 'Claude login', openrouter: 'OpenRouter' },
-  opencode: { default: "OpenCode's default", openrouter: 'OpenRouter' },
+  claude: { default: 'Claude login', openrouter: 'OpenRouter', opencode: 'OpenCode model' },
+  opencode: { default: "OpenCode's default", openrouter: 'OpenRouter', opencode: 'OpenCode model' },
 }
 
 // OpenCode has no edits-only mode: its own permission settings decide, and --auto approves what they do not deny.

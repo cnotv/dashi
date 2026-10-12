@@ -58,6 +58,7 @@ export const useStartChoices = (repository: RepositoryReference, isOpen: boolean
     permissionMode: 'auto',
     modelSource: 'default',
     openRouterModel: '',
+    opencodeModel: '',
   })
   const { options, errorMessage } = useStartOptions(repository, isOpen)
   const chosenTarget = choices.target ?? (options ? defaultTargetFor(options) : null)

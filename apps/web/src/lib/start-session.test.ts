@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { StartOptions } from '@dashi/contracts'
 import { runnerLaunchAgentCommands, runnerReviewCommands, runnerSystemdCommands, runnerTryCommands } from './runner-setup'
-import { agentFor, choicesWithAgent, defaultTargetFor, openRouterModelFor, startModelProblemFor, suggestedWorkflowFor, targetAvailabilityFor } from './start-session'
+import { agentFor, choicesWithAgent, defaultTargetFor, opencodeModelFor, openRouterModelFor, startModelProblemFor, suggestedWorkflowFor, targetAvailabilityFor } from './start-session'
 
 const onlineRunner = { label: 'Mac mini', lastSeenAt: '2026-09-30T10:00:00Z', isOnline: true }
 const optionsWith = (overrides: Partial<StartOptions>): StartOptions => ({
@@ -66,7 +66,7 @@ describe('agentFor', () => {
 
 describe('choicesWithAgent', () => {
   it("keeps the permission mode when the new agent has it, and falls back to auto when it does not", () => {
-    const choices = { workflow: 'fix' as const, target: null, agent: 'claude' as const, permissionMode: 'acceptEdits' as const, modelSource: 'default' as const, openRouterModel: '' }
+    const choices = { workflow: 'fix' as const, target: null, agent: 'claude' as const, permissionMode: 'acceptEdits' as const, modelSource: 'default' as const, openRouterModel: '', opencodeModel: '' }
     expect(choicesWithAgent(choices, 'opencode')).toMatchObject({ agent: 'opencode', permissionMode: 'auto' })
     expect(choicesWithAgent({ ...choices, permissionMode: 'dontAsk' }, 'opencode')).toMatchObject({ permissionMode: 'dontAsk' })
     expect(choicesWithAgent({ ...choices, agent: 'opencode', permissionMode: 'dontAsk' }, 'claude')).toMatchObject({ agent: 'claude', permissionMode: 'dontAsk' })
@@ -74,13 +74,21 @@ describe('choicesWithAgent', () => {
 })
 
 describe('the model a start runs on', () => {
-  const onOpenRouter = { modelSource: 'openrouter' as const, openRouterModel: ' meta-llama/llama-3.3-70b-instruct:free ' }
+  const onOpenRouter = { modelSource: 'openrouter' as const, openRouterModel: ' meta-llama/llama-3.3-70b-instruct:free ', opencodeModel: '' }
+  const onOpenCodeModel = { modelSource: 'opencode' as const, openRouterModel: '', opencodeModel: 'opencode/longcat-2.5-preview-free' }
 
   it('sends an OpenRouter model only for an unattended laptop start that picked one', () => {
     expect(openRouterModelFor(onOpenRouter, 'laptop-headless')).toBe('meta-llama/llama-3.3-70b-instruct:free')
     expect(openRouterModelFor(onOpenRouter, 'laptop-remote-control')).toBeNull()
     expect(openRouterModelFor(onOpenRouter, 'cloud-routine')).toBeNull()
     expect(openRouterModelFor({ ...onOpenRouter, modelSource: 'default' }, 'laptop-headless')).toBeNull()
+  })
+
+  it('sends an OpenCode model only for an unattended laptop start that picked one', () => {
+    expect(opencodeModelFor(onOpenCodeModel, 'laptop-headless')).toBe('opencode/longcat-2.5-preview-free')
+    expect(opencodeModelFor(onOpenCodeModel, 'laptop-remote-control')).toBeNull()
+    expect(opencodeModelFor(onOpenCodeModel, 'cloud-routine')).toBeNull()
+    expect(opencodeModelFor({ ...onOpenCodeModel, modelSource: 'default' }, 'laptop-headless')).toBeNull()
   })
 
   it('holds the start back until an OpenRouter model reads as a model slug', () => {
@@ -90,6 +98,15 @@ describe('the model a start runs on', () => {
       'An OpenRouter model reads like provider/model, such as openai/gpt-5-mini',
     )
     expect(startModelProblemFor({ ...onOpenRouter, openRouterModel: '' }, 'laptop-remote-control')).toBeNull()
+  })
+
+  it('holds the start back until an OpenCode model reads as a model slug', () => {
+    expect(startModelProblemFor(onOpenCodeModel, 'laptop-headless')).toBeNull()
+    expect(startModelProblemFor({ ...onOpenCodeModel, opencodeModel: '' }, 'laptop-headless')).toBe('Pick an OpenCode model to run on')
+    expect(startModelProblemFor({ ...onOpenCodeModel, opencodeModel: 'not-a-model' }, 'laptop-headless')).toBe(
+      'An OpenCode model reads like opencode/model, such as opencode/longcat-2.5-preview-free',
+    )
+    expect(startModelProblemFor({ ...onOpenCodeModel, opencodeModel: '' }, 'laptop-remote-control')).toBeNull()
   })
 })
 

@@ -45,8 +45,8 @@ import type {
 } from '@dashi/contracts'
 
 // What an unattended laptop start runs on: the agent's own default (the laptop's Claude login, or OpenCode's
-// configured model), or an OpenRouter model on the laptop's own key.
-export type StartModelSource = 'default' | 'openrouter'
+// configured model), an OpenRouter model on the laptop's own key, or an OpenCode provider model.
+export type StartModelSource = 'default' | 'openrouter' | 'opencode'
 
 export interface StartChoices {
   workflow: StartWorkflow
@@ -57,6 +57,8 @@ export interface StartChoices {
   modelSource: StartModelSource
   // As typed; read through openRouterModelFor before it is sent.
   openRouterModel: string
+  // As typed; read through opencodeModelFor before it is sent.
+  opencodeModel: string
 }
 
 export interface PickedAttachment {

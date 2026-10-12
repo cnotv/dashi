@@ -63,6 +63,7 @@ describe('canChatWithStart', () => {
     agent: 'claude',
     permissionMode: 'auto',
     openRouterModel: null,
+    opencodeModel: null,
     note: '',
     state: 'started',
     runnerLabel: null,
