@@ -11,7 +11,6 @@ import {
   startModelSourceOrders,
   startTargetLabels,
   startTargetOrder,
-  startWorkflowOrder,
 } from '@/lib/presentation'
 import { choicesWithAgent, targetAvailabilityFor } from '@/lib/start-session'
 import type { StartChoices, StartTargetAvailability } from '@/lib/types'
@@ -24,7 +23,6 @@ interface StartChoicesFieldsProps {
   chosenTarget: StartTarget | null
   chosenAvailability: StartTargetAvailability | null
   attachmentBytes: number
-  showsWorkflow: boolean
   modelProblem: string | null
 }
 
@@ -174,8 +172,9 @@ const UnattendedFields = ({ choices, onChange, modelProblem }: UnattendedFieldsP
 )
 
 /**
- * The choices every start dialog asks for: the workflow, where the session runs, and for an
- * unattended laptop session the agent, its permission mode and the model it runs on.
+ * The choices every start dialog asks for: where the session runs, and for an unattended laptop
+ * session the agent, its permission mode and the model it runs on. The workflow is the session's
+ * own pick.
  */
 export const StartChoicesFields = ({
   choices,
@@ -185,30 +184,9 @@ export const StartChoicesFields = ({
   chosenTarget,
   chosenAvailability,
   attachmentBytes,
-  showsWorkflow,
   modelProblem,
 }: StartChoicesFieldsProps) => (
   <>
-    {showsWorkflow && (
-      <label>
-        <Text as="div" size="2" mb="1" weight="medium">
-          Workflow
-        </Text>
-        <Select.Root
-          value={choices.workflow}
-          onValueChange={(value) => onChange({ ...choices, workflow: startWorkflowOrder.find((workflow) => workflow === value) ?? choices.workflow })}
-        >
-          <Select.Trigger />
-          <Select.Content>
-            {startWorkflowOrder.map((workflow) => (
-              <Select.Item key={workflow} value={workflow}>
-                {workflow}
-              </Select.Item>
-            ))}
-          </Select.Content>
-        </Select.Root>
-      </label>
-    )}
     <Flex direction="column" gap="1">
       <Text size="2" weight="medium">
         Where it runs

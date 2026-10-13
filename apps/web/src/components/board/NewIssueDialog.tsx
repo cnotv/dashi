@@ -60,7 +60,6 @@ export const NewIssueDialog = ({ defaultRepository }: NewIssueDialogProps) => {
   const { choices, setChoices, options, errorMessage, chosenTarget, chosenAvailability, modelProblem } = useStartChoices(
     repository ?? { owner: '', name: '' },
     isOpen && repository !== null,
-    'feature',
     attachmentBytes,
   )
   const attachmentCountLimit = options?.attachmentLimits.fileCount ?? 0
@@ -121,7 +120,7 @@ export const NewIssueDialog = ({ defaultRepository }: NewIssueDialogProps) => {
         repository: chosenRepository,
         issueNumber: issue.number,
         pullRequestNumber: null,
-        workflow: choices.workflow,
+        workflow: null,
         target: chosenTarget,
         agent: agentFor(choices, chosenTarget),
         permissionMode: choices.permissionMode,
@@ -230,7 +229,6 @@ export const NewIssueDialog = ({ defaultRepository }: NewIssueDialogProps) => {
                 chosenAvailability={chosenAvailability}
                 attachmentBytes={attachmentBytes}
                 modelProblem={modelProblem}
-                showsWorkflow
               />
               <Flex direction="column" gap="2" className={isDraggingFiles ? 'new-issue-composer new-issue-composer-dropping' : 'new-issue-composer'}>
                 {pickedAttachments.length > 0 && (

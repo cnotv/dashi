@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import type { RepositoryReference, SessionStart, SessionStartState, StartTarget } from '@dashi/contracts'
-import { sessionStartRequestSchema } from './schema.ts'
+import { storedSessionStartRequestSchema } from './schema.ts'
 import type { RoutineStore, SessionStartStore } from './types.ts'
 
 const recentStartCount = 50
@@ -14,7 +14,7 @@ const readOptionalText = (row: Record<string, unknown>, column: string): string 
 // The request is kept as the JSON the dashboard accepted, and read back through the same schema,
 // so a row can never hand the runner anything the Start dialog could not have sent.
 const toSessionStart = (row: Record<string, unknown>): SessionStart | null => {
-  const parsedRequest = sessionStartRequestSchema.safeParse(JSON.parse(String(row.request_json ?? 'null')))
+  const parsedRequest = storedSessionStartRequestSchema.safeParse(JSON.parse(String(row.request_json ?? 'null')))
   const state = startStates.find((startState) => startState === row.state)
   if (!parsedRequest.success || state === undefined) return null
   return {

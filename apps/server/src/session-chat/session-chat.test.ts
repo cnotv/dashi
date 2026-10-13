@@ -129,7 +129,6 @@ describe('session chat', () => {
       jsonRequest('POST', '/api/session-starts', {
         repository: { owner: 'cnotv', name: 'generative-art' },
         issueNumber: 42,
-        workflow: 'fix',
         target: 'laptop-headless',
         permissionMode: 'auto',
         openRouterModel: 'openai/gpt-5-mini',
@@ -155,7 +154,6 @@ describe('session chat', () => {
       jsonRequest('POST', '/api/session-starts', {
         repository: { owner: 'cnotv', name: 'generative-art' },
         issueNumber: 42,
-        workflow: 'fix',
         target: 'laptop-headless',
         openRouterModel: 'openai/gpt-5-mini',
       }),
@@ -182,7 +180,6 @@ describe('session chat', () => {
       jsonRequest('POST', '/api/session-starts', {
         repository: { owner: 'cnotv', name: 'generative-art' },
         issueNumber: 42,
-        workflow: 'fix',
         target: 'laptop-headless',
         agent: 'opencode',
       }),
@@ -218,7 +215,7 @@ describe('cloud session chat', () => {
     await testApp.app.request(
       jsonRequest('PUT', '/api/repositories/cnotv/generative-art/routine', { routineId: 'trig_01ABCDEFGHJK', token: routineToken }),
     )
-    const startBody = { repository: { owner: 'cnotv', name: 'generative-art' }, issueNumber: 42, workflow: 'fix', target: 'cloud-routine', note: '' }
+    const startBody = { repository: { owner: 'cnotv', name: 'generative-art' }, issueNumber: 42, target: 'cloud-routine', note: '' }
     const startId = z.object({ startId: z.string() }).parse(await (await testApp.app.request(jsonRequest('POST', '/api/session-starts', startBody))).json()).startId
     const reportHook = (payload: Record<string, unknown>, cloudSession = 'cse_01Fired') =>
       testApp.app.request(
@@ -232,14 +229,14 @@ describe('cloud session chat', () => {
     const { vault, reportHook, readStartChat } = await setUpRoutineStart()
     vault.saveSecret('github-token', githubToken)
     await reportHook({ hook_event_name: 'SessionStart' })
-    await reportHook({ hook_event_name: 'UserPromptSubmit', prompt: '/workflow:start fix https://github.com/cnotv/generative-art/issues/42' })
+    await reportHook({ hook_event_name: 'UserPromptSubmit', prompt: '/workflow:start https://github.com/cnotv/generative-art/issues/42' })
     await reportHook({ hook_event_name: 'Stop', last_assistant_message: `Opened the draft pull request; pushed with ${githubToken}` })
     await reportHook({ hook_event_name: 'Stop', last_assistant_message: 'Not this session' }, 'cse_01Another')
 
     const chat = await readStartChat()
     expect(chat).toMatchObject({ availability: 'in-cloud', deliveryRoute: 'none', sendBlocker: expect.stringContaining('laptop runner') })
     expect(chat.messages.map((message) => message.text)).toEqual([
-      '/workflow:start fix https://github.com/cnotv/generative-art/issues/42',
+      '/workflow:start https://github.com/cnotv/generative-art/issues/42',
       'Opened the draft pull request; pushed with [redacted]',
     ])
   })

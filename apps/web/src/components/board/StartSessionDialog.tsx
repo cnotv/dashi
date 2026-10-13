@@ -5,7 +5,7 @@ import type { IssueSummary, PullRequestSummary, RepositoryReference, SessionStar
 import { useStartChoices } from '@/hooks/useSessionStarts'
 import { useToast } from '@/hooks/useToast'
 import { dashboardApi } from '@/lib/api'
-import { agentFor, opencodeModelFor, openRouterModelFor, suggestedWorkflowFor } from '@/lib/start-session'
+import { agentFor, opencodeModelFor, openRouterModelFor } from '@/lib/start-session'
 import { StartChoicesFields } from './StartChoicesFields'
 import { StartedSummary } from './StartedSummary'
 
@@ -16,10 +16,10 @@ interface StartSessionDialogProps {
 }
 
 /**
- * The Start button on a board card and its dialog: pick a workflow, where the session runs and
- * an optional note, then start it on the laptop runner or a Claude Code routine. Given a pull
- * request with merge conflicts, it is that pull request's red warning instead, and starts the
- * conflicts workflow on its branch.
+ * The Start button on a board card and its dialog: pick where the session runs and add an
+ * optional note, then start it on the laptop runner or a Claude Code routine; the session's start
+ * skill picks the workflow. Given a pull request with merge conflicts, it is that pull request's
+ * red warning instead, and starts the conflicts workflow on its branch.
  */
 export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }: StartSessionDialogProps) => {
   const toast = useToast()
@@ -27,8 +27,7 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
   const [isStarting, setIsStarting] = useState(false)
   const [started, setStarted] = useState<SessionStart | null>(null)
   const [note, setNote] = useState('')
-  const initialWorkflow = conflictingPullRequest ? 'conflicts' : suggestedWorkflowFor(issue?.labels ?? [])
-  const { choices, setChoices, options, errorMessage, chosenTarget, chosenAvailability, modelProblem } = useStartChoices(repository, isOpen, initialWorkflow, 0)
+  const { choices, setChoices, options, errorMessage, chosenTarget, chosenAvailability, modelProblem } = useStartChoices(repository, isOpen, 0)
   const triggerLabel = conflictingPullRequest ? 'Merge conflict: start a session to fix it' : 'Start a session'
   const dialogTitle = conflictingPullRequest
     ? `Fix the conflicts in #${conflictingPullRequest.number}`
@@ -50,7 +49,7 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
         repository,
         issueNumber: issue?.number ?? null,
         pullRequestNumber: conflictingPullRequest?.number ?? null,
-        workflow: choices.workflow,
+        workflow: conflictingPullRequest ? 'conflicts' : null,
         target: chosenTarget,
         agent: agentFor(choices, chosenTarget),
         permissionMode: choices.permissionMode,
@@ -110,7 +109,6 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
                 chosenAvailability={chosenAvailability}
                 attachmentBytes={0}
                 modelProblem={modelProblem}
-                showsWorkflow={!conflictingPullRequest}
               />
               <label>
                 <Text as="div" size="2" mb="1" weight="medium">

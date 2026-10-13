@@ -371,9 +371,9 @@ repository); until then the board offers **Enable Netlify**, which would make a 
 ## Start a session from the board
 
 Every card without a pull request has a **Start** button (the play icon), so work can be started
-from the phone; once a pull request exists, the session that opened it carries on with it. Pick a
-workflow from agent-base's `start` router (suggested from the issue's labels), add a note if the
-issue leaves something out, and pick where it runs:
+from the phone; once a pull request exists, the session that opened it carries on with it. Add a
+note if the issue leaves something out and pick where it runs; the session's own `start` router,
+from agent-base, reads the issue and picks the workflow:
 
 | Where                              | What happens                                                                                                          | Needs                                     |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
@@ -382,13 +382,13 @@ issue leaves something out, and pick where it runs:
 | Claude cloud, sent from the laptop | The runner runs `claude --cloud` in its clone and reports the claude.ai link back                                     | The laptop runner, logged in to claude.ai |
 | Claude cloud routine               | The dashboard fires the repository's routine through the routines API; works with the laptop off                      | A routine for the repository              |
 
-Each start's session opens with `/workflow:start <workflow> <issue link>`, then the note, then
-the workflow spelled out: read AGENTS.md and the issue, branch as `<type>/<issue>-<slug>` (with
-permission to push that name, so a cloud session does not stay on its `claude/` branch and drop
-off the board), tests first, the checks before every push, a draft pull request at the first
-commit, and staying with it until it is green. A routine receives the first line as text, not as a
-command, and a cloud session may not have the workflow plugin, so the steps travel with the
-message. The message is built once, in `packages/contracts/src/first-message.ts`, for the server
+Each start's session opens with `/workflow:start <issue link>`, then the note, then the steps
+spelled out: read AGENTS.md and the issue, answer a question without changing anything, otherwise
+branch as `<type>/<issue>-<slug>` with the type of the workflow it picked (and permission to push
+that name, so a cloud session does not stay on its `claude/` branch and drop off the board), tests
+first, the checks before every push, a draft pull request at the first commit, and staying with it
+until it is green. A routine receives the first line as text, not as a command, and a cloud session
+may not have the workflow plugin, so the steps travel with the message. The message is built once, in `packages/contracts/src/first-message.ts`, for the server
 and the demo alike.
 
 A pull request with merge conflicts shows a red warning icon on its card. Tapping it opens the
@@ -453,7 +453,7 @@ which `dashi connect` and `dashi update` install wherever `opencode` is on the P
 ### New issue
 
 **New issue**, on Sessions and on the board, starts work that has no issue yet, as a chat: pick
-the repository and the same workflow and place to run as **Start**, then write what the work is
+the repository and the same place to run as **Start**, then write what the work is
 about, attaching files by picking, pasting or dropping them. Sending (Enter) opens the issue on
 GitHub as you, titled by the message's first line, then starts the session on it with the message
 as its note.
@@ -492,7 +492,7 @@ steered from the phone (`brew install tmux` or `sudo apt install tmux`).
 
 It asks for work every five seconds, every second and a half while a chat drawer is open, with
 its own runner token, which can only take and report starts, send the transcript of a session
-whose drawer is open, and report on the messages it delivers, never read anything else. It accepts only a known workflow, target and permission mode
+whose drawer is open, and report on the messages it delivers, never read anything else. It accepts only a known target and permission mode
 and a repository in `owner/name` form; it clones under `~/dashi/repos` with your own git
 credentials, and every command is an argument list, never a shell string. **Revoke** cuts it off.
 

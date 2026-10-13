@@ -1,33 +1,10 @@
-import type { IssueLabel, StartAgent, StartOptions, StartTarget, StartWorkflow } from '@dashi/contracts'
+import type { StartAgent, StartOptions, StartTarget } from '@dashi/contracts'
 import { openRouterModelPattern, takesOpenCode, takesOpenRouterModel } from '@dashi/contracts/open-router'
 import { opencodeModelPattern } from '@dashi/contracts/opencode-models'
 import { permissionModeOrders, startModelSourceOrders } from './presentation'
 import type { StartChoices, StartTargetAvailability } from './types'
 
 type ModelChoices = Pick<StartChoices, 'agent' | 'modelSource' | 'openRouterModel' | 'opencodeModel'>
-
-const workflowByLabel: Record<string, StartWorkflow> = {
-  bug: 'fix',
-  documentation: 'docs',
-  docs: 'docs',
-  enhancement: 'feature',
-  feature: 'feature',
-  security: 'security',
-  test: 'tests',
-  tests: 'tests',
-  refactor: 'refactor',
-  design: 'design',
-  chore: 'chore',
-  dependencies: 'chore',
-}
-
-/**
- * Suggests a workflow from an issue's labels, falling back to feature.
- * @param labels The issue's labels.
- * @returns The workflow the first recognised label points at.
- */
-export const suggestedWorkflowFor = (labels: IssueLabel[]): StartWorkflow =>
-  labels.map((label) => workflowByLabel[label.name.toLowerCase()]).find((workflow) => workflow !== undefined) ?? 'feature'
 
 /**
  * Tells whether a session takes attachments as files on the laptop, or only as text in its prompt.

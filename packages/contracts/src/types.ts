@@ -314,18 +314,9 @@ export interface CreatedMachineToken {
   token: string
 }
 
-export type StartWorkflow =
-  | 'research'
-  | 'feature'
-  | 'fix'
-  | 'refactor'
-  | 'docs'
-  | 'design'
-  | '3d'
-  | 'security'
-  | 'tests'
-  | 'chore'
-  | 'conflicts'
+// The one workflow a start names itself: a merge-conflict start already knows its job. Every
+// other start leaves the workflow to the agent's start skill, which reads the request.
+export type StartWorkflow = 'conflicts'
 
 export type StartTarget = 'laptop-remote-control' | 'laptop-headless' | 'laptop-cloud' | 'cloud-routine'
 
@@ -346,7 +337,8 @@ export interface SessionStartRequest {
   repository: RepositoryReference
   issueNumber: number | null
   pullRequestNumber: number | null
-  workflow: StartWorkflow
+  // Null lets the agent pick the workflow.
+  workflow: StartWorkflow | null
   target: StartTarget
   agent: StartAgent
   permissionMode: HeadlessPermissionMode

@@ -58,7 +58,7 @@ describe('canChatWithStart', () => {
     repository: { owner: 'cnotv', name: 'example' },
     issueNumber: 12,
     pullRequestNumber: null,
-    workflow: 'feature',
+    workflow: null,
     target: 'cloud-routine',
     agent: 'claude',
     permissionMode: 'auto',

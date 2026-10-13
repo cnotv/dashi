@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { StartOptions } from '@dashi/contracts'
 import { runnerLaunchAgentCommands, runnerReviewCommands, runnerSystemdCommands, runnerTryCommands } from './runner-setup'
-import { agentFor, choicesWithAgent, defaultTargetFor, opencodeModelFor, openRouterModelFor, startModelProblemFor, suggestedWorkflowFor, targetAvailabilityFor } from './start-session'
+import { agentFor, choicesWithAgent, defaultTargetFor, opencodeModelFor, openRouterModelFor, startModelProblemFor, targetAvailabilityFor } from './start-session'
 
 const onlineRunner = { label: 'Mac mini', lastSeenAt: '2026-09-30T10:00:00Z', isOnline: true }
 const optionsWith = (overrides: Partial<StartOptions>): StartOptions => ({
@@ -9,14 +9,6 @@ const optionsWith = (overrides: Partial<StartOptions>): StartOptions => ({
   routineConfigured: false,
   attachmentLimits: { fileCount: 5, fileTargetBytes: 8 * 1024 * 1024, inlineTargetBytes: 48 * 1024 },
   ...overrides,
-})
-
-describe('suggestedWorkflowFor', () => {
-  it('reads the workflow from the first label it knows', () => {
-    expect(suggestedWorkflowFor([{ name: 'P1', color: '' }, { name: 'Bug', color: '' }])).toBe('fix')
-    expect(suggestedWorkflowFor([{ name: 'documentation', color: '' }])).toBe('docs')
-    expect(suggestedWorkflowFor([])).toBe('feature')
-  })
 })
 
 describe('targetAvailabilityFor', () => {
@@ -66,14 +58,14 @@ describe('agentFor', () => {
 
 describe('choicesWithAgent', () => {
   it("keeps the permission mode when the new agent has it, and falls back to auto when it does not", () => {
-    const choices = { workflow: 'fix' as const, target: null, agent: 'claude' as const, permissionMode: 'acceptEdits' as const, modelSource: 'default' as const, openRouterModel: '', opencodeModel: '' }
+    const choices = { target: null, agent: 'claude' as const, permissionMode: 'acceptEdits' as const, modelSource: 'default' as const, openRouterModel: '', opencodeModel: '' }
     expect(choicesWithAgent(choices, 'opencode')).toMatchObject({ agent: 'opencode', permissionMode: 'auto' })
     expect(choicesWithAgent({ ...choices, permissionMode: 'dontAsk' }, 'opencode')).toMatchObject({ permissionMode: 'dontAsk' })
     expect(choicesWithAgent({ ...choices, agent: 'opencode', permissionMode: 'dontAsk' }, 'claude')).toMatchObject({ agent: 'claude', permissionMode: 'dontAsk' })
   })
 
   it('keeps the model source when the new agent offers it, and falls back to the default when it does not', () => {
-    const choices = { workflow: 'fix' as const, target: null, agent: 'opencode' as const, permissionMode: 'auto' as const, modelSource: 'opencode' as const, openRouterModel: '', opencodeModel: 'opencode/big-pickle' }
+    const choices = { target: null, agent: 'opencode' as const, permissionMode: 'auto' as const, modelSource: 'opencode' as const, openRouterModel: '', opencodeModel: 'opencode/big-pickle' }
     expect(choicesWithAgent(choices, 'claude')).toMatchObject({ agent: 'claude', modelSource: 'default' })
     expect(choicesWithAgent({ ...choices, modelSource: 'openrouter' }, 'claude')).toMatchObject({ modelSource: 'openrouter' })
   })

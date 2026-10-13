@@ -37,7 +37,6 @@ import type {
   HeadlessPermissionMode,
   StartAttachment,
   StartTarget,
-  StartWorkflow,
   StartOptions,
   UsageReport,
   WorkflowSkillsPullRequest,
@@ -50,7 +49,6 @@ import type {
 export type StartModelSource = 'default' | 'openrouter' | 'opencode'
 
 export interface StartChoices {
-  workflow: StartWorkflow
   target: StartTarget | null
   // Read through agentFor: only an unattended laptop start can run OpenCode.
   agent: StartAgent

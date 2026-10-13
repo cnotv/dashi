@@ -30,8 +30,8 @@ const claimBody = (overrides: Record<string, unknown> = {}) => ({
     permissionMode: 'auto',
     ...overrides,
   },
-  prompt: '/workflow:start fix https://github.com/cnotv/generative-art/issues/42\n\nKeep it small; $(rm -rf ~) stays text',
-  sessionName: 'generative-art #42 fix',
+  prompt: '/workflow:start https://github.com/cnotv/generative-art/issues/42\n\nKeep it small; $(rm -rf ~) stays text',
+  sessionName: 'generative-art #42',
 })
 
 const claimOf = (overrides: Record<string, unknown> = {}) => {
@@ -131,7 +131,7 @@ describe('launchPlanFor', () => {
       'claude',
       '--remote-control',
       '--name',
-      'generative-art #42 fix',
+      'generative-art #42',
       claimOf().prompt,
     ])
   })
@@ -176,9 +176,9 @@ describe('launchPlanFor', () => {
   it('runs an unattended OpenCode start with opencode run, auto-approving only in auto mode', () => {
     const plan = launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode' }), paths, {})
     expect(plan).toMatchObject({ mode: 'detached', command: 'opencode', cwd: paths.worktreePath, environment: { DASHI_START_ID: startId } })
-    expect(plan.args).toEqual(['run', '--title=generative-art #42 fix', '--auto', claimOf().prompt])
+    expect(plan.args).toEqual(['run', '--title=generative-art #42', '--auto', claimOf().prompt])
     const asked = launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode', permissionMode: 'dontAsk' }), paths, {})
-    expect(asked.args).toEqual(['run', '--title=generative-art #42 fix', claimOf().prompt])
+    expect(asked.args).toEqual(['run', '--title=generative-art #42', claimOf().prompt])
     const dashedName = launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode', repository: { owner: 'cnotv', name: '--auto' } }), paths, {})
     expect(dashedName.args.filter((argument) => argument === '--auto')).toEqual(['--auto'])
   })
@@ -382,7 +382,7 @@ describe('summariseTranscript', () => {
       uuid: 'u1',
       cwd: '/Users/me/dashi/worktrees/x',
       timestamp: '2026-09-30T10:00:00Z',
-      message: { role: 'user', content: '<command-message>workflow:start</command-message>\n<command-name>/workflow:start</command-name>\n<command-args>fix https://github.com/x/y/issues/1</command-args>' },
+      message: { role: 'user', content: '<command-message>workflow:start</command-message>\n<command-name>/workflow:start</command-name>\n<command-args>https://github.com/x/y/issues/1</command-args>' },
     }),
     line({ type: 'user', uuid: 'u0', isMeta: true, message: { role: 'user', content: 'Caveat: meta' } }),
     line({
@@ -407,7 +407,7 @@ describe('summariseTranscript', () => {
     const summary = summariseTranscript(transcript)
     expect(summary.directory).toBe('/Users/me/dashi/worktrees/x')
     expect(summary.messages.map(({ role, kind, text, toolName }) => ({ role, kind, text, toolName }))).toEqual([
-      { role: 'user', kind: 'text', text: '/workflow:start fix https://github.com/x/y/issues/1', toolName: null },
+      { role: 'user', kind: 'text', text: '/workflow:start https://github.com/x/y/issues/1', toolName: null },
       { role: 'assistant', kind: 'text', text: 'Reading the issue.', toolName: null },
       { role: 'assistant', kind: 'tool', text: 'gh issue view 1 --comments', toolName: 'Bash' },
     ])

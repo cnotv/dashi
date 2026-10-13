@@ -7,7 +7,7 @@ const startAt = (createdAt: string, overrides: Partial<SessionStart> = {}): Sess
   repository: { owner: 'cnotv', name: 'dashi' },
   issueNumber: 55,
   pullRequestNumber: null,
-  workflow: 'feature',
+  workflow: null,
   target: 'cloud-routine',
   agent: 'claude',
   permissionMode: 'auto',

@@ -1,4 +1,5 @@
 import type { AgentSessionSummary, ChatDelivery, ChatMessage, SessionChat, SessionStart } from '@dashi/contracts'
+import { sessionNameFor } from '@dashi/contracts/first-message'
 import { sessionStartStateColors, sessionStartStateLabels, sessionStateColors, sessionStateLabels, startTargetLabels } from './presentation'
 import { sessionDetail, sessionLabel } from './session-timeline'
 import type { ChatSubject, ChatTarget, ChatTimelineItem } from './types'
@@ -80,7 +81,7 @@ export const canChatWithSession = ({ provider }: Pick<AgentSessionSummary, 'prov
  */
 export const chatSubjectOfStart = (start: SessionStart): ChatSubject => ({
   target: { kind: 'start', startId: start.startId },
-  title: `${start.repository.name}${start.issueNumber === null ? '' : ` #${start.issueNumber}`} · ${start.workflow}`,
+  title: sessionNameFor(start),
   detail: startTargetLabels[start.target].name,
   badgeLabel: sessionStartStateLabels[start.state],
   badgeColor: sessionStartStateColors[start.state],

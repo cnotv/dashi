@@ -8,19 +8,28 @@ const repositorySchema = z.object({
   name: z.string().regex(/^[A-Za-z0-9._-]{1,100}$/).refine((name) => name !== '.' && name !== '..'),
 })
 
-export const startWorkflowSchema = z.enum(['research', 'feature', 'fix', 'refactor', 'docs', 'design', '3d', 'security', 'tests', 'chore', 'conflicts'])
 
 export const sessionStartRequestSchema = z.object({
   repository: repositorySchema,
   issueNumber: z.number().int().positive().nullable(),
   pullRequestNumber: z.number().int().positive().nullable().default(null),
-  workflow: startWorkflowSchema,
+  workflow: z.enum(['conflicts']).nullable().default(null),
   target: z.enum(['laptop-remote-control', 'laptop-headless', 'laptop-cloud', 'cloud-routine']),
   agent: z.enum(['claude', 'opencode']).default('claude'),
   permissionMode: z.enum(['auto', 'acceptEdits', 'dontAsk']).default('auto'),
   openRouterModel: z.string().regex(openRouterModelPattern).nullable().default(null),
   opencodeModel: z.string().regex(opencodeModelPattern).nullable().default(null),
   note: z.string().trim().max(20000).default(''),
+})
+
+// A start stored before the agent picked its own workflow names one, such as fix; it reads back
+// as null, so the agent picks again on a retry. Only a conflicts start keeps its workflow.
+export const storedSessionStartRequestSchema = sessionStartRequestSchema.extend({
+  workflow: z
+    .string()
+    .nullable()
+    .default(null)
+    .transform((workflow) => (workflow === 'conflicts' ? workflow : null)),
 })
 
 // The runner writes each name as a file name, so it is a plain base name and nothing else.

@@ -9,7 +9,6 @@ import type {
   SessionStartState,
   StartAgent,
   StartTarget,
-  StartWorkflow,
 } from '@dashi/contracts'
 import type { GateRingGroup, RadixColor, StartModelSource } from './types'
 
@@ -84,7 +83,6 @@ export const startTargetLabels: Record<StartTarget, { name: string; description:
 
 export const startTargetOrder: StartTarget[] = ['laptop-remote-control', 'laptop-headless', 'laptop-cloud', 'cloud-routine']
 
-export const startWorkflowOrder: StartWorkflow[] = ['feature', 'fix', 'refactor', 'docs', 'design', '3d', 'security', 'tests', 'chore', 'research']
 
 export const startAgentOrder: StartAgent[] = ['claude', 'opencode']
 

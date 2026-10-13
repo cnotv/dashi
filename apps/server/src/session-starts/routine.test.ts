@@ -16,13 +16,13 @@ describe('fireRoutine', () => {
         claude_code_session_url: 'https://claude.ai/code/session_01X',
       })
     })
-    expect(await fireRoutine('trig_01ABCDEFGHJK', routineToken, '/workflow:start fix')).toEqual({
+    expect(await fireRoutine('trig_01ABCDEFGHJK', routineToken, '/workflow:start')).toEqual({
       ok: true,
       sessionUrl: 'https://claude.ai/code/session_01X',
     })
     expect(receivedRequests[0]?.url).toBe('https://api.anthropic.com/v1/claude_code/routines/trig_01ABCDEFGHJK/fire')
     expect(receivedRequests[0]?.init.headers).toMatchObject({ Authorization: `Bearer ${routineToken}`, 'anthropic-version': '2023-06-01' })
-    expect(receivedRequests[0]?.init.body).toBe(JSON.stringify({ text: '/workflow:start fix' }))
+    expect(receivedRequests[0]?.init.body).toBe(JSON.stringify({ text: '/workflow:start' }))
   })
 
   it("passes on the API's reason when it refuses", async () => {
