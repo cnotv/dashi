@@ -425,9 +425,12 @@ OpenRouter, from the session's `ANTHROPIC_BASE_URL`.
 
 [OpenCode](https://opencode.ai) sessions show on Sessions and Usage beside Claude Code's, and an
 unattended laptop start can run on OpenCode instead: pick **OpenCode** under **Agent** in the Start
-dialog. Its model is OpenCode's own default, or an OpenRouter model (`--model openrouter/<slug>`)
-on the laptop's `OPENROUTER_API_KEY`, as above. OpenCode's permission settings decide what it may
-do; **Auto** adds `--auto`, which approves what those settings do not deny. OpenCode has no
+dialog. Its model is OpenCode's own default; one of the free models on OpenCode's own provider,
+picked under **Model** as **OpenCode** (`--model=opencode/<slug>`, no key needed); or an OpenRouter
+model (`--model=openrouter/<slug>`) on the laptop's `OPENROUTER_API_KEY`, as above. Claude Code
+starts are not offered OpenCode's models, and a start names at most one of the two. OpenCode's
+permission settings decide what it may do; **Auto** adds `--auto`, which approves what those
+settings do not deny. OpenCode has no
 Remote Control and Dashi cannot read its conversation, so it is not offered for steerable or cloud
 starts, and its sessions have no chat.
 
