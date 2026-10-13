@@ -320,7 +320,7 @@ describe('laptop starts', () => {
     const { token } = runnerTokens.createToken('Mac mini')
     const model = 'opencode/longcat-2.5-preview-free'
     const startId = await startIdOf(
-      await app.request(jsonRequest('POST', '/api/session-starts', startBody({ target: 'laptop-headless', opencodeModel: model }))),
+      await app.request(jsonRequest('POST', '/api/session-starts', startBody({ target: 'laptop-headless', agent: 'opencode', opencodeModel: model }))),
     )
     expect(await (await app.request(runnerRequest('/claim', token))).json()).toMatchObject({ start: { startId, opencodeModel: model } })
     startStore.recordOutcome(startId, { state: 'failed', sessionUrl: null, message: 'Model unavailable' })
@@ -338,11 +338,28 @@ describe('laptop starts', () => {
     )
     expect(remoteControlResponse.status).toBe(422)
     expect(await remoteControlResponse.json()).toEqual({ error: 'Only an unattended laptop session can run on an OpenCode model' })
-    const headless = { target: 'laptop-headless' }
+    const headless = { target: 'laptop-headless', agent: 'opencode' }
     expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ ...headless, opencodeModel: 'openai/gpt-5-mini' })))).status).toBe(
       400,
     )
     expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ ...headless, opencodeModel: '--model x' })))).status).toBe(400)
+  })
+
+  it('refuses an OpenCode model for Claude Code, and alongside an OpenRouter model', async () => {
+    const { app } = createTestApp()
+    const model = 'opencode/longcat-2.5-preview-free'
+    const claudeResponse = await app.request(jsonRequest('POST', '/api/session-starts', startBody({ target: 'laptop-headless', opencodeModel: model })))
+    expect(claudeResponse.status).toBe(422)
+    expect(await claudeResponse.json()).toEqual({ error: 'Only an OpenCode session can run on an OpenCode model' })
+    const bothResponse = await app.request(
+      jsonRequest(
+        'POST',
+        '/api/session-starts',
+        startBody({ target: 'laptop-headless', agent: 'opencode', opencodeModel: model, openRouterModel: 'openai/gpt-5-mini' }),
+      ),
+    )
+    expect(bothResponse.status).toBe(422)
+    expect(await bothResponse.json()).toEqual({ error: 'A start runs on an OpenRouter model or an OpenCode model, not both' })
   })
 
   it('hands the runner an unattended OpenCode start, and runs every other start on Claude Code', async () => {

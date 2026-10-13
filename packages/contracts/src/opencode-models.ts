@@ -1,10 +1,12 @@
-// The free models OpenCode's own provider offers, newest first.
-// These run on OpenCode's infrastructure at no cost, without an API key.
-export interface OpenCodeModel {
-  id: string
-  name: string
-}
+import type { OpenCodeModel } from './types.ts'
 
+// An OpenCode provider model slug such as opencode/longcat-2.5-preview-free. It becomes an argument
+// joined to --model=, so it is kept to a slug that can never pass for a flag of its own.
+export const opencodeModelPattern = /^opencode\/[a-z0-9][a-z0-9._-]{0,63}$/
+
+// The free models OpenCode's own provider offers, newest first, kept by hand. They run on OpenCode's
+// infrastructure at no cost, without an API key. The server takes any slug the pattern allows, so a
+// model missing here only needs adding to be offered.
 export const openCodeModels: OpenCodeModel[] = [
   { id: 'opencode/exo-free', name: 'Exo Free' },
   { id: 'opencode/ling-3.1-flash-free', name: 'Ling 3.1 Flash Free' },

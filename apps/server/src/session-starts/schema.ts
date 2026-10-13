@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { openRouterModelPattern, opencodeModelPattern } from '@dashi/contracts/open-router'
+import { openRouterModelPattern } from '@dashi/contracts/open-router'
+import { opencodeModelPattern } from '@dashi/contracts/opencode-models'
 
 // GitHub's own limits on owner and repository names; nothing else can become a clone path.
 const repositorySchema = z.object({

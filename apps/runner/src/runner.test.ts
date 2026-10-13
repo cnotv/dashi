@@ -70,15 +70,23 @@ describe('parseClaim', () => {
     expect(parseClaim(claimBody({ ...headless, openRouterModel: 'a/b\nANTHROPIC_BASE_URL=https://evil' }))).toBeNull()
   })
 
-  it('reads an OpenCode model only for an unattended start, and only as a model slug', () => {
-    const headless = { target: 'laptop-headless' }
+  it('reads an OpenCode model only for an unattended OpenCode start, and only as a model slug', () => {
+    const headless = { target: 'laptop-headless', agent: 'opencode' }
+    const model = 'opencode/longcat-2.5-preview-free'
     expect(claimOf().start.opencodeModel).toBeNull()
-    expect(claimOf({ ...headless, opencodeModel: 'opencode/longcat-2.5-preview-free' }).start.opencodeModel).toBe(
-      'opencode/longcat-2.5-preview-free',
-    )
-    expect(parseClaim(claimBody({ opencodeModel: 'opencode/longcat-2.5-preview-free' }))).toBeNull()
+    expect(claimOf({ ...headless, opencodeModel: model }).start.opencodeModel).toBe(model)
+    expect(parseClaim(claimBody({ opencodeModel: model }))).toBeNull()
     expect(parseClaim(claimBody({ ...headless, opencodeModel: 'openai/gpt-5-mini' }))).toBeNull()
     expect(parseClaim(claimBody({ ...headless, opencodeModel: '--model x' }))).toBeNull()
+  })
+
+  it('refuses an OpenCode model for Claude Code, and alongside an OpenRouter model', () => {
+    const model = 'opencode/longcat-2.5-preview-free'
+    expect(parseClaim(claimBody({ target: 'laptop-headless', opencodeModel: model }))).toBeNull()
+    expect(parseClaim(claimBody({ target: 'laptop-headless', agent: 'claude', opencodeModel: model }))).toBeNull()
+    expect(
+      parseClaim(claimBody({ target: 'laptop-headless', agent: 'opencode', opencodeModel: model, openRouterModel: 'openai/gpt-5-mini' })),
+    ).toBeNull()
   })
 })
 
@@ -189,7 +197,7 @@ describe('launchPlanFor', () => {
     )
   })
 
-  it("runs OpenCode on an OpenCode provider model with no key of its own", () => {
+  it('runs OpenCode on an OpenCode provider model with no key of its own', () => {
     const plan = launchPlanFor(
       claimOf({ target: 'laptop-headless', agent: 'opencode', opencodeModel: 'opencode/longcat-2.5-preview-free' }),
       paths,

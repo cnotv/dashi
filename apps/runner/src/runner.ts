@@ -204,7 +204,8 @@ const openRouterModelOf = (value: unknown): string | null | undefined => {
   return typeof value === 'string' && openRouterModelPattern.test(value) ? value : undefined
 }
 
-// An OpenCode provider model slug, or null for OpenCode's default.
+// An OpenCode provider model slug, or null for OpenCode's default. The same pattern as
+// opencodeModelPattern in packages/contracts, repeated because the runner is served as one file.
 const opencodeModelPattern = /^opencode\/[a-z0-9][a-z0-9._-]{0,63}$/
 const opencodeModelOf = (value: unknown): string | null | undefined => {
   if (value === null || value === undefined) return null
@@ -231,6 +232,7 @@ export const parseClaim = (claimBody: unknown): ClaimedStart | null => {
   if (!/^[0-9a-f-]{36}$/.test(startId) || !isSafeRepository(repository)) return null
   if (!isOneOf(laptopTargets, target) || !isOneOf(permissionModes, permissionMode)) return null
   if ((openRouterModel !== null || opencodeModel !== null || agent === 'opencode') && target !== 'laptop-headless') return null
+  if (opencodeModel !== null && (agent !== 'opencode' || openRouterModel !== null)) return null
   return { start: { startId, repository, target, agent, permissionMode, openRouterModel, opencodeModel }, prompt, sessionName, attachments }
 }
 

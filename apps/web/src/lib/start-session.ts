@@ -1,9 +1,10 @@
 import type { IssueLabel, StartAgent, StartOptions, StartTarget, StartWorkflow } from '@dashi/contracts'
-import { openRouterModelPattern, opencodeModelPattern, takesOpenCode, takesOpenRouterModel } from '@dashi/contracts/open-router'
-import { permissionModeOrders } from './presentation'
+import { openRouterModelPattern, takesOpenCode, takesOpenRouterModel } from '@dashi/contracts/open-router'
+import { opencodeModelPattern } from '@dashi/contracts/opencode-models'
+import { permissionModeOrders, startModelSourceOrders } from './presentation'
 import type { StartChoices, StartTargetAvailability } from './types'
 
-type ModelChoices = Pick<StartChoices, 'modelSource' | 'openRouterModel' | 'opencodeModel'>
+type ModelChoices = Pick<StartChoices, 'agent' | 'modelSource' | 'openRouterModel' | 'opencodeModel'>
 
 const workflowByLabel: Record<string, StartWorkflow> = {
   bug: 'fix',
@@ -71,7 +72,9 @@ export const defaultTargetFor = (options: StartOptions): StartTarget => {
 
 const isOnOpenRouter = (choices: ModelChoices, target: StartTarget): boolean => choices.modelSource === 'openrouter' && takesOpenRouterModel(target)
 
-const isOnOpenCodeModel = (choices: ModelChoices, target: StartTarget): boolean => choices.modelSource === 'opencode' && takesOpenCode(target)
+// Only OpenCode itself can run on its provider's models; Claude Code would ignore one and run on its login.
+const isOnOpenCodeModel = (choices: ModelChoices, target: StartTarget): boolean =>
+  choices.modelSource === 'opencode' && choices.agent === 'opencode' && takesOpenCode(target)
 
 /**
  * The OpenRouter model a start sends, when it runs on one.
@@ -85,11 +88,11 @@ export const openRouterModelFor = (choices: ModelChoices, target: StartTarget): 
 /**
  * The OpenCode provider model a start sends, when it runs on one.
  * @param choices What the dialog's model fields hold.
- * @param target Where the session would run; only an unattended laptop start can use an OpenCode model.
+ * @param target Where the session would run; only an unattended OpenCode start can use an OpenCode model.
  * @returns The model slug, or null for OpenCode's default.
  */
 export const opencodeModelFor = (choices: ModelChoices, target: StartTarget): string | null =>
-  isOnOpenCodeModel(choices, target) ? choices.opencodeModel.trim() : null
+  isOnOpenCodeModel(choices, target) ? choices.opencodeModel : null
 
 /**
  * Says what keeps a start's model choice from being sent.
@@ -122,13 +125,14 @@ export const agentFor = ({ agent }: Pick<StartChoices, 'agent'>, target: StartTa
   agent === 'opencode' && takesOpenCode(target) ? 'opencode' : 'claude'
 
 /**
- * Switches a start dialog's agent, keeping the permission mode when the new agent offers it.
+ * Switches a start dialog's agent, keeping the permission mode and model source when the new agent offers them.
  * @param choices What the dialog holds.
  * @param agent The agent picked.
- * @returns The choices with the agent, and a permission mode that agent has.
+ * @returns The choices with the agent, and a permission mode and model source that agent has.
  */
 export const choicesWithAgent = (choices: StartChoices, agent: StartAgent): StartChoices => ({
   ...choices,
   agent,
   permissionMode: permissionModeOrders[agent].includes(choices.permissionMode) ? choices.permissionMode : 'auto',
+  modelSource: startModelSourceOrders[agent].includes(choices.modelSource) ? choices.modelSource : 'default',
 })

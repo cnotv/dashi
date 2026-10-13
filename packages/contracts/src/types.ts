@@ -334,6 +334,12 @@ export type HeadlessPermissionMode = 'auto' | 'acceptEdits' | 'dontAsk'
 // The agent a start runs: Claude Code anywhere, OpenCode only unattended on the laptop.
 export type StartAgent = Exclude<AgentProvider, 'codex'>
 
+// A model on OpenCode's own provider, as the start dialog offers it.
+export interface OpenCodeModel {
+  id: string
+  name: string
+}
+
 export type SessionStartState = 'queued' | 'claimed' | 'started' | 'failed'
 
 export interface SessionStartRequest {
@@ -347,7 +353,8 @@ export interface SessionStartRequest {
   // An OpenRouter model slug for an unattended laptop start, run on the laptop's own OpenRouter
   // key; null runs it on the laptop's Claude login.
   openRouterModel: string | null
-  // An OpenCode provider model slug for an unattended laptop start; null uses OpenCode's default.
+  // An OpenCode provider model slug for an unattended OpenCode start; null uses OpenCode's default.
+  // A start runs on at most one of the two.
   opencodeModel: string | null
   note: string
 }

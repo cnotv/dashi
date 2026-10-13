@@ -71,11 +71,17 @@ describe('choicesWithAgent', () => {
     expect(choicesWithAgent({ ...choices, permissionMode: 'dontAsk' }, 'opencode')).toMatchObject({ permissionMode: 'dontAsk' })
     expect(choicesWithAgent({ ...choices, agent: 'opencode', permissionMode: 'dontAsk' }, 'claude')).toMatchObject({ agent: 'claude', permissionMode: 'dontAsk' })
   })
+
+  it('keeps the model source when the new agent offers it, and falls back to the default when it does not', () => {
+    const choices = { workflow: 'fix' as const, target: null, agent: 'opencode' as const, permissionMode: 'auto' as const, modelSource: 'opencode' as const, openRouterModel: '', opencodeModel: 'opencode/big-pickle' }
+    expect(choicesWithAgent(choices, 'claude')).toMatchObject({ agent: 'claude', modelSource: 'default' })
+    expect(choicesWithAgent({ ...choices, modelSource: 'openrouter' }, 'claude')).toMatchObject({ modelSource: 'openrouter' })
+  })
 })
 
 describe('the model a start runs on', () => {
-  const onOpenRouter = { modelSource: 'openrouter' as const, openRouterModel: ' meta-llama/llama-3.3-70b-instruct:free ', opencodeModel: '' }
-  const onOpenCodeModel = { modelSource: 'opencode' as const, openRouterModel: '', opencodeModel: 'opencode/longcat-2.5-preview-free' }
+  const onOpenRouter = { agent: 'claude' as const, modelSource: 'openrouter' as const, openRouterModel: ' meta-llama/llama-3.3-70b-instruct:free ', opencodeModel: '' }
+  const onOpenCodeModel = { agent: 'opencode' as const, modelSource: 'opencode' as const, openRouterModel: '', opencodeModel: 'opencode/longcat-2.5-preview-free' }
 
   it('sends an OpenRouter model only for an unattended laptop start that picked one', () => {
     expect(openRouterModelFor(onOpenRouter, 'laptop-headless')).toBe('meta-llama/llama-3.3-70b-instruct:free')
@@ -84,7 +90,8 @@ describe('the model a start runs on', () => {
     expect(openRouterModelFor({ ...onOpenRouter, modelSource: 'default' }, 'laptop-headless')).toBeNull()
   })
 
-  it('sends an OpenCode model only for an unattended laptop start that picked one', () => {
+  it('sends an OpenCode model only for an unattended OpenCode start that picked one', () => {
+    expect(opencodeModelFor({ ...onOpenCodeModel, agent: 'claude' }, 'laptop-headless')).toBeNull()
     expect(opencodeModelFor(onOpenCodeModel, 'laptop-headless')).toBe('opencode/longcat-2.5-preview-free')
     expect(opencodeModelFor(onOpenCodeModel, 'laptop-remote-control')).toBeNull()
     expect(opencodeModelFor(onOpenCodeModel, 'cloud-routine')).toBeNull()

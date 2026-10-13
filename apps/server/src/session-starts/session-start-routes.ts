@@ -115,6 +115,13 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
     if (request.opencodeModel !== null && !takesOpenCode(request.target)) {
       return { ok: false, status: 422, error: 'Only an unattended laptop session can run on an OpenCode model' }
     }
+    // Claude Code would ignore an OpenCode model and run on its own login instead.
+    if (request.opencodeModel !== null && request.agent !== 'opencode') {
+      return { ok: false, status: 422, error: 'Only an OpenCode session can run on an OpenCode model' }
+    }
+    if (request.openRouterModel !== null && request.opencodeModel !== null) {
+      return { ok: false, status: 422, error: 'A start runs on an OpenRouter model or an OpenCode model, not both' }
+    }
     const limitProblem = attachmentLimitProblem(attachments, request.target)
     if (limitProblem !== null) return { ok: false, status: 413, error: limitProblem }
     const routine = request.target === 'cloud-routine' ? routineOf(repository) : null

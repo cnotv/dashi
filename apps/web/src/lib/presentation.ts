@@ -90,11 +90,16 @@ export const startAgentOrder: StartAgent[] = ['claude', 'opencode']
 
 export const startAgentLabels: Record<StartAgent, string> = { claude: 'Claude Code', opencode: 'OpenCode' }
 
-export const startModelSourceOrder: StartModelSource[] = ['default', 'openrouter', 'opencode']
+// OpenCode's own provider serves only OpenCode, so Claude Code is never offered its models.
+export const startModelSourceOrders: Record<StartAgent, StartModelSource[]> = {
+  claude: ['default', 'openrouter'],
+  opencode: ['default', 'openrouter', 'opencode'],
+}
 
 export const startModelSourceLabels: Record<StartAgent, Record<StartModelSource, string>> = {
-  claude: { default: 'Claude login', openrouter: 'OpenRouter', opencode: 'OpenCode model' },
-  opencode: { default: "OpenCode's default", openrouter: 'OpenRouter', opencode: 'OpenCode model' },
+  claude: { default: 'Claude login', openrouter: 'OpenRouter', opencode: 'OpenCode' },
+  // Short, so three fit side by side at phone width.
+  opencode: { default: 'Default', openrouter: 'OpenRouter', opencode: 'OpenCode' },
 }
 
 // OpenCode has no edits-only mode: its own permission settings decide, and --auto approves what they do not deny.

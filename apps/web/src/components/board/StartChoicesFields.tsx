@@ -7,7 +7,7 @@ import {
   startAgentLabels,
   startAgentOrder,
   startModelSourceLabels,
-  startModelSourceOrder,
+  startModelSourceOrders,
   startTargetLabels,
   startTargetOrder,
   startWorkflowOrder,
@@ -29,6 +29,9 @@ interface StartChoicesFieldsProps {
 
 const openRouterModelsUrl = 'https://openrouter.ai/models'
 
+// The smaller size on a phone, where three model sources side by side would push the dialog off screen.
+const segmentedControlSize = { initial: '1', sm: '2' } as const
+
 type UnattendedFieldsProps = Pick<StartChoicesFieldsProps, 'choices' | 'onChange' | 'modelProblem'>
 
 const OpenRouterModelField = ({ choices, onChange, modelProblem }: UnattendedFieldsProps) => (
@@ -49,7 +52,7 @@ const OpenRouterModelField = ({ choices, onChange, modelProblem }: UnattendedFie
       </Link>
       ; one ending in :free costs nothing.
     </Text>
-    {modelProblem && choices.modelSource === 'openrouter' && (
+    {modelProblem && (
       <Text size="1" color="red">
         {modelProblem}
       </Text>
@@ -63,7 +66,7 @@ const OpenCodeModelField = ({ choices, onChange, modelProblem }: UnattendedField
       value={choices.opencodeModel}
       onValueChange={(value) => onChange({ ...choices, opencodeModel: value })}
     >
-      <Select.Trigger placeholder="Pick a model" />
+      <Select.Trigger aria-label="OpenCode model" placeholder="Pick a model" />
       <Select.Content>
         {openCodeModels.map((model) => (
           <Select.Item key={model.id} value={model.id}>
@@ -75,7 +78,7 @@ const OpenCodeModelField = ({ choices, onChange, modelProblem }: UnattendedField
     <Text size="1" color="gray">
       Runs on OpenCode&apos;s own provider at no cost, without an API key.
     </Text>
-    {modelProblem && choices.modelSource === 'opencode' && (
+    {modelProblem && (
       <Text size="1" color="red">
         {modelProblem}
       </Text>
@@ -91,6 +94,8 @@ const UnattendedFields = ({ choices, onChange, modelProblem }: UnattendedFieldsP
         Agent
       </Text>
       <SegmentedControl.Root
+        aria-label="Agent"
+        size={segmentedControlSize}
         value={choices.agent}
         onValueChange={(value) => onChange(choicesWithAgent(choices, startAgentOrder.find((agent) => agent === value) ?? 'claude'))}
       >
@@ -126,10 +131,12 @@ const UnattendedFields = ({ choices, onChange, modelProblem }: UnattendedFieldsP
         Model
       </Text>
       <SegmentedControl.Root
+        aria-label="Model"
+        size={segmentedControlSize}
         value={choices.modelSource}
-        onValueChange={(value) => onChange({ ...choices, modelSource: startModelSourceOrder.find((source) => source === value) ?? 'default' })}
+        onValueChange={(value) => onChange({ ...choices, modelSource: startModelSourceOrders[choices.agent].find((source) => source === value) ?? 'default' })}
       >
-        {startModelSourceOrder.map((source) => (
+        {startModelSourceOrders[choices.agent].map((source) => (
           <SegmentedControl.Item key={source} value={source}>
             {startModelSourceLabels[choices.agent][source]}
           </SegmentedControl.Item>
