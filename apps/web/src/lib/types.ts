@@ -10,6 +10,7 @@ import type {
   MachineTokenSummary,
   MachineTokenKind,
   MachinePlatform,
+  OpenRouterModel,
   NetlifyStatus,
   PreviewMediaKind,
   PairingApproval,
@@ -55,9 +56,9 @@ export interface StartChoices {
   agent: StartAgent
   permissionMode: HeadlessPermissionMode
   modelSource: StartModelSource
-  // As typed; read through openRouterModelFor before it is sent.
+  // As picked; read through openRouterModelFor before it is sent.
   openRouterModel: string
-  // As typed; read through opencodeModelFor before it is sent.
+  // As picked; read through opencodeModelFor before it is sent.
   opencodeModel: string
 }
 
@@ -165,6 +166,7 @@ export interface DashboardApi {
   createMachineToken: (kind: MachineTokenKind, label: string) => Promise<CreatedMachineToken>
   revokeMachineToken: (kind: MachineTokenKind, tokenId: string) => Promise<void>
   readStartOptions: (repository: RepositoryReference) => Promise<StartOptions>
+  listOpenRouterModels: () => Promise<OpenRouterModel[]>
   listSessionStarts: () => Promise<SessionStart[]>
   startSession: (submission: SessionStartSubmission) => Promise<SessionStart>
   createIssue: (repository: RepositoryReference, newIssue: NewIssueRequest) => Promise<CreatedIssue>

@@ -13,6 +13,7 @@ import { createGithubGraphqlFetcher } from './github/board.ts'
 import { createGithubRestFetcher } from './github/rest.ts'
 import { createNetlifyFetcher } from './netlify/rest.ts'
 import { loadRepositories } from './repos/load-repositories.ts'
+import { fetchOpenRouterModels } from './session-starts/open-router-models.ts'
 import { fireRoutine } from './session-starts/routine.ts'
 import { createRoutineStore, createSessionStartStore } from './session-starts/start-store.ts'
 import { resolveRuntimeSettings } from './runtime/settings.ts'
@@ -61,6 +62,7 @@ const app = createApp({
     routineStore: createRoutineStore(database),
     runnerTokens: createMachineTokenStore(database, Date.now, 'runner'),
     fireRoutine,
+    fetchOpenRouterModels,
     runnerScriptPath: join(workspaceRoot, 'apps/runner/src/runner.ts'),
   },
   activity: {

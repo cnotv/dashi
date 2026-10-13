@@ -1,4 +1,5 @@
-import { Callout, Flex, Link, RadioCards, SegmentedControl, Select, Text, TextField } from '@radix-ui/themes'
+import { Callout, Flex, Link, RadioCards, SegmentedControl, Select, Text } from '@radix-ui/themes'
+import { useOpenRouterModels } from '@/hooks/useSessionStarts'
 import type { StartOptions, StartTarget } from '@dashi/contracts'
 import { openCodeModels } from '@dashi/contracts/opencode-models'
 import {
@@ -34,31 +35,55 @@ const segmentedControlSize = { initial: '1', sm: '2' } as const
 
 type UnattendedFieldsProps = Pick<StartChoicesFieldsProps, 'choices' | 'onChange' | 'modelProblem'>
 
-const OpenRouterModelField = ({ choices, onChange, modelProblem }: UnattendedFieldsProps) => (
-  <>
-    <TextField.Root
-      aria-label="OpenRouter model"
-      placeholder="openai/gpt-5-mini"
-      autoCapitalize="none"
-      autoCorrect="off"
-      spellCheck={false}
-      value={choices.openRouterModel}
-      onChange={(changeEvent) => onChange({ ...choices, openRouterModel: changeEvent.target.value })}
-    />
-    <Text size="1" color="gray">
-      Runs on the laptop&apos;s own OPENROUTER_API_KEY, which the runner needs in its environment.{' '}
-      <Link href={openRouterModelsUrl} target="_blank" rel="noopener noreferrer">
-        Browse models
-      </Link>
-      ; one ending in :free costs nothing.
-    </Text>
-    {modelProblem && (
-      <Text size="1" color="red">
-        {modelProblem}
+const openRouterModelGroups = [
+  { label: 'Free', isFree: true },
+  { label: 'Paid', isFree: false },
+]
+
+const OpenRouterModelField = ({ choices, onChange, modelProblem }: UnattendedFieldsProps) => {
+  const { models, errorMessage } = useOpenRouterModels()
+  return (
+    <>
+      <Select.Root
+        value={choices.openRouterModel}
+        onValueChange={(value) => onChange({ ...choices, openRouterModel: value })}
+        disabled={models === null}
+      >
+        <Select.Trigger aria-label="OpenRouter model" placeholder={models === null && errorMessage === null ? 'Loading models…' : 'Pick a model'} />
+        <Select.Content position="popper">
+          {openRouterModelGroups.map((group) => (
+            <Select.Group key={group.label}>
+              <Select.Label>{group.label}</Select.Label>
+              {(models ?? [])
+                .filter((model) => model.isFree === group.isFree)
+                .map((model) => (
+                  <Select.Item key={model.id} value={model.id}>
+                    {model.name}
+                  </Select.Item>
+                ))}
+            </Select.Group>
+          ))}
+        </Select.Content>
+      </Select.Root>
+      <Text size="1" color="gray">
+        Runs on the laptop&apos;s own OPENROUTER_API_KEY, which the runner needs in its environment; a free model costs nothing.{' '}
+        <Link href={openRouterModelsUrl} target="_blank" rel="noopener noreferrer">
+          Compare models
+        </Link>
       </Text>
-    )}
-  </>
-)
+      {errorMessage !== null && (
+        <Text size="1" color="red">
+          Could not load OpenRouter&apos;s models: {errorMessage}
+        </Text>
+      )}
+      {modelProblem && (
+        <Text size="1" color="red">
+          {modelProblem}
+        </Text>
+      )}
+    </>
+  )
+}
 
 const OpenCodeModelField = ({ choices, onChange, modelProblem }: UnattendedFieldsProps) => (
   <>

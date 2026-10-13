@@ -80,7 +80,7 @@ describe('choicesWithAgent', () => {
 })
 
 describe('the model a start runs on', () => {
-  const onOpenRouter = { agent: 'claude' as const, modelSource: 'openrouter' as const, openRouterModel: ' meta-llama/llama-3.3-70b-instruct:free ', opencodeModel: '' }
+  const onOpenRouter = { agent: 'claude' as const, modelSource: 'openrouter' as const, openRouterModel: 'meta-llama/llama-3.3-70b-instruct:free', opencodeModel: '' }
   const onOpenCodeModel = { agent: 'opencode' as const, modelSource: 'opencode' as const, openRouterModel: '', opencodeModel: 'opencode/longcat-2.5-preview-free' }
 
   it('sends an OpenRouter model only for an unattended laptop start that picked one', () => {
@@ -100,7 +100,7 @@ describe('the model a start runs on', () => {
 
   it('holds the start back until an OpenRouter model reads as a model slug', () => {
     expect(startModelProblemFor(onOpenRouter, 'laptop-headless')).toBeNull()
-    expect(startModelProblemFor({ ...onOpenRouter, openRouterModel: '' }, 'laptop-headless')).toBe('Name the OpenRouter model to run on')
+    expect(startModelProblemFor({ ...onOpenRouter, openRouterModel: '' }, 'laptop-headless')).toBe('Pick an OpenRouter model to run on')
     expect(startModelProblemFor({ ...onOpenRouter, openRouterModel: 'gpt 5' }, 'laptop-headless')).toBe(
       'An OpenRouter model reads like provider/model, such as openai/gpt-5-mini',
     )

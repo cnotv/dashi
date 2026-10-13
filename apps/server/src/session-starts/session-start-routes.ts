@@ -20,12 +20,15 @@ import { findRepository } from '../repos/load-repositories.ts'
 import { sessionNameFor, sessionPromptFor } from '@dashi/contracts/first-message'
 import { takesOpenCode, takesOpenRouterModel } from '@dashi/contracts/open-router'
 import { attachmentDeliveryFor, attachmentLimitProblem, attachmentLimits } from './attachments.ts'
+import { createOpenRouterModelCache } from './open-router-models.ts'
 import { routineSettingsBodySchema, runnerReportSchema, sessionStartSubmissionSchema } from './schema.ts'
 import type { MachineTokenStore } from '../machine-tokens/types.ts'
 import type { SessionStartDependencies } from './types.ts'
 
 // A runner asks every few seconds, so one silent for this long is taken to be off.
 const runnerOnlineMilliseconds = 30_000
+// OpenRouter adds models every few days, so an hour-old list is current enough for the dialog.
+const openRouterModelsCacheMilliseconds = 60 * 60 * 1000
 const createTokenBodySchema = z.object({ label: z.string().trim().min(1).max(80) })
 // Room for the largest attachments a laptop session takes, once base64 and JSON have grown them.
 const sessionStartBodyBytes = 12 * 1024 * 1024
@@ -75,8 +78,10 @@ export const createRunnerTokenGuard = (runnerTokens: MachineTokenStore) =>
  * @returns The routes, mounted under /api.
  */
 export const createSessionStartRoutes = (dependencies: SessionStartDependencies) => {
-  const { startStore, routineStore, runnerTokens, vault, repositories, fireRoutine, attachmentRelay, markPullRequestDraft, now } = dependencies
+  const { startStore, routineStore, runnerTokens, vault, repositories, fireRoutine, fetchOpenRouterModels, attachmentRelay, markPullRequestDraft, now } =
+    dependencies
   const routes = new Hono<AppEnvironment>()
+  const readOpenRouterModels = createOpenRouterModelCache(fetchOpenRouterModels, now, openRouterModelsCacheMilliseconds)
 
   const repositoryOf = (owner: string, name: string): RepositoryReference | undefined => findRepository(repositories, owner, name)
   const routineOf = (repository: RepositoryReference): { routineId: string; routineToken: string } | null => {
@@ -94,6 +99,11 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
       attachmentLimits,
     }
     return context.json(options)
+  })
+
+  routes.get('/openrouter-models', async (context) => {
+    const models = await readOpenRouterModels()
+    return models === null ? context.json({ error: "OpenRouter's model list could not be reached" }, 502) : context.json(models)
   })
 
   // The attachments are never stored: a laptop start's wait in memory for its runner, and a

@@ -404,6 +404,13 @@ export interface AttachmentLimits {
   inlineTargetBytes: number
 }
 
+// A model OpenRouter serves, as the start dialog offers it. A free one costs nothing on the laptop's key.
+export interface OpenRouterModel {
+  id: string
+  name: string
+  isFree: boolean
+}
+
 export interface StartOptions {
   runners: RunnerPresence[]
   routineConfigured: boolean

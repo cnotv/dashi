@@ -27,7 +27,7 @@ import {
   sampleUsageReport,
 } from './sample-activity'
 import { applyDemoPullRequestOutcomes, demoMediaUrls, sampleBoardColumns, samplePullRequestFiles } from './sample-board'
-import { demoUser, sampleRepositories, sampleSecrets } from './sample-data'
+import { demoUser, sampleOpenRouterModels, sampleRepositories, sampleSecrets } from './sample-data'
 
 // The same limits the server answers with, so the dialog behaves as it would against one.
 const demoAttachmentLimits = { fileCount: 5, fileTargetBytes: 8 * 1024 * 1024, inlineTargetBytes: 40 * 1024 }
@@ -228,6 +228,7 @@ export const createDemoApi = (): DashboardApi => {
       demoMemory.createdIssues = new Map([...demoMemory.createdIssues, [repositoryKey(repository), [issue, ...createdIssues]]])
       return { number: issueNumber, url }
     },
+    listOpenRouterModels: async () => sampleOpenRouterModels,
     listSessionStarts: async () => demoMemory.sessionStarts,
     startSession: async ({ attachments, ...request }) => {
       const now = new Date().toISOString()

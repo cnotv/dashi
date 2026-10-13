@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { RepositoryReference, StartOptions, StartWorkflow } from '@dashi/contracts'
+import type { OpenRouterModel, RepositoryReference, StartOptions, StartWorkflow } from '@dashi/contracts'
 import { dashboardApi } from '@/lib/api'
 import { errorMessageOf } from '@/lib/presentation'
 import { defaultTargetFor, startModelProblemFor, targetAvailabilityFor } from '@/lib/start-session'
@@ -37,6 +37,28 @@ export const useStartOptions = (repository: RepositoryReference, isOpen: boolean
       request.isCurrent = false
     }
   }, [repository, isOpen])
+
+  return result
+}
+
+/**
+ * Loads the models OpenRouter serves. The OpenRouter model field calls it, so nothing is read
+ * until a start's model is set to OpenRouter.
+ * @returns The models, or null until they arrive, and any error.
+ */
+export const useOpenRouterModels = () => {
+  const [result, setResult] = useState<{ models: OpenRouterModel[] | null; errorMessage: string | null }>({ models: null, errorMessage: null })
+
+  useEffect(() => {
+    const request = { isCurrent: true }
+    dashboardApi
+      .listOpenRouterModels()
+      .then((models) => request.isCurrent && setResult({ models, errorMessage: null }))
+      .catch((loadError: unknown) => request.isCurrent && setResult({ models: null, errorMessage: errorMessageOf(loadError) }))
+    return () => {
+      request.isCurrent = false
+    }
+  }, [])
 
   return result
 }

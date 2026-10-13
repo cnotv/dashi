@@ -83,7 +83,7 @@ const isOnOpenCodeModel = (choices: ModelChoices, target: StartTarget): boolean 
  * @returns The model slug, or null for the Claude login.
  */
 export const openRouterModelFor = (choices: ModelChoices, target: StartTarget): string | null =>
-  isOnOpenRouter(choices, target) ? choices.openRouterModel.trim() : null
+  isOnOpenRouter(choices, target) ? choices.openRouterModel : null
 
 /**
  * The OpenCode provider model a start sends, when it runs on one.
@@ -103,7 +103,7 @@ export const opencodeModelFor = (choices: ModelChoices, target: StartTarget): st
 export const startModelProblemFor = (choices: ModelChoices, target: StartTarget): string | null => {
   const openRouterModel = openRouterModelFor(choices, target)
   if (openRouterModel !== null) {
-    if (openRouterModel === '') return 'Name the OpenRouter model to run on'
+    if (openRouterModel === '') return 'Pick an OpenRouter model to run on'
     return openRouterModelPattern.test(openRouterModel) ? null : 'An OpenRouter model reads like provider/model, such as openai/gpt-5-mini'
   }
   const opencodeModel = opencodeModelFor(choices, target)

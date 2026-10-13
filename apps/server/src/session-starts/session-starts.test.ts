@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { createDraftGithub, createTestApp, getRequest, jsonRequest } from '../app/test-app.ts'
+import { createDraftGithub, createTestApp, getRequest, jsonRequest, testOpenRouterModels } from '../app/test-app.ts'
 import { sessionNameFor, sessionPromptFor } from '@dashi/contracts/first-message'
 
 const repository = { owner: 'cnotv', name: 'generative-art' }
@@ -391,6 +391,26 @@ describe('laptop starts', () => {
     expect(scriptResponse.status).toBe(200)
     expect(await scriptResponse.text()).toContain('DASHI_RUNNER_TOKEN')
     expect((await app.request(getRequest('/api/session-starts'))).status).toBe(401)
+  })
+})
+
+describe('OpenRouter models', () => {
+  it("serves OpenRouter's models and asks OpenRouter again only once the list is an hour old", async () => {
+    const clock = { now: 0 }
+    const { app, openRouterModelFetches } = createTestApp({}, {}, clock)
+    expect(await (await app.request(getRequest('/api/openrouter-models'))).json()).toEqual(testOpenRouterModels)
+    clock.now = 59 * 60 * 1000
+    await app.request(getRequest('/api/openrouter-models'))
+    expect(openRouterModelFetches).toEqual([0])
+    clock.now = 61 * 60 * 1000
+    await app.request(getRequest('/api/openrouter-models'))
+    expect(openRouterModelFetches).toEqual([0, 61 * 60 * 1000])
+  })
+
+  it('serves the models only to a signed-in browser on an allowed host', async () => {
+    expect((await createTestApp({}, { signInRequired: true }).app.request(getRequest('/api/openrouter-models'))).status).toBe(401)
+    const attackerRequest = new Request('http://attacker.example/api/openrouter-models', { headers: { host: 'attacker.example' } })
+    expect((await createTestApp().app.request(attackerRequest)).status).toBe(403)
   })
 })
 

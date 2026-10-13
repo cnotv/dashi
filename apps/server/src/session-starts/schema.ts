@@ -57,3 +57,13 @@ export const routineFireResponseSchema = z.object({
 })
 
 export const anthropicErrorSchema = z.object({ error: z.object({ message: z.string() }) })
+
+// OpenRouter's GET /api/v1/models answer. Each model is read on its own, so one it changes the
+// shape of drops out of the list instead of taking the whole list down.
+export const openRouterModelListSchema = z.object({ data: z.array(z.unknown()) })
+
+export const openRouterModelEntrySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  pricing: z.object({ prompt: z.string(), completion: z.string() }),
+})

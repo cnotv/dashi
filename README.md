@@ -404,8 +404,9 @@ start with the same request (without attachments, which are never kept).
 ### Run on an OpenRouter model
 
 An unattended laptop start can run on any [OpenRouter model](https://openrouter.ai/models) instead
-of the laptop's Claude login: pick **OpenRouter** under **Model** in the Start dialog and type the
-model's slug, such as `openai/gpt-5-mini`; one ending in `:free` costs nothing. Only unattended
+of the laptop's Claude login: pick **OpenRouter** under **Model** in the Start dialog, then the model
+from the list, where the free ones come first. The dashboard reads that list from OpenRouter's public
+`GET https://openrouter.ai/api/v1/models`, which needs no key, and keeps it for an hour. Only unattended
 starts can: Remote Control needs a claude.ai login, and a cloud session runs in Anthropic's cloud.
 
 The runner starts Claude Code with the environment
