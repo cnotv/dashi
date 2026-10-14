@@ -22,3 +22,14 @@ export const blobSchema = z.object({ content: z.string(), encoding: z.literal('b
 export const pullRequestLinkSchema = z.object({ number: z.number().int().positive(), html_url: z.string().url() })
 
 export const openPullRequestsSchema = z.array(pullRequestLinkSchema)
+
+export const settingsObjectSchema = z.record(z.string(), z.unknown())
+
+// A settings file declares the plugin when it registers agent-base as the cnotv marketplace and
+// enables the workflow plugin from it; any other settings may sit alongside.
+export const pluginDeclarationSchema = z.object({
+  extraKnownMarketplaces: z.object({
+    cnotv: z.object({ source: z.object({ source: z.literal('github'), repo: z.literal('cnotv/agent-base') }) }),
+  }),
+  enabledPlugins: z.object({ 'workflow@cnotv': z.literal(true) }),
+})

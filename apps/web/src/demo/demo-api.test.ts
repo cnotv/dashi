@@ -149,10 +149,10 @@ describe('createDemoApi', () => {
   it('asks to add the workflow skills to the first repository and remembers the pull request it opens', async () => {
     const demoApi = createDemoApi()
     const [firstRepository, secondRepository] = await demoApi.listRepositories()
-    expect(await demoApi.readWorkflowSkills(firstRepository!)).toMatchObject({ state: 'missing' })
+    expect(await demoApi.readWorkflowSkills(firstRepository!)).toMatchObject({ state: 'copied' })
     expect(await demoApi.readWorkflowSkills(secondRepository!)).toMatchObject({ state: 'current' })
     const pullRequest = await demoApi.addWorkflowSkills(firstRepository!)
-    expect(await demoApi.readWorkflowSkills(firstRepository!)).toEqual({ state: 'pull-request-open', changedFileCount: 12, pullRequestUrl: pullRequest.url })
+    expect(await demoApi.readWorkflowSkills(firstRepository!)).toEqual({ state: 'pull-request-open', copiedFileCount: 12, pullRequestUrl: pullRequest.url })
   })
 
   it('enables Netlify for a repository in memory only', async () => {

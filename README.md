@@ -518,16 +518,19 @@ another routine; generate a new one, save it, and test.
 
 ### Workflow skills in the repository
 
-A cloud session, routine or not, does not install the plugins a repository enables in
-`.claude/settings.json`, so it never gets agent-base's workflow plugin. It does load the skills
-committed under `.claude/skills/`. When a repository on the board lacks agent-base's workflow
-skills there, or holds an older copy, the board asks to add them. **Add them in a pull request**
-copies every file under agent-base's `plugins/workflow/skills/` into `.claude/skills/`, unchanged,
-on the `chore/workflow-skills` branch, and opens the pull request with your GitHub access, which
-needs write access to contents and pull requests. While it is open, the board links to it; **Not
-now** hides the question until the next visit. When agent-base changes its skills, the board
-offers the update the same way. A local session that also has the plugin lists each skill twice,
-once as `workflow:<name>` and once as `<name>`; they are the same files.
+Every Claude Code session, local or cloud, routine or not, installs the plugins a repository
+enables in `.claude/settings.json`, so agent-base's workflow skills reach a repository through
+that declaration alone, as `/workflow:<name>`. A copy of one of them under `.claude/skills/` loads a
+second time under its bare name and drifts from the plugin, so the board checks for both. When a
+repository on the board does not enable `workflow@cnotv` from the `cnotv` marketplace, or keeps
+copies of the plugin's skills, the board asks to fix it. **Enable the plugin in a pull request**
+(or **Remove the copies**) adds the marketplace and the plugin to `.claude/settings.json`, keeping
+every other setting, and deletes every file under a `.claude/skills/<name>/` folder whose name the
+plugin also uses. Skills the repository wrote itself, under names of their own, stay. It commits on
+the `chore/workflow-plugin` branch and opens the pull request with your GitHub access, which needs
+write access to contents and pull requests. While it is open, the board links to it; **Not now**
+hides the question until the next visit. A settings file that is not a JSON object is left for you
+to fix by hand.
 
 ## Merge and close
 

@@ -40,7 +40,7 @@ const WorkflowSkillsQuestion = ({ entry, onAdd, onDismiss }: WorkflowSkillsQuest
           </Button>
         ) : (
           <Button size="1" onClick={() => void add()} loading={isAdding}>
-            {status.state === 'outdated' ? 'Update them in a pull request' : 'Add them in a pull request'}
+            {status.state === 'copied' ? 'Remove the copies in a pull request' : 'Enable the plugin in a pull request'}
           </Button>
         )}
         <Button size="1" variant="soft" color="gray" onClick={() => onDismiss(repository)}>
@@ -52,9 +52,10 @@ const WorkflowSkillsQuestion = ({ entry, onAdd, onDismiss }: WorkflowSkillsQuest
 }
 
 /**
- * Asks, above the board, to add agent-base's workflow skills to each shown repository that lacks
- * them or holds an older copy, by a pull request that copies them into .claude/skills/. Not now
- * hides the question until the next visit; while the pull request is open it links to it instead.
+ * Asks, above the board, to fix each shown repository that does not enable agent-base's workflow
+ * plugin or keeps copies of its skills, by a pull request that declares the plugin in
+ * .claude/settings.json and deletes the copies. Not now hides the question until the next visit;
+ * while the pull request is open it links to it instead.
  */
 export const WorkflowSkillsPrompt = ({ repositories }: { repositories: RepositoryReference[] }) => {
   const toast = useToast()
