@@ -1,7 +1,7 @@
 ---
 name: security-audit
 description: >-
-  Use for anything security-shaped — "is this secure", "audit the dependencies", "check for
+  Use when anything is security-shaped — "is this secure", "audit the dependencies", "check for
   vulnerabilities", "security review", "pentest", "harden this", a Dependabot or npm audit
   alert, a CVE, a leaked key, XSS, injection, CSRF, SSRF, auth or session bugs — and from
   `finish-change` when a diff touches authentication, sessions, input handling, file or

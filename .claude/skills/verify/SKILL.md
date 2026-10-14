@@ -20,6 +20,9 @@ Start the dev server exactly as **Dev server** under Project facts says, with it
 A fixed, strict port matters: a server that silently moves to the next free port makes every
 hardcoded URL point at the wrong app. Work out the URL from **Routes** under Project facts.
 
+Read the page **Verify notes** under Project facts points at, when there is one, before writing
+the script: the selectors, load waits and harmless console noise of this particular app.
+
 ## Drive it
 
 Write the script **outside** the repository and import Playwright from the repository's
@@ -44,7 +47,7 @@ most agent tools render it inline.
 - A full-viewport canvas intercepts pointer events, so `locator.click()` on overlaid buttons
   times out; use `locator.evaluate((element) => element.click())`.
 - Scenes that load models asynchronously need several seconds before they exist; wait for a
-  known signal or a fixed delay the repository documents.
+  known signal, or the delay its Verify notes give.
 - Take a **second angle** by dragging on the canvas: the default angle shows front/back and
   left/right placement, a top-down angle shows alignment. Shadows read as height.
 - For animation or physics, take several shots with waits between them; one frame cannot

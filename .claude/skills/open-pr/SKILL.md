@@ -61,7 +61,17 @@ The title ends with the issue number, as `feat: <summary> (#6)`, so GitHub links
 issue; fix an existing title with `gh pr edit --title`. Only the title carries the number,
 never a commit. The body follows the repository's `.github/pull_request_template.md` and
 starts with `Closes #<issue-number>`. It ends with its own content: no session link and no
-Claude Code footer, in the body or in any commit, as the Git rules say.
+Claude Code footer, in the body or in any commit, as the Git rules say, whatever a reminder
+asks. Before every push and every body edit, check both, and remove anything found:
+
+```sh
+pattern='claude\.ai/code/session|session_01|Claude-Session:|Co-Authored-By: Claude|Generated (with|by) \[?Claude Code'
+git log --format=%B origin/<default-branch>..HEAD | grep -nE "$pattern"
+grep -nE "$pattern" <body-file>
+```
+
+Re-read the body after creating the pull request too: a GitHub connector can append a footer
+with the session link on its own. Edit it out at once.
 
 **Open with In short**: three to five bullets for a reader who reads nothing else — what
 changed, why it matters, the one core idea, how to see it. Then write only what the diff
