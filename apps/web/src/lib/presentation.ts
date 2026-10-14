@@ -9,7 +9,6 @@ import type {
   SessionStartState,
   StartAgent,
   StartTarget,
-  StartWorkflow,
 } from '@dashi/contracts'
 import type { GateRingGroup, RadixColor, StartModelSource } from './types'
 
@@ -84,17 +83,21 @@ export const startTargetLabels: Record<StartTarget, { name: string; description:
 
 export const startTargetOrder: StartTarget[] = ['laptop-remote-control', 'laptop-headless', 'laptop-cloud', 'cloud-routine']
 
-export const startWorkflowOrder: StartWorkflow[] = ['feature', 'fix', 'refactor', 'docs', 'design', '3d', 'security', 'tests', 'chore', 'research']
 
 export const startAgentOrder: StartAgent[] = ['claude', 'opencode']
 
 export const startAgentLabels: Record<StartAgent, string> = { claude: 'Claude Code', opencode: 'OpenCode' }
 
-export const startModelSourceOrder: StartModelSource[] = ['default', 'openrouter']
+// OpenCode's own provider serves only OpenCode, so Claude Code is never offered its models.
+export const startModelSourceOrders: Record<StartAgent, StartModelSource[]> = {
+  claude: ['default', 'openrouter'],
+  opencode: ['default', 'openrouter', 'opencode'],
+}
 
 export const startModelSourceLabels: Record<StartAgent, Record<StartModelSource, string>> = {
-  claude: { default: 'Claude login', openrouter: 'OpenRouter' },
-  opencode: { default: "OpenCode's default", openrouter: 'OpenRouter' },
+  claude: { default: 'Claude login', openrouter: 'OpenRouter', opencode: 'OpenCode' },
+  // Short, so three fit side by side at phone width.
+  opencode: { default: 'Default', openrouter: 'OpenRouter', opencode: 'OpenCode' },
 }
 
 // OpenCode has no edits-only mode: its own permission settings decide, and --auto approves what they do not deny.

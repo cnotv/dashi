@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { openRouterModelPattern } from '@dashi/contracts/open-router'
+import { opencodeModelPattern } from '@dashi/contracts/opencode-models'
 
 // GitHub's own limits on owner and repository names; nothing else can become a clone path.
 const repositorySchema = z.object({
@@ -7,18 +8,28 @@ const repositorySchema = z.object({
   name: z.string().regex(/^[A-Za-z0-9._-]{1,100}$/).refine((name) => name !== '.' && name !== '..'),
 })
 
-export const startWorkflowSchema = z.enum(['research', 'feature', 'fix', 'refactor', 'docs', 'design', '3d', 'security', 'tests', 'chore', 'conflicts'])
 
 export const sessionStartRequestSchema = z.object({
   repository: repositorySchema,
   issueNumber: z.number().int().positive().nullable(),
   pullRequestNumber: z.number().int().positive().nullable().default(null),
-  workflow: startWorkflowSchema,
+  workflow: z.enum(['conflicts']).nullable().default(null),
   target: z.enum(['laptop-remote-control', 'laptop-headless', 'laptop-cloud', 'cloud-routine']),
   agent: z.enum(['claude', 'opencode']).default('claude'),
   permissionMode: z.enum(['auto', 'acceptEdits', 'dontAsk']).default('auto'),
   openRouterModel: z.string().regex(openRouterModelPattern).nullable().default(null),
+  opencodeModel: z.string().regex(opencodeModelPattern).nullable().default(null),
   note: z.string().trim().max(20000).default(''),
+})
+
+// A start stored before the agent picked its own workflow names one, such as fix; it reads back
+// as null, so the agent picks again on a retry. Only a conflicts start keeps its workflow.
+export const storedSessionStartRequestSchema = sessionStartRequestSchema.extend({
+  workflow: z
+    .string()
+    .nullable()
+    .default(null)
+    .transform((workflow) => (workflow === 'conflicts' ? workflow : null)),
 })
 
 // The runner writes each name as a file name, so it is a plain base name and nothing else.
@@ -55,3 +66,13 @@ export const routineFireResponseSchema = z.object({
 })
 
 export const anthropicErrorSchema = z.object({ error: z.object({ message: z.string() }) })
+
+// OpenRouter's GET /api/v1/models answer. Each model is read on its own, so one it changes the
+// shape of drops out of the list instead of taking the whole list down.
+export const openRouterModelListSchema = z.object({ data: z.array(z.unknown()) })
+
+export const openRouterModelEntrySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  pricing: z.object({ prompt: z.string(), completion: z.string() }),
+})

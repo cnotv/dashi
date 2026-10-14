@@ -10,6 +10,7 @@ import type {
   MachineTokenSummary,
   MachineTokenKind,
   MachinePlatform,
+  OpenRouterModel,
   NetlifyStatus,
   PreviewMediaKind,
   PairingApproval,
@@ -36,7 +37,6 @@ import type {
   HeadlessPermissionMode,
   StartAttachment,
   StartTarget,
-  StartWorkflow,
   StartOptions,
   UsageReport,
   WorkflowSkillsPullRequest,
@@ -45,18 +45,19 @@ import type {
 } from '@dashi/contracts'
 
 // What an unattended laptop start runs on: the agent's own default (the laptop's Claude login, or OpenCode's
-// configured model), or an OpenRouter model on the laptop's own key.
-export type StartModelSource = 'default' | 'openrouter'
+// configured model), an OpenRouter model on the laptop's own key, or an OpenCode provider model.
+export type StartModelSource = 'default' | 'openrouter' | 'opencode'
 
 export interface StartChoices {
-  workflow: StartWorkflow
   target: StartTarget | null
   // Read through agentFor: only an unattended laptop start can run OpenCode.
   agent: StartAgent
   permissionMode: HeadlessPermissionMode
   modelSource: StartModelSource
-  // As typed; read through openRouterModelFor before it is sent.
+  // As picked; read through openRouterModelFor before it is sent.
   openRouterModel: string
+  // As picked; read through opencodeModelFor before it is sent.
+  opencodeModel: string
 }
 
 export interface PickedAttachment {
@@ -163,6 +164,7 @@ export interface DashboardApi {
   createMachineToken: (kind: MachineTokenKind, label: string) => Promise<CreatedMachineToken>
   revokeMachineToken: (kind: MachineTokenKind, tokenId: string) => Promise<void>
   readStartOptions: (repository: RepositoryReference) => Promise<StartOptions>
+  listOpenRouterModels: () => Promise<OpenRouterModel[]>
   listSessionStarts: () => Promise<SessionStart[]>
   startSession: (submission: SessionStartSubmission) => Promise<SessionStart>
   createIssue: (repository: RepositoryReference, newIssue: NewIssueRequest) => Promise<CreatedIssue>

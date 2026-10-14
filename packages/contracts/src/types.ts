@@ -314,18 +314,9 @@ export interface CreatedMachineToken {
   token: string
 }
 
-export type StartWorkflow =
-  | 'research'
-  | 'feature'
-  | 'fix'
-  | 'refactor'
-  | 'docs'
-  | 'design'
-  | '3d'
-  | 'security'
-  | 'tests'
-  | 'chore'
-  | 'conflicts'
+// The one workflow a start names itself: a merge-conflict start already knows its job. Every
+// other start leaves the workflow to the agent's start skill, which reads the request.
+export type StartWorkflow = 'conflicts'
 
 export type StartTarget = 'laptop-remote-control' | 'laptop-headless' | 'laptop-cloud' | 'cloud-routine'
 
@@ -334,19 +325,29 @@ export type HeadlessPermissionMode = 'auto' | 'acceptEdits' | 'dontAsk'
 // The agent a start runs: Claude Code anywhere, OpenCode only unattended on the laptop.
 export type StartAgent = Exclude<AgentProvider, 'codex'>
 
+// A model on OpenCode's own provider, as the start dialog offers it.
+export interface OpenCodeModel {
+  id: string
+  name: string
+}
+
 export type SessionStartState = 'queued' | 'claimed' | 'started' | 'failed'
 
 export interface SessionStartRequest {
   repository: RepositoryReference
   issueNumber: number | null
   pullRequestNumber: number | null
-  workflow: StartWorkflow
+  // Null lets the agent pick the workflow.
+  workflow: StartWorkflow | null
   target: StartTarget
   agent: StartAgent
   permissionMode: HeadlessPermissionMode
   // An OpenRouter model slug for an unattended laptop start, run on the laptop's own OpenRouter
   // key; null runs it on the laptop's Claude login.
   openRouterModel: string | null
+  // An OpenCode provider model slug for an unattended OpenCode start; null uses OpenCode's default.
+  // A start runs on at most one of the two.
+  opencodeModel: string | null
   note: string
 }
 
@@ -393,6 +394,13 @@ export interface AttachmentLimits {
   fileCount: number
   fileTargetBytes: number
   inlineTargetBytes: number
+}
+
+// A model OpenRouter serves, as the start dialog offers it. A free one costs nothing on the laptop's key.
+export interface OpenRouterModel {
+  id: string
+  name: string
+  isFree: boolean
 }
 
 export interface StartOptions {

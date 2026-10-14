@@ -1,6 +1,7 @@
 import { ChatBubbleIcon, ExternalLinkIcon, InfoCircledIcon } from '@radix-ui/react-icons'
 import { Badge, Card, Flex, Heading, IconButton, Link, Table, Text, Tooltip } from '@radix-ui/themes'
 import type { SessionStart } from '@dashi/contracts'
+import { sessionNameFor } from '@dashi/contracts/first-message'
 import { SourceTags } from '@/components/charts/SourceTags'
 import { sessionStartStateColors, sessionStartStateLabels, startTargetLabels } from '@/lib/presentation'
 import { canChatWithStart } from '@/lib/session-chat'
@@ -23,7 +24,7 @@ const StartActions = ({ start, onOpenChat, onOpenDetails }: { start: SessionStar
         size="1"
         variant="ghost"
         color={start.state === 'failed' ? 'red' : 'gray'}
-        aria-label={`Details of ${start.repository.name} ${start.workflow}`}
+        aria-label={`Details of ${sessionNameFor(start)}`}
         onClick={() => onOpenDetails(start)}
       >
         <InfoCircledIcon />
@@ -31,7 +32,7 @@ const StartActions = ({ start, onOpenChat, onOpenDetails }: { start: SessionStar
     </Tooltip>
     {canChatWithStart(start) && (
       <Tooltip content="Open the conversation">
-        <IconButton size="1" variant="ghost" aria-label={`Chat with ${start.repository.name} ${start.workflow}`} onClick={() => onOpenChat(start)}>
+        <IconButton size="1" variant="ghost" aria-label={`Chat with ${sessionNameFor(start)}`} onClick={() => onOpenChat(start)}>
           <ChatBubbleIcon />
         </IconButton>
       </Tooltip>
@@ -106,8 +107,7 @@ export const SessionStartsList = ({ starts, windowHours, windowStartedAt, onOpen
                   </Table.Cell>
                   <Table.RowHeaderCell>
                     <Text size="2">
-                      {start.repository.name}
-                      {start.issueNumber === null ? '' : ` #${start.issueNumber}`} · {start.workflow}
+                      {sessionNameFor(start)}
                     </Text>
                   </Table.RowHeaderCell>
                   <Table.Cell>

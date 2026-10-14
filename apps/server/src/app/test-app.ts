@@ -19,6 +19,11 @@ export const testHost = 'localhost:4317'
 
 export const signedVideoUrl = 'https://private-user-images.githubusercontent.com/1/video.mp4?jwt=signed'
 
+export const testOpenRouterModels = [
+  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Meta: Llama 3.3 70B Instruct (free)', isFree: true },
+  { id: 'openai/gpt-5-mini', name: 'OpenAI: GPT-5 Mini', isFree: false },
+]
+
 const pullRequestBodyHtmlFixture = {
   data: {
     repository: {
@@ -48,6 +53,7 @@ export const createTestApp = (
   const runnerTokens = createMachineTokenStore(database, () => clock.now, 'runner')
   const startStore = createSessionStartStore(database, () => clock.now)
   const firedRoutines: { routineId: string; routineToken: string; text: string }[] = []
+  const openRouterModelFetches: number[] = []
   const receivedTokens: string[] = []
   const receivedRestRequests: ReceivedRestRequest[] = []
   const app = createApp({
@@ -68,6 +74,10 @@ export const createTestApp = (
       fireRoutine: async (routineId, routineToken, text) => {
         firedRoutines.push({ routineId, routineToken, text })
         return { ok: true, sessionUrl: 'https://claude.ai/code/session_01Fired' }
+      },
+      fetchOpenRouterModels: async () => {
+        openRouterModelFetches.push(clock.now)
+        return testOpenRouterModels
       },
       runnerScriptPath: fileURLToPath(new URL('../../../runner/src/runner.ts', import.meta.url)),
     },
@@ -92,7 +102,19 @@ export const createTestApp = (
     now: () => clock.now,
     ...overrides,
   })
-  return { app, vault, database, receivedTokens, receivedRestRequests, activityStore, ingestTokens, runnerTokens, startStore, firedRoutines }
+  return {
+    app,
+    vault,
+    database,
+    receivedTokens,
+    receivedRestRequests,
+    activityStore,
+    ingestTokens,
+    runnerTokens,
+    startStore,
+    firedRoutines,
+    openRouterModelFetches,
+  }
 }
 
 /**

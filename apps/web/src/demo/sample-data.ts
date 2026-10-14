@@ -1,10 +1,20 @@
-import type { RepositoryReference, SecretSummary, SignedInUser } from '@dashi/contracts'
+import type { OpenRouterModel, RepositoryReference, SecretSummary, SignedInUser } from '@dashi/contracts'
 
 export const demoUser: SignedInUser = { login: 'demo', avatarUrl: '' }
 
 export const sampleRepositories: RepositoryReference[] = [
   { owner: 'cnotv', name: 'example' },
   { owner: 'cnotv', name: 'example-api' },
+]
+
+// A few of OpenRouter's models, as the dashboard serves them: sorted by name, free ones marked.
+export const sampleOpenRouterModels: OpenRouterModel[] = [
+  { id: 'anthropic/claude-sonnet-4.5', name: 'Anthropic: Claude Sonnet 4.5', isFree: false },
+  { id: 'deepseek/deepseek-chat-v3.1:free', name: 'DeepSeek: DeepSeek V3.1 (free)', isFree: true },
+  { id: 'google/gemini-2.5-flash', name: 'Google: Gemini 2.5 Flash', isFree: false },
+  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Meta: Llama 3.3 70B Instruct (free)', isFree: true },
+  { id: 'openai/gpt-5-mini', name: 'OpenAI: GPT-5 Mini', isFree: false },
+  { id: 'qwen/qwen3-coder:free', name: 'Qwen: Qwen3 Coder 480B A35B (free)', isFree: true },
 ]
 
 export const sampleSecrets: SecretSummary[] = [

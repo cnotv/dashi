@@ -30,8 +30,8 @@ const claimBody = (overrides: Record<string, unknown> = {}) => ({
     permissionMode: 'auto',
     ...overrides,
   },
-  prompt: '/workflow:start fix https://github.com/cnotv/generative-art/issues/42\n\nKeep it small; $(rm -rf ~) stays text',
-  sessionName: 'generative-art #42 fix',
+  prompt: '/workflow:start https://github.com/cnotv/generative-art/issues/42\n\nKeep it small; $(rm -rf ~) stays text',
+  sessionName: 'generative-art #42',
 })
 
 const claimOf = (overrides: Record<string, unknown> = {}) => {
@@ -68,6 +68,25 @@ describe('parseClaim', () => {
     expect(parseClaim(claimBody({ openRouterModel: 'openai/gpt-5-mini' }))).toBeNull()
     expect(parseClaim(claimBody({ ...headless, openRouterModel: '--dangerously-skip-permissions' }))).toBeNull()
     expect(parseClaim(claimBody({ ...headless, openRouterModel: 'a/b\nANTHROPIC_BASE_URL=https://evil' }))).toBeNull()
+  })
+
+  it('reads an OpenCode model only for an unattended OpenCode start, and only as a model slug', () => {
+    const headless = { target: 'laptop-headless', agent: 'opencode' }
+    const model = 'opencode/longcat-2.5-preview-free'
+    expect(claimOf().start.opencodeModel).toBeNull()
+    expect(claimOf({ ...headless, opencodeModel: model }).start.opencodeModel).toBe(model)
+    expect(parseClaim(claimBody({ opencodeModel: model }))).toBeNull()
+    expect(parseClaim(claimBody({ ...headless, opencodeModel: 'openai/gpt-5-mini' }))).toBeNull()
+    expect(parseClaim(claimBody({ ...headless, opencodeModel: '--model x' }))).toBeNull()
+  })
+
+  it('refuses an OpenCode model for Claude Code, and alongside an OpenRouter model', () => {
+    const model = 'opencode/longcat-2.5-preview-free'
+    expect(parseClaim(claimBody({ target: 'laptop-headless', opencodeModel: model }))).toBeNull()
+    expect(parseClaim(claimBody({ target: 'laptop-headless', agent: 'claude', opencodeModel: model }))).toBeNull()
+    expect(
+      parseClaim(claimBody({ target: 'laptop-headless', agent: 'opencode', opencodeModel: model, openRouterModel: 'openai/gpt-5-mini' })),
+    ).toBeNull()
   })
 })
 
@@ -112,7 +131,7 @@ describe('launchPlanFor', () => {
       'claude',
       '--remote-control',
       '--name',
-      'generative-art #42 fix',
+      'generative-art #42',
       claimOf().prompt,
     ])
   })
@@ -157,9 +176,9 @@ describe('launchPlanFor', () => {
   it('runs an unattended OpenCode start with opencode run, auto-approving only in auto mode', () => {
     const plan = launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode' }), paths, {})
     expect(plan).toMatchObject({ mode: 'detached', command: 'opencode', cwd: paths.worktreePath, environment: { DASHI_START_ID: startId } })
-    expect(plan.args).toEqual(['run', '--title=generative-art #42 fix', '--auto', claimOf().prompt])
+    expect(plan.args).toEqual(['run', '--title=generative-art #42', '--auto', claimOf().prompt])
     const asked = launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode', permissionMode: 'dontAsk' }), paths, {})
-    expect(asked.args).toEqual(['run', '--title=generative-art #42 fix', claimOf().prompt])
+    expect(asked.args).toEqual(['run', '--title=generative-art #42', claimOf().prompt])
     const dashedName = launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode', repository: { owner: 'cnotv', name: '--auto' } }), paths, {})
     expect(dashedName.args.filter((argument) => argument === '--auto')).toEqual(['--auto'])
   })
@@ -176,6 +195,16 @@ describe('launchPlanFor', () => {
     expect(() => launchPlanFor(claimOf({ target: 'laptop-headless', agent: 'opencode', openRouterModel: 'openai/gpt-5-mini' }), paths, {})).toThrow(
       'OPENROUTER_API_KEY',
     )
+  })
+
+  it('runs OpenCode on an OpenCode provider model with no key of its own', () => {
+    const plan = launchPlanFor(
+      claimOf({ target: 'laptop-headless', agent: 'opencode', opencodeModel: 'opencode/longcat-2.5-preview-free' }),
+      paths,
+      {},
+    )
+    expect(plan.args.slice(0, 2)).toEqual(['run', '--model=opencode/longcat-2.5-preview-free'])
+    expect(plan.environment).toEqual({ DASHI_START_ID: startId })
   })
 
   it('sends a cloud session from the clone itself', () => {
@@ -353,7 +382,7 @@ describe('summariseTranscript', () => {
       uuid: 'u1',
       cwd: '/Users/me/dashi/worktrees/x',
       timestamp: '2026-09-30T10:00:00Z',
-      message: { role: 'user', content: '<command-message>workflow:start</command-message>\n<command-name>/workflow:start</command-name>\n<command-args>fix https://github.com/x/y/issues/1</command-args>' },
+      message: { role: 'user', content: '<command-message>workflow:start</command-message>\n<command-name>/workflow:start</command-name>\n<command-args>https://github.com/x/y/issues/1</command-args>' },
     }),
     line({ type: 'user', uuid: 'u0', isMeta: true, message: { role: 'user', content: 'Caveat: meta' } }),
     line({
@@ -378,7 +407,7 @@ describe('summariseTranscript', () => {
     const summary = summariseTranscript(transcript)
     expect(summary.directory).toBe('/Users/me/dashi/worktrees/x')
     expect(summary.messages.map(({ role, kind, text, toolName }) => ({ role, kind, text, toolName }))).toEqual([
-      { role: 'user', kind: 'text', text: '/workflow:start fix https://github.com/x/y/issues/1', toolName: null },
+      { role: 'user', kind: 'text', text: '/workflow:start https://github.com/x/y/issues/1', toolName: null },
       { role: 'assistant', kind: 'text', text: 'Reading the issue.', toolName: null },
       { role: 'assistant', kind: 'tool', text: 'gh issue view 1 --comments', toolName: 'Bash' },
     ])

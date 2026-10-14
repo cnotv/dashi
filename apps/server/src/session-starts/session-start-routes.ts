@@ -20,12 +20,15 @@ import { findRepository } from '../repos/load-repositories.ts'
 import { sessionNameFor, sessionPromptFor } from '@dashi/contracts/first-message'
 import { takesOpenCode, takesOpenRouterModel } from '@dashi/contracts/open-router'
 import { attachmentDeliveryFor, attachmentLimitProblem, attachmentLimits } from './attachments.ts'
+import { createOpenRouterModelCache } from './open-router-models.ts'
 import { routineSettingsBodySchema, runnerReportSchema, sessionStartSubmissionSchema } from './schema.ts'
 import type { MachineTokenStore } from '../machine-tokens/types.ts'
 import type { SessionStartDependencies } from './types.ts'
 
 // A runner asks every few seconds, so one silent for this long is taken to be off.
 const runnerOnlineMilliseconds = 30_000
+// OpenRouter adds models every few days, so an hour-old list is current enough for the dialog.
+const openRouterModelsCacheMilliseconds = 60 * 60 * 1000
 const createTokenBodySchema = z.object({ label: z.string().trim().min(1).max(80) })
 // Room for the largest attachments a laptop session takes, once base64 and JSON have grown them.
 const sessionStartBodyBytes = 12 * 1024 * 1024
@@ -75,8 +78,10 @@ export const createRunnerTokenGuard = (runnerTokens: MachineTokenStore) =>
  * @returns The routes, mounted under /api.
  */
 export const createSessionStartRoutes = (dependencies: SessionStartDependencies) => {
-  const { startStore, routineStore, runnerTokens, vault, repositories, fireRoutine, attachmentRelay, markPullRequestDraft, now } = dependencies
+  const { startStore, routineStore, runnerTokens, vault, repositories, fireRoutine, fetchOpenRouterModels, attachmentRelay, markPullRequestDraft, now } =
+    dependencies
   const routes = new Hono<AppEnvironment>()
+  const readOpenRouterModels = createOpenRouterModelCache(fetchOpenRouterModels, now, openRouterModelsCacheMilliseconds)
 
   const repositoryOf = (owner: string, name: string): RepositoryReference | undefined => findRepository(repositories, owner, name)
   const routineOf = (repository: RepositoryReference): { routineId: string; routineToken: string } | null => {
@@ -96,6 +101,11 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
     return context.json(options)
   })
 
+  routes.get('/openrouter-models', async (context) => {
+    const models = await readOpenRouterModels()
+    return models === null ? context.json({ error: "OpenRouter's model list could not be reached" }, 502) : context.json(models)
+  })
+
   // The attachments are never stored: a laptop start's wait in memory for its runner, and a
   // routine's go out with the prompt. A start on a pull request turns it back into a draft first,
   // so the board shows it as being changed until the session marks it ready again.
@@ -111,6 +121,16 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
     }
     if (request.openRouterModel !== null && !takesOpenRouterModel(request.target)) {
       return { ok: false, status: 422, error: 'Only an unattended laptop session can run on an OpenRouter model' }
+    }
+    if (request.opencodeModel !== null && !takesOpenCode(request.target)) {
+      return { ok: false, status: 422, error: 'Only an unattended laptop session can run on an OpenCode model' }
+    }
+    // Claude Code would ignore an OpenCode model and run on its own login instead.
+    if (request.opencodeModel !== null && request.agent !== 'opencode') {
+      return { ok: false, status: 422, error: 'Only an OpenCode session can run on an OpenCode model' }
+    }
+    if (request.openRouterModel !== null && request.opencodeModel !== null) {
+      return { ok: false, status: 422, error: 'A start runs on an OpenRouter model or an OpenCode model, not both' }
     }
     const limitProblem = attachmentLimitProblem(attachments, request.target)
     if (limitProblem !== null) return { ok: false, status: 413, error: limitProblem }
@@ -159,11 +179,11 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
     const failedStart = startStore.readStart(context.req.param('startId'))
     if (failedStart === null) return context.json({ error: 'Unknown start' }, 404)
     if (failedStart.state !== 'failed') return context.json({ error: 'Only a failed start can be retried' }, 409)
-    const { repository, issueNumber, pullRequestNumber, workflow, target, agent, permissionMode, openRouterModel, note } = failedStart
+    const { repository, issueNumber, pullRequestNumber, workflow, target, agent, permissionMode, openRouterModel, opencodeModel, note } = failedStart
     return answerLaunch(
       context,
       await launchStart(
-        { repository, issueNumber, pullRequestNumber, workflow, target, agent, permissionMode, openRouterModel, note },
+        { repository, issueNumber, pullRequestNumber, workflow, target, agent, permissionMode, openRouterModel, opencodeModel, note },
         [],
         context.get('session'),
       ),

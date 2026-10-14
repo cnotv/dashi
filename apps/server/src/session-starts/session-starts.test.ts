@@ -1,21 +1,20 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { createDraftGithub, createTestApp, getRequest, jsonRequest } from '../app/test-app.ts'
+import { createDraftGithub, createTestApp, getRequest, jsonRequest, testOpenRouterModels } from '../app/test-app.ts'
 import { sessionNameFor, sessionPromptFor } from '@dashi/contracts/first-message'
 
 const repository = { owner: 'cnotv', name: 'generative-art' }
 const startBody = (overrides: Record<string, unknown> = {}) => ({
   repository,
   issueNumber: 42,
-  workflow: 'fix',
   target: 'laptop-remote-control',
   permissionMode: 'auto',
   note: '',
   ...overrides,
 })
 const routineToken = 'sk-ant-oat01-exampleRoutineToken0123456789'
-const issueStart: Parameters<typeof sessionPromptFor>[0] = { repository, issueNumber: 42, pullRequestNumber: null, workflow: 'fix', note: '' }
+const issueStart: Parameters<typeof sessionPromptFor>[0] = { repository, issueNumber: 42, pullRequestNumber: null, workflow: null, note: '' }
 const firstMessageOf = (overrides: Partial<typeof issueStart> = {}): string => sessionPromptFor({ ...issueStart, ...overrides }, [])
 
 const startIdOf = async (response: Response): Promise<string> => z.object({ startId: z.string() }).parse(await response.json()).startId
@@ -50,20 +49,19 @@ describe('a start on a pull request', () => {
 })
 
 describe('sessionPromptFor', () => {
-  it('opens with the router line, then the note, then the workflow spelled out', () => {
+  it('opens with the router line on the issue alone, then the note, then the steps spelled out', () => {
     const [routerLine, note, introduction, skillLine, steps] = sessionPromptFor({ ...issueStart, note: 'Only the physics.' }, []).split('\n\n')
-    expect(routerLine).toBe('/workflow:start fix https://github.com/cnotv/generative-art/issues/42')
+    expect(routerLine).toBe('/workflow:start https://github.com/cnotv/generative-art/issues/42')
     expect(note).toBe('Only the physics.')
-    expect(introduction).toContain('`fix` workflow on https://github.com/cnotv/generative-art/issues/42')
-    expect(skillLine).toContain('run the `workflow:start` skill yourself with `fix https://github.com/cnotv/generative-art/issues/42`')
+    expect(introduction).toContain('on https://github.com/cnotv/generative-art/issues/42. The `workflow:start` skill picks the workflow from the request.')
+    expect(skillLine).toContain('run the `workflow:start` skill yourself with `https://github.com/cnotv/generative-art/issues/42`')
     expect(steps?.split('\n').every((step, stepIndex) => step.startsWith(`${stepIndex + 1}. `))).toBe(true)
-    expect(sessionNameFor(issueStart)).toBe('generative-art #42 fix')
+    expect(sessionNameFor(issueStart)).toBe('generative-art #42')
   })
 
-  it('names the branch after the issue and allows pushing it, so the board links the work', () => {
-    expect(firstMessageOf()).toContain("`fix/42-<two or three word slug of the issue title>`")
-    expect(firstMessageOf({ workflow: 'feature' })).toContain('`feat/42-')
-    expect(firstMessageOf({ workflow: 'tests' })).toContain('`test/42-')
+  it('names the branch after the issue, with the type of the workflow the agent picks, and allows pushing it', () => {
+    expect(firstMessageOf()).toContain('`<type>/42-<two or three word slug of the issue title>`')
+    expect(firstMessageOf()).toContain('the branch type AGENTS.md gives the workflow you picked (feat, fix, refactor, docs, test or chore)')
     expect(firstMessageOf()).toContain("this message is the owner's permission to create and push it")
   })
 
@@ -80,23 +78,24 @@ describe('sessionPromptFor', () => {
 
   it('has a start without an issue write one first', () => {
     const message = firstMessageOf({ issueNumber: null })
-    expect(message.split('\n\n')[0]).toBe('/workflow:start fix')
+    expect(message.split('\n\n')[0]).toBe('/workflow:start')
+    expect(message).toContain('run the `workflow:start` skill yourself. These steps')
     expect(message).toContain('Write the issue from the note first')
-    expect(message).toContain('`fix/<issue-number>-')
+    expect(message).toContain('`<type>/<issue-number>-')
   })
 
-  it('keeps a research start to an answer, with no branch or pull request', () => {
-    const message = firstMessageOf({ workflow: 'research' })
-    expect(message).toContain('Change nothing: no branch, commit or pull request.')
+  it('keeps a request that only asks a question to an answer, with no branch or pull request', () => {
+    const message = firstMessageOf()
+    expect(message).toContain('If the request only asks a question, answer it from the code, the issue and the documentation, and change nothing')
     expect(message).toContain('Post the answer as a comment on the issue')
-    expect(message).not.toContain('Branch:')
-    expect(message).not.toContain('draft pull request')
+    expect(message.indexOf('only asks a question')).toBeLessThan(message.indexOf('Branch:'))
   })
 
   it("points a conflicts start at its pull request and keeps it on that pull request's branch", () => {
     const conflictsStart = { ...issueStart, pullRequestNumber: 43, workflow: 'conflicts' as const }
     const message = sessionPromptFor(conflictsStart, [])
     expect(message.split('\n\n')[0]).toBe('/workflow:start conflicts https://github.com/cnotv/generative-art/pull/43')
+    expect(message).toContain('The workflow is `conflicts`.')
     expect(message).toContain("Work on the pull request's own branch: no new issue, branch or pull request.")
     expect(message).toContain('stop and ask which wins')
     expect(message).not.toContain('Branch:')
@@ -240,7 +239,7 @@ describe('laptop starts', () => {
     expect(await claimResponse.json()).toMatchObject({
       start: { startId: queuedStartId, state: 'claimed', runnerLabel: 'Mac mini' },
       prompt: firstMessageOf({ note: 'Keep it small' }),
-      sessionName: 'generative-art #42 fix',
+      sessionName: 'generative-art #42',
     })
     expect((await app.request(runnerRequest('/claim', token))).status).toBe(204)
 
@@ -273,6 +272,13 @@ describe('laptop starts', () => {
     expect((await app.request(runnerRequest('/claim', 'adr_made-up'))).status).toBe(401)
   })
 
+  it('reads a start stored with a workflow of its own as one the agent picks again', async () => {
+    const { app, database } = createTestApp()
+    const startId = await startIdOf(await app.request(jsonRequest('POST', '/api/session-starts', startBody())))
+    database.prepare("UPDATE session_starts SET request_json = json_set(request_json, '$.workflow', 'fix') WHERE start_id = ?").run(startId)
+    expect(await (await app.request(getRequest(`/api/session-starts/${startId}`))).json()).toMatchObject({ start: { startId, workflow: null } })
+  })
+
   it('lets a runner report only on starts it claimed', async () => {
     const { app, runnerTokens } = createTestApp()
     const first = runnerTokens.createToken('Mac mini').token
@@ -282,10 +288,11 @@ describe('laptop starts', () => {
     expect((await app.request(runnerRequest(`/starts/${queuedStartId}`, second, { state: 'started' }))).status).toBe(404)
   })
 
-  it('refuses repositories that are not configured and workflows the router does not know', async () => {
+  it('refuses repositories that are not configured, and any workflow but conflicts, since the agent picks it', async () => {
     const { app } = createTestApp()
     expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ repository: { owner: 'someone', name: 'else' } })))).status).toBe(404)
     expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ workflow: 'rm -rf' })))).status).toBe(400)
+    expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ workflow: 'fix' })))).status).toBe(400)
     expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ permissionMode: 'bypassPermissions' })))).status).toBe(400)
   })
 
@@ -313,6 +320,53 @@ describe('laptop starts', () => {
     const headless = { target: 'laptop-headless' }
     expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ ...headless, openRouterModel: '$(whoami)' })))).status).toBe(400)
     expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ ...headless, openRouterModel: '--model x' })))).status).toBe(400)
+  })
+
+  it('hands the runner an unattended start on an OpenCode model, and keeps the model on a retry', async () => {
+    const { app, runnerTokens, startStore } = createTestApp()
+    const { token } = runnerTokens.createToken('Mac mini')
+    const model = 'opencode/longcat-2.5-preview-free'
+    const startId = await startIdOf(
+      await app.request(jsonRequest('POST', '/api/session-starts', startBody({ target: 'laptop-headless', agent: 'opencode', opencodeModel: model }))),
+    )
+    expect(await (await app.request(runnerRequest('/claim', token))).json()).toMatchObject({ start: { startId, opencodeModel: model } })
+    startStore.recordOutcome(startId, { state: 'failed', sessionUrl: null, message: 'Model unavailable' })
+    expect(await (await app.request(jsonRequest('POST', `/api/session-starts/${startId}/retry`, {}))).json()).toMatchObject({
+      state: 'queued',
+      opencodeModel: model,
+    })
+  })
+
+  it('runs a start on the default model unless it names an OpenCode one, and only an unattended one on it', async () => {
+    const { app } = createTestApp()
+    expect(await (await app.request(jsonRequest('POST', '/api/session-starts', startBody()))).json()).toMatchObject({ opencodeModel: null })
+    const remoteControlResponse = await app.request(
+      jsonRequest('POST', '/api/session-starts', startBody({ opencodeModel: 'opencode/longcat-2.5-preview-free' })),
+    )
+    expect(remoteControlResponse.status).toBe(422)
+    expect(await remoteControlResponse.json()).toEqual({ error: 'Only an unattended laptop session can run on an OpenCode model' })
+    const headless = { target: 'laptop-headless', agent: 'opencode' }
+    expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ ...headless, opencodeModel: 'openai/gpt-5-mini' })))).status).toBe(
+      400,
+    )
+    expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ ...headless, opencodeModel: '--model x' })))).status).toBe(400)
+  })
+
+  it('refuses an OpenCode model for Claude Code, and alongside an OpenRouter model', async () => {
+    const { app } = createTestApp()
+    const model = 'opencode/longcat-2.5-preview-free'
+    const claudeResponse = await app.request(jsonRequest('POST', '/api/session-starts', startBody({ target: 'laptop-headless', opencodeModel: model })))
+    expect(claudeResponse.status).toBe(422)
+    expect(await claudeResponse.json()).toEqual({ error: 'Only an OpenCode session can run on an OpenCode model' })
+    const bothResponse = await app.request(
+      jsonRequest(
+        'POST',
+        '/api/session-starts',
+        startBody({ target: 'laptop-headless', agent: 'opencode', opencodeModel: model, openRouterModel: 'openai/gpt-5-mini' }),
+      ),
+    )
+    expect(bothResponse.status).toBe(422)
+    expect(await bothResponse.json()).toEqual({ error: 'A start runs on an OpenRouter model or an OpenCode model, not both' })
   })
 
   it('hands the runner an unattended OpenCode start, and runs every other start on Claude Code', async () => {
@@ -344,6 +398,26 @@ describe('laptop starts', () => {
     expect(scriptResponse.status).toBe(200)
     expect(await scriptResponse.text()).toContain('DASHI_RUNNER_TOKEN')
     expect((await app.request(getRequest('/api/session-starts'))).status).toBe(401)
+  })
+})
+
+describe('OpenRouter models', () => {
+  it("serves OpenRouter's models and asks OpenRouter again only once the list is an hour old", async () => {
+    const clock = { now: 0 }
+    const { app, openRouterModelFetches } = createTestApp({}, {}, clock)
+    expect(await (await app.request(getRequest('/api/openrouter-models'))).json()).toEqual(testOpenRouterModels)
+    clock.now = 59 * 60 * 1000
+    await app.request(getRequest('/api/openrouter-models'))
+    expect(openRouterModelFetches).toEqual([0])
+    clock.now = 61 * 60 * 1000
+    await app.request(getRequest('/api/openrouter-models'))
+    expect(openRouterModelFetches).toEqual([0, 61 * 60 * 1000])
+  })
+
+  it('serves the models only to a signed-in browser on an allowed host', async () => {
+    expect((await createTestApp({}, { signInRequired: true }).app.request(getRequest('/api/openrouter-models'))).status).toBe(401)
+    const attackerRequest = new Request('http://attacker.example/api/openrouter-models', { headers: { host: 'attacker.example' } })
+    expect((await createTestApp().app.request(attackerRequest)).status).toBe(403)
   })
 })
 

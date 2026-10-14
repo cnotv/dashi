@@ -24,11 +24,12 @@ describe('createDemoApi', () => {
       repository: firstRepository!,
       issueNumber: createdIssue.number,
       pullRequestNumber: null,
-      workflow: 'feature',
+      workflow: null,
       target: 'laptop-remote-control',
       agent: 'claude',
       permissionMode: 'auto',
       openRouterModel: null,
+      opencodeModel: null,
       note: 'In the corner.',
       attachments: [screenshot],
     })

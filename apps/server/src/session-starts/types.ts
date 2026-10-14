@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import type { RepositoryReference, SessionStart, SessionStartRequest, StartAttachment } from '@dashi/contracts'
+import type { OpenRouterModel, RepositoryReference, SessionStart, SessionStartRequest, StartAttachment } from '@dashi/contracts'
 import type { DashboardSession } from '../auth/types.ts'
 import type { MachineTokenStore } from '../machine-tokens/types.ts'
 import type { Vault } from '../secrets/types.ts'
@@ -32,11 +32,15 @@ export type RoutineFireResult = { ok: true; sessionUrl: string } | { ok: false; 
 
 export type RoutineFirer = (routineId: string, routineToken: string, text: string) => Promise<RoutineFireResult>
 
+// Null when OpenRouter could not be reached or answered something else.
+export type OpenRouterModelFetcher = () => Promise<OpenRouterModel[] | null>
+
 export interface SessionStartServices {
   startStore: SessionStartStore
   routineStore: RoutineStore
   runnerTokens: MachineTokenStore
   fireRoutine: RoutineFirer
+  fetchOpenRouterModels: OpenRouterModelFetcher
   runnerScriptPath: string
 }
 

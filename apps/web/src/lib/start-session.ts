@@ -1,32 +1,10 @@
-import type { IssueLabel, StartAgent, StartOptions, StartTarget, StartWorkflow } from '@dashi/contracts'
+import type { StartAgent, StartOptions, StartTarget } from '@dashi/contracts'
 import { openRouterModelPattern, takesOpenCode, takesOpenRouterModel } from '@dashi/contracts/open-router'
-import { permissionModeOrders } from './presentation'
+import { opencodeModelPattern } from '@dashi/contracts/opencode-models'
+import { permissionModeOrders, startModelSourceOrders } from './presentation'
 import type { StartChoices, StartTargetAvailability } from './types'
 
-type ModelChoices = Pick<StartChoices, 'modelSource' | 'openRouterModel'>
-
-const workflowByLabel: Record<string, StartWorkflow> = {
-  bug: 'fix',
-  documentation: 'docs',
-  docs: 'docs',
-  enhancement: 'feature',
-  feature: 'feature',
-  security: 'security',
-  test: 'tests',
-  tests: 'tests',
-  refactor: 'refactor',
-  design: 'design',
-  chore: 'chore',
-  dependencies: 'chore',
-}
-
-/**
- * Suggests a workflow from an issue's labels, falling back to feature.
- * @param labels The issue's labels.
- * @returns The workflow the first recognised label points at.
- */
-export const suggestedWorkflowFor = (labels: IssueLabel[]): StartWorkflow =>
-  labels.map((label) => workflowByLabel[label.name.toLowerCase()]).find((workflow) => workflow !== undefined) ?? 'feature'
+type ModelChoices = Pick<StartChoices, 'agent' | 'modelSource' | 'openRouterModel' | 'opencodeModel'>
 
 /**
  * Tells whether a session takes attachments as files on the laptop, or only as text in its prompt.
@@ -71,6 +49,10 @@ export const defaultTargetFor = (options: StartOptions): StartTarget => {
 
 const isOnOpenRouter = (choices: ModelChoices, target: StartTarget): boolean => choices.modelSource === 'openrouter' && takesOpenRouterModel(target)
 
+// Only OpenCode itself can run on its provider's models; Claude Code would ignore one and run on its login.
+const isOnOpenCodeModel = (choices: ModelChoices, target: StartTarget): boolean =>
+  choices.modelSource === 'opencode' && choices.agent === 'opencode' && takesOpenCode(target)
+
 /**
  * The OpenRouter model a start sends, when it runs on one.
  * @param choices What the dialog's model fields hold.
@@ -78,7 +60,16 @@ const isOnOpenRouter = (choices: ModelChoices, target: StartTarget): boolean => 
  * @returns The model slug, or null for the Claude login.
  */
 export const openRouterModelFor = (choices: ModelChoices, target: StartTarget): string | null =>
-  isOnOpenRouter(choices, target) ? choices.openRouterModel.trim() : null
+  isOnOpenRouter(choices, target) ? choices.openRouterModel : null
+
+/**
+ * The OpenCode provider model a start sends, when it runs on one.
+ * @param choices What the dialog's model fields hold.
+ * @param target Where the session would run; only an unattended OpenCode start can use an OpenCode model.
+ * @returns The model slug, or null for OpenCode's default.
+ */
+export const opencodeModelFor = (choices: ModelChoices, target: StartTarget): string | null =>
+  isOnOpenCodeModel(choices, target) ? choices.opencodeModel : null
 
 /**
  * Says what keeps a start's model choice from being sent.
@@ -88,9 +79,16 @@ export const openRouterModelFor = (choices: ModelChoices, target: StartTarget): 
  */
 export const startModelProblemFor = (choices: ModelChoices, target: StartTarget): string | null => {
   const openRouterModel = openRouterModelFor(choices, target)
-  if (openRouterModel === null) return null
-  if (openRouterModel === '') return 'Name the OpenRouter model to run on'
-  return openRouterModelPattern.test(openRouterModel) ? null : 'An OpenRouter model reads like provider/model, such as openai/gpt-5-mini'
+  if (openRouterModel !== null) {
+    if (openRouterModel === '') return 'Pick an OpenRouter model to run on'
+    return openRouterModelPattern.test(openRouterModel) ? null : 'An OpenRouter model reads like provider/model, such as openai/gpt-5-mini'
+  }
+  const opencodeModel = opencodeModelFor(choices, target)
+  if (opencodeModel !== null) {
+    if (opencodeModel === '') return 'Pick an OpenCode model to run on'
+    return opencodeModelPattern.test(opencodeModel) ? null : 'An OpenCode model reads like opencode/model, such as opencode/longcat-2.5-preview-free'
+  }
+  return null
 }
 
 /**
@@ -104,13 +102,14 @@ export const agentFor = ({ agent }: Pick<StartChoices, 'agent'>, target: StartTa
   agent === 'opencode' && takesOpenCode(target) ? 'opencode' : 'claude'
 
 /**
- * Switches a start dialog's agent, keeping the permission mode when the new agent offers it.
+ * Switches a start dialog's agent, keeping the permission mode and model source when the new agent offers them.
  * @param choices What the dialog holds.
  * @param agent The agent picked.
- * @returns The choices with the agent, and a permission mode that agent has.
+ * @returns The choices with the agent, and a permission mode and model source that agent has.
  */
 export const choicesWithAgent = (choices: StartChoices, agent: StartAgent): StartChoices => ({
   ...choices,
   agent,
   permissionMode: permissionModeOrders[agent].includes(choices.permissionMode) ? choices.permissionMode : 'auto',
+  modelSource: startModelSourceOrders[agent].includes(choices.modelSource) ? choices.modelSource : 'default',
 })

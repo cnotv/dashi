@@ -65,6 +65,7 @@ export const createHttpApi = (apiBaseUrl: string): DashboardApi => {
     revokeMachineToken: (kind, tokenId) => sendJson('DELETE', `${machineTokensPath(kind)}/${encodeURIComponent(tokenId)}`),
     readStartOptions: (repository) =>
       requestJson(`/api/start-options?owner=${encodeURIComponent(repository.owner)}&name=${encodeURIComponent(repository.name)}`),
+    listOpenRouterModels: () => requestJson('/api/openrouter-models'),
     listSessionStarts: () => requestJson('/api/session-starts'),
     startSession: (submission) => sendJson('POST', '/api/session-starts', submission),
     createIssue: (repository, newIssue) => sendJson('POST', `${repositoryPath(repository)}/issues`, newIssue),

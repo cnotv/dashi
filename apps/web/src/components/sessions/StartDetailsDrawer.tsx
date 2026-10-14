@@ -2,7 +2,7 @@ import { Cross2Icon, ExternalLinkIcon, ReloadIcon } from '@radix-ui/react-icons'
 import { Badge, Button, Callout, Code, DataList, Dialog, Flex, IconButton, Link, Skeleton, Text } from '@radix-ui/themes'
 import { useState } from 'react'
 import type { SessionStart } from '@dashi/contracts'
-import { subjectUrlOf } from '@dashi/contracts/first-message'
+import { sessionNameFor, subjectUrlOf } from '@dashi/contracts/first-message'
 import { usePolledResource } from '@/hooks/usePolledResource'
 import { useToast } from '@/hooks/useToast'
 import { dashboardApi } from '@/lib/api'
@@ -75,8 +75,7 @@ export const StartDetailsDrawer = ({ start, onClose, onRetried }: StartDetailsDr
         <Flex direction="column" gap="4">
           <Flex gap="3" align="start" justify="between">
             <Dialog.Title size="4" mb="0">
-              {start.repository.name}
-              {start.issueNumber === null ? '' : ` #${start.issueNumber}`} · {start.workflow}
+              {sessionNameFor(start)}
             </Dialog.Title>
             <Dialog.Close>
               <IconButton size="2" variant="ghost" color="gray" aria-label="Close">
@@ -113,7 +112,11 @@ export const StartDetailsDrawer = ({ start, onClose, onRetried }: StartDetailsDr
             <DataList.Item>
               <DataList.Label>Model</DataList.Label>
               <DataList.Value>
-                {start.openRouterModel === null ? startModelSourceLabels[start.agent].default : `OpenRouter: ${start.openRouterModel}`}
+                {start.openRouterModel !== null
+                  ? `OpenRouter: ${start.openRouterModel}`
+                  : start.opencodeModel !== null
+                    ? `OpenCode: ${start.opencodeModel}`
+                    : startModelSourceLabels[start.agent].default}
               </DataList.Value>
             </DataList.Item>
             <DataList.Item>
