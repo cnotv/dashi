@@ -33,7 +33,7 @@ import { demoUser, sampleOpenRouterModels, sampleRepositories, sampleSecrets } f
 const demoAttachmentLimits = { fileCount: 5, fileTargetBytes: 8 * 1024 * 1024, inlineTargetBytes: 40 * 1024 }
 // Above every sample issue's number, so an issue opened in demo mode never takes one of theirs.
 const firstDemoIssueNumber = 100
-const demoWorkflowSkillFileCount = 12
+const demoCopiedSkillFileCount = 12
 
 const withCreatedIssues = (columns: BoardColumn[], createdIssues: IssueSummary[]): BoardColumn[] =>
   columns.map((column) =>
@@ -156,13 +156,13 @@ export const createDemoApi = (): DashboardApi => {
       demoMemory.netlifyRepositoryKeys = new Set([...demoMemory.netlifyRepositoryKeys, repositoryKey(repository)])
       return demoNetlifySite(repository)
     },
-    // The first sample repository lacks the workflow skills, so the board shows its question.
+    // The first sample repository keeps copies of the plugin's skills, so the board shows its question.
     readWorkflowSkills: async (repository) => {
       const pullRequest = demoMemory.workflowSkillsPullRequests.get(repositoryKey(repository))
-      if (pullRequest !== undefined) return { state: 'pull-request-open', changedFileCount: demoWorkflowSkillFileCount, pullRequestUrl: pullRequest.url }
+      if (pullRequest !== undefined) return { state: 'pull-request-open', copiedFileCount: demoCopiedSkillFileCount, pullRequestUrl: pullRequest.url }
       return repositoryKey(repository) === repositoryKey(sampleRepositories[0] ?? repository)
-        ? { state: 'missing', changedFileCount: demoWorkflowSkillFileCount, pullRequestUrl: null }
-        : { state: 'current', changedFileCount: 0, pullRequestUrl: null }
+        ? { state: 'copied', copiedFileCount: demoCopiedSkillFileCount, pullRequestUrl: null }
+        : { state: 'current', copiedFileCount: 0, pullRequestUrl: null }
     },
     addWorkflowSkills: async (repository) => {
       const pullRequest = { number: 40, url: `https://github.com/${repositoryKey(repository)}/pull/40` }

@@ -13,11 +13,15 @@ export interface GithubFailure {
 
 export type GithubResult<Value> = { ok: true; value: Value } | ({ ok: false } & GithubFailure)
 
-// Where a repository's skills stand against agent-base's: the files to copy, the commit a copy
-// builds on, and the pull request already open for one.
+export type ClaudeSettings = Record<string, unknown>
+
+// Where a repository stands against agent-base's plugin: its settings (null when the file is not
+// a JSON object), the plugin skills it also keeps a copy of, the commit a fix builds on, and the
+// pull request already open for one.
 export interface WorkflowSkillsComparison {
   status: WorkflowSkillsStatus
-  changedEntries: TreeEntry[]
+  settings: ClaudeSettings | null
+  copiedEntries: TreeEntry[]
   defaultBranch: string
   baseCommitSha: string
   baseTreeSha: string

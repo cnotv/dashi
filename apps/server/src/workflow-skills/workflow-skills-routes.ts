@@ -9,8 +9,8 @@ const missingTokenError = { error: 'Sign in with GitHub, or save a GitHub token 
 const writeAccessHint = 'The GitHub App or stored token needs write access to contents and pull requests.'
 
 /**
- * Builds the routes that say whether a repository carries agent-base's workflow skills, and open
- * the pull request that copies them in. A status is kept per reader for a short while, since the
+ * Builds the routes that say whether a repository takes agent-base's workflow skills from the
+ * plugin alone, and open the pull request that declares the plugin and removes copies of its skills. A status is kept per reader for a short while, since the
  * board asks for it on every visit.
  * @param dependencies The repositories, the reader's token, the GitHub caller and the clock.
  * @returns The routes, mounted under /api.

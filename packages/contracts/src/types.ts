@@ -111,14 +111,15 @@ export interface Board {
   fetchedAt: string
 }
 
-// Whether a repository carries agent-base's workflow skills under .claude/skills/, the only place
-// a cloud session loads them from.
-export type WorkflowSkillsState = 'current' | 'missing' | 'outdated' | 'pull-request-open'
+// Whether a repository takes agent-base's workflow skills from the plugin its .claude/settings.json
+// enables, and nothing else: undeclared when the settings do not enable it, copied when
+// .claude/skills/ also holds a copy of a skill the plugin ships, which would load twice.
+export type WorkflowSkillsState = 'current' | 'undeclared' | 'copied' | 'pull-request-open'
 
 export interface WorkflowSkillsStatus {
   state: WorkflowSkillsState
-  // The skill files missing from the repository or different from agent-base's.
-  changedFileCount: number
+  // The files under .claude/skills/ that copy a skill the plugin ships.
+  copiedFileCount: number
   pullRequestUrl: string | null
 }
 
