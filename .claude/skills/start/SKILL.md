@@ -26,7 +26,7 @@ ports and paths every skill below relies on.
 | `refactor` | Same behaviour, better structure                                 | `start-issue` -> confirm tests cover it -> refactor -> `finish-change` -> `open-pr`             |
 | `docs`     | Only documentation changes                                       | `start-issue` -> write -> docs build -> `open-pr`                                               |
 | `design`   | A UI, layout or visual change, with or without a Figma file      | `start-issue` -> read the design source -> implement -> `verify` (screenshot) -> `finish-change` -> `open-pr` |
-| `3d`       | A scene, model, material, camera, animation or physics change    | `start-issue` -> implement -> `verify` (two angles) -> the repository's perf skill if it has one -> `finish-change` -> `open-pr` |
+| `3d`       | A scene, model, material, camera, animation or physics change    | `start-issue` -> implement -> `verify` (two angles) -> `performance` -> `finish-change` -> `open-pr` |
 | `security` | A security review, a vulnerability, a dependency alert, hardening | `start-issue` -> `security-audit` (mode `full`, `change` or `advisory`) -> fix with a test -> `finish-change` -> `open-pr` |
 | `tests`    | Adding or repairing tests only                                   | `start-issue` -> write tests against the issue, not the implementation -> `finish-change` -> `open-pr` |
 | `chore`    | Tooling, dependencies, CI                                        | `start-issue` -> change -> checks -> `open-pr`                                                  |

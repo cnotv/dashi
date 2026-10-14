@@ -81,6 +81,8 @@ the agent dashboard, shows exactly these two next to the check gates.
   a tab or the fold is not in it. Add `Preview click: <selector>` lines (up to five, clicked in
   order) to unfold it, and one `Preview show: <selector>` line to scroll it to the top, e.g.
   `Preview click: [aria-label="Show Closed"]` then `Preview show: [aria-label="Fold Closed"]`.
+  Add `Preview step: <caption>` lines (up to ten) to narrate the video: caption one shows
+  before the first click, and the video gains a visible cursor and click ripple.
   Open the recorded screenshot and check the feature itself is in it, not just the page.
 - When the repository has no `pr-preview` workflow, capture them yourself from the running
   app (see `verify`) and put the first image and the first video in the body. Pin raw links
