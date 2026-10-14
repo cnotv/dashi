@@ -87,6 +87,9 @@ the agent dashboard, shows exactly these two next to the check gates.
 - When the repository has no `pr-preview` workflow, capture them yourself from the running
   app (see `verify`) and put the first image and the first video in the body. Pin raw links
   to the commit sha, never the branch, and re-fetch the body to confirm the image renders.
+- A video you put in the body is an MP4 (H.264), never a GIF. GitHub plays a video in the
+  body only when it was uploaded through the web editor, which no API reaches, so a linked MP4
+  shows as a link: say so to the user, who can drag the file into the body for a player.
 - Show the **before** as well when the change alters something that already existed.
 
 ## 5. Watch the check gates
