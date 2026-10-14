@@ -36,7 +36,9 @@ The rule holds only because the linter runs it. Check that the repository's lint
 - `jsdoc/require-param` and `jsdoc/require-returns`.
 
 Tests may be left out. If the config lacks it, adding it, and the comments it then asks for, is
-part of this change or its own issue opened now; it is never left unsaid.
+part of this change or its own issue; it is never left unsaid. When the repository's rules say
+the lint config is changed only when asked, or an open issue already tracks adding it, link
+that issue in the pull request instead of opening another.
 
 ## Walk the done-checklist
 

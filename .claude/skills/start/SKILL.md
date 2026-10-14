@@ -1,8 +1,8 @@
 ---
 name: start
 description: >-
-  Use first, at the start of every new request in a repository, before reading code or
-  writing anything — a question, a bug, a feature, "let's try X", "look into Y", a linked
+  Use before anything else, at the start of every new request in a repository, before
+  reading code or writing anything — a question, a bug, a feature, "let's try X", "look into Y", a linked
   issue, or a session opened from Dashi, the agent dashboard, with a workflow already named.
   Picks the workflow that fits the request and lists the skills to run, in order.
 ---
