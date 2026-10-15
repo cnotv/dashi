@@ -1,6 +1,6 @@
 import { ChevronDownIcon, ChevronRightIcon, ReloadIcon } from '@radix-ui/react-icons'
 import { Badge, Button, Callout, Flex, IconButton, SegmentedControl, Select, Skeleton, Text } from '@radix-ui/themes'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link as RouterLink, useSearchParams } from 'react-router'
 import { BoardCardItem } from '@/components/board/BoardCardItem'
 import { NetlifyControl } from '@/components/board/NetlifyControl'
@@ -8,6 +8,7 @@ import { NewIssueDialog } from '@/components/board/NewIssueDialog'
 import { WorkflowSkillsPrompt } from '@/components/board/WorkflowSkillsPrompt'
 import { useBoards, useRepositories } from '@/hooks/useBoard'
 import { useCollapsedColumns } from '@/hooks/useCollapsedColumns'
+import { useSessionStarts } from '@/hooks/useSessionStarts'
 import { mergeBoards } from '@/lib/board-merge'
 import { issueStatusColors, issueStatusLabels, parseRepositoryKey, repositoryKey } from '@/lib/presentation'
 
@@ -16,7 +17,8 @@ const allRepositoriesKey = 'all'
 
 /**
  * The Issues page: issues and pull requests as a board, one column per status, for every
- * configured repository at once unless the address names one with `?repository=owner/name`.
+ * configured repository at once unless the address names one with `?repository=owner/name`. The
+ * sessions started from Dashi are read alongside, so the issues they work on get their own column.
  * Above it, the question to add agent-base's workflow skills to a shown repository that lacks them.
  */
 export const IssuesBoardView = () => {
@@ -33,7 +35,9 @@ export const IssuesBoardView = () => {
     [showsAllRepositories, repositories, selectedRepository],
   )
   const { boards, isLoading, errorMessage, refresh } = useBoards(shownRepositories)
-  const columns = useMemo(() => mergeBoards(boards), [boards])
+  const [startsRevision, setStartsRevision] = useState(0)
+  const { resource: sessionStarts } = useSessionStarts(startsRevision)
+  const columns = useMemo(() => mergeBoards(boards, sessionStarts ?? []), [boards, sessionStarts])
   const oldestFetchedAt = boards.map((board) => board.fetchedAt).sort()[0]
 
   const selectRepository = (nextKey: string): void => setSearchParams({ repository: nextKey }, { replace: true })
@@ -128,13 +132,15 @@ export const IssuesBoardView = () => {
                   </Badge>
                 </div>
                 {!isCollapsed &&
-                  column.cards.map(({ card, repository }) => (
+                  column.cards.map(({ card, repository, sessionStart }) => (
                     <BoardCardItem
                       key={`${repositoryKey(repository)}-${card.pullRequest ? `pull-${card.pullRequest.number}` : `issue-${card.issues[0]?.number}`}`}
                       card={card}
                       repository={repository}
                       showRepository={showsAllRepositories}
+                      sessionStart={sessionStart}
                       onPullRequestChanged={refresh}
+                      onStartChanged={() => setStartsRevision((revision) => revision + 1)}
                     />
                   ))}
               </section>

@@ -107,6 +107,10 @@ export const createSessionStartStore = (database: DatabaseSync, now: () => numbe
         .run(report.state, report.sessionUrl, report.message, nowIso(), startId, runnerLabel)
       return updateResult.changes === 1 ? readStart(startId) : null
     },
+    // A start a runner is launching, or one that ran, stays: usage reads it to tell the sessions
+    // the board started, and the runner's report would find nothing to land on.
+    discardUnstartedStart: (startId) =>
+      database.prepare(`DELETE FROM session_starts WHERE start_id = ? AND state IN ('queued', 'failed')`).run(startId).changes === 1,
     recordOutcome: (startId, outcome) => {
       database
         .prepare('UPDATE session_starts SET state = ?, session_url = ?, message = ?, updated_at = ? WHERE start_id = ?')

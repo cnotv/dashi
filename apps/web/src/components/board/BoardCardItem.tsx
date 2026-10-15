@@ -1,6 +1,7 @@
 import { FileTextIcon, GlobeIcon, Link2Icon } from '@radix-ui/react-icons'
 import { Badge, Card, Flex, IconButton, Link, Separator, Text, Tooltip } from '@radix-ui/themes'
-import type { BoardCard, IssueSummary, RepositoryReference } from '@dashi/contracts'
+import type { BoardCard, IssueSummary, RepositoryReference, SessionStart } from '@dashi/contracts'
+import { DashiStartControls } from './DashiStartControls'
 import { GateIndicator } from './GateIndicator'
 import { PullRequestActions } from './PullRequestActions'
 import { PullRequestFilesDrawer } from './PullRequestFilesDrawer'
@@ -11,7 +12,9 @@ interface BoardCardItemProps {
   card: BoardCard
   repository: RepositoryReference
   showRepository: boolean
+  sessionStart: SessionStart | null
   onPullRequestChanged: () => void
+  onStartChanged: () => void
 }
 
 const IssueHeading = ({ issue }: { issue: IssueSummary }) => (
@@ -61,11 +64,12 @@ const PreviewButton = ({ previewUrl }: { previewUrl: string | null }) =>
 /**
  * One board card: its repository when the board shows several, every issue its pull request works
  * on with the pull request's checks at the top right, then the pull request, and one row of icons.
- * An issue without a pull request has only Start; a pull request has its merge conflict, deploy
+ * An issue without a pull request has only Start, or, once Dashi started a session on it, that
+ * start's state and controls; a pull request has its merge conflict, deploy
  * preview, screenshot, video, changed files, merge and close. A closed issue says when it closed
  * and keeps the preview, recording and files of the merged pull request that closed it.
  */
-export const BoardCardItem = ({ card, repository, showRepository, onPullRequestChanged }: BoardCardItemProps) => (
+export const BoardCardItem = ({ card, repository, showRepository, sessionStart, onPullRequestChanged, onStartChanged }: BoardCardItemProps) => (
   <Card size="2">
     <Flex direction="column" gap="3">
       <Flex gap="3" align="start" justify="between">
@@ -113,7 +117,13 @@ export const BoardCardItem = ({ card, repository, showRepository, onPullRequestC
           </Flex>
         </>
       )}
-      {card.status !== 'closed' && (
+      {card.status !== 'closed' && sessionStart !== null && (
+        <>
+          <Separator size="4" />
+          <DashiStartControls start={sessionStart} onStartChanged={onStartChanged} />
+        </>
+      )}
+      {card.status !== 'closed' && sessionStart === null && (
         <>
           <Separator size="4" />
           <Flex className="card-icon-row" gap="2" align="center">

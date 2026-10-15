@@ -11,6 +11,14 @@ export const startsSince = (starts: SessionStart[], windowStartedAt: string): Se
   starts.filter((start) => Date.parse(start.createdAt) >= Date.parse(windowStartedAt))
 
 /**
+ * Tells whether a start can be discarded: only one that never ran. A start a runner is launching,
+ * or one that started, stays, since usage reads it to tell the sessions Dashi started.
+ * @param start The start.
+ * @returns True when it is queued or failed.
+ */
+export const canDiscardStart = (start: SessionStart): boolean => start.state === 'queued' || start.state === 'failed'
+
+/**
  * Says what to do when the routines API turns a run away, from the reason it gave.
  * @param reason The API's message, such as Authentication failed.
  * @returns The advice.

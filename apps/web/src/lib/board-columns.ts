@@ -1,10 +1,10 @@
-import type { IssueStatus } from '@dashi/contracts'
 import { issueStatusLabels } from './presentation'
+import type { BoardColumnStatus } from './types'
 
 // The columns most boards fill with work nobody is on yet, or work already done, start folded.
-export const defaultCollapsedStatuses: IssueStatus[] = ['no-pull-request', 'closed']
+export const defaultCollapsedStatuses: BoardColumnStatus[] = ['no-pull-request', 'closed']
 
-const isIssueStatus = (value: unknown): value is IssueStatus => typeof value === 'string' && Object.hasOwn(issueStatusLabels, value)
+const isBoardColumnStatus = (value: unknown): value is BoardColumnStatus => typeof value === 'string' && Object.hasOwn(issueStatusLabels, value)
 
 /**
  * Reads the folded columns this browser remembers, falling back to the defaults when nothing
@@ -12,11 +12,11 @@ const isIssueStatus = (value: unknown): value is IssueStatus => typeof value ===
  * @param storedValue What browser storage holds, or null.
  * @returns The statuses of the folded columns.
  */
-export const parseCollapsedStatuses = (storedValue: string | null): IssueStatus[] => {
+export const parseCollapsedStatuses = (storedValue: string | null): BoardColumnStatus[] => {
   if (storedValue === null) return defaultCollapsedStatuses
   try {
     const parsedValue: unknown = JSON.parse(storedValue)
-    return Array.isArray(parsedValue) ? parsedValue.filter(isIssueStatus) : defaultCollapsedStatuses
+    return Array.isArray(parsedValue) ? parsedValue.filter(isBoardColumnStatus) : defaultCollapsedStatuses
   } catch {
     return defaultCollapsedStatuses
   }
@@ -28,7 +28,7 @@ export const parseCollapsedStatuses = (storedValue: string | null): IssueStatus[
  * @param status The column to toggle.
  * @returns The folded columns after the toggle.
  */
-export const toggleCollapsedStatus = (collapsedStatuses: IssueStatus[], status: IssueStatus): IssueStatus[] =>
+export const toggleCollapsedStatus = (collapsedStatuses: BoardColumnStatus[], status: BoardColumnStatus): BoardColumnStatus[] =>
   collapsedStatuses.includes(status)
     ? collapsedStatuses.filter((collapsedStatus) => collapsedStatus !== status)
     : [...collapsedStatuses, status]

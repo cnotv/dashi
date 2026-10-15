@@ -83,6 +83,16 @@ export const sampleBoardColumns: BoardColumn[] = [
         pullRequest: null,
         status: 'no-pull-request',
       },
+      {
+        issues: [issueOf(14, 'Play a sound when marbles collide', [])],
+        pullRequest: null,
+        status: 'no-pull-request',
+      },
+      {
+        issues: [issueOf(15, 'Pause the run when the tab is hidden', [])],
+        pullRequest: null,
+        status: 'no-pull-request',
+      },
     ],
   },
   {
