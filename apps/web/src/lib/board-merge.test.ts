@@ -13,6 +13,7 @@ const issueUpdatedAt = (issueNumber: number, updatedAt: string): IssueSummary =>
   parent: null,
   subIssues: [],
   blockedBy: [],
+  agentLine: { state: 'missing' },
 })
 
 const issueCard = (issue: IssueSummary): BoardCard => ({ issues: [issue], pullRequest: null, status: 'no-pull-request', tickets: [] })

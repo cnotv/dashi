@@ -23,6 +23,7 @@ const makeIssue = (number: number, linkedPullRequestNumbers: number[] = []): Iss
   parent: null,
   subIssues: [],
   blockedBy: [],
+  agentLine: { state: 'missing' },
 })
 
 const makePullRequest = (overrides: Partial<PullRequestSummary>): PullRequestSummary => {

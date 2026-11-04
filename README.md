@@ -351,6 +351,31 @@ home page when there is none. The code icon opens a drawer from the side with ev
 pull request changes, its status and line counts, and its diff; past ten files each one starts
 folded, and past three hundred the rest is left to GitHub.
 
+### Which agent runs a ticket
+
+A ticket names the agent that runs it with a line in its issue body, read the way `Preview route:` is
+read from a pull request body:
+
+```
+Agent: <agent> <target> [model]
+```
+
+- `<agent>` is `claude` or `opencode`.
+- `<target>` is one of `laptop-remote-control`, `laptop-headless`, `laptop-cloud` or `cloud-routine`.
+  OpenCode runs only as `laptop-headless`.
+- `[model]` is optional. A Claude model name such as `opus` or `sonnet` (not for `cloud-routine`, which
+  runs on its own model), an OpenCode model such as `opencode/big-pickle`, or an OpenRouter slug such as
+  `anthropic/claude-sonnet-4.5` (only as `laptop-headless`). Left out, the agent's own default applies.
+
+For example `Agent: claude laptop-headless sonnet`. The first such line of the body counts. The Start
+dialog opens with that agent, target and model chosen, and all of it can still be changed. A line Dashi cannot use, such as an unknown
+agent or target or a model the agent cannot run, is shown in red on the ticket's card and in the epic
+view, and the Start dialog ignores it.
+
+In the epic view, the agent menu on a ticket rewrites that line in the issue on GitHub (adding it at
+the end of the body when there is none) and leaves the rest of the body as it was. It needs write
+access to issues, like opening one from the board does.
+
 ## Netlify
 
 The button at the top of the board is green, and opens the site in Netlify, when a Netlify

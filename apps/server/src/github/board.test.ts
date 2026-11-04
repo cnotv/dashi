@@ -51,6 +51,16 @@ describe('fetchRepositoryBoard', () => {
     ])
   })
 
+  it("reads each ticket's Agent: line and keeps a wrong one as a problem", async () => {
+    const board = await fetchRepositoryBoard(async () => boardResponseFixture, repository)
+    const issues = board.columns.flatMap((column) => column.cards.flatMap((card) => [...card.issues, ...card.tickets.map((ticket) => ticket.issue)]))
+    const lineOf = (issueNumber: number) => issues.find((issue) => issue.number === issueNumber)?.agentLine
+
+    expect(lineOf(12)).toEqual({ state: 'set', choice: { agent: 'claude', target: 'laptop-headless', model: 'sonnet' } })
+    expect(lineOf(7)).toMatchObject({ state: 'invalid', text: 'Agent: gemini laptop-headless', problem: expect.stringContaining('gemini') })
+    expect(lineOf(10)).toEqual({ state: 'missing' })
+  })
+
   it('rejects an issue whose blocker has an unknown state', async () => {
     const brokenResponse = structuredClone(boardResponseFixture)
     const firstIssue = brokenResponse.data.repository.issues.nodes[0]

@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import type { StartOptions, StartTarget } from '@dashi/contracts'
+import type { StartOptions, StartTarget, TicketAgent } from '@dashi/contracts'
 import { runnerLaunchAgentCommands, runnerReviewCommands, runnerSystemdCommands, runnerTryCommands } from './runner-setup'
-import { agentFor, choicesWithAgent, claudeModelFor, defaultTargetFor, modelSourcesFor, opencodeModelFor, openRouterModelFor, startModelProblemFor, targetAvailabilityFor } from './start-session'
+import {
+  agentFor,
+  choicesFromTicketAgent,
+  choicesWithAgent,
+  claudeModelFor,
+  defaultTargetFor,
+  modelSourcesFor,
+  opencodeModelFor,
+  openRouterModelFor,
+  startModelProblemFor,
+  targetAvailabilityFor,
+  ticketAgentAfterAgentChange,
+} from './start-session'
 
 const onlineRunner = { label: 'Mac mini', lastSeenAt: '2026-09-30T10:00:00Z', isOnline: true }
 const optionsWith = (overrides: Partial<StartOptions>): StartOptions => ({
@@ -189,5 +201,68 @@ describe('runner setup commands', () => {
     expect(commands).toContain('DASHI_RUNNER_TOKEN=adr_secret')
     expect(commands).toContain('chmod 600 ~/dashi/runner.env')
     expect(commands.indexOf('sha256sum')).toBeLessThan(commands.indexOf('systemctl --user enable --now dashi-runner'))
+  })
+})
+
+const dialogDefaults = {
+  target: null,
+  agent: 'claude',
+  permissionMode: 'auto',
+  modelSource: 'default',
+  openRouterModel: '',
+  opencodeModel: '',
+  claudeModel: '',
+} as const
+
+describe('choicesFromTicketAgent', () => {
+  it('opens the dialog on the agent, target and model of the ticket', () => {
+    const choice: TicketAgent = { agent: 'opencode', target: 'laptop-headless', model: 'opencode/big-pickle' }
+    const choices = choicesFromTicketAgent(choice)
+    expect(choices).toMatchObject({ target: 'laptop-headless', agent: 'opencode', modelSource: 'opencode', opencodeModel: 'opencode/big-pickle' })
+    expect(openRouterModelFor(choices, 'laptop-headless')).toBeNull()
+    expect(opencodeModelFor(choices, 'laptop-headless')).toBe('opencode/big-pickle')
+    expect(agentFor(choices, 'laptop-headless')).toBe('opencode')
+  })
+
+  it('selects OpenRouter for a provider slug', () => {
+    const choices = choicesFromTicketAgent({ agent: 'claude', target: 'laptop-headless', model: 'anthropic/claude-sonnet-4.5' })
+    expect(choices).toMatchObject({ agent: 'claude', modelSource: 'openrouter', openRouterModel: 'anthropic/claude-sonnet-4.5' })
+    expect(openRouterModelFor(choices, 'laptop-headless')).toBe('anthropic/claude-sonnet-4.5')
+  })
+
+  it('selects the Claude model source for a Claude model', () => {
+    const choices = choicesFromTicketAgent({ agent: 'claude', target: 'laptop-headless', model: 'sonnet' })
+    expect(choices).toMatchObject({ agent: 'claude', modelSource: 'claude', claudeModel: 'sonnet' })
+    expect(claudeModelFor(choices, 'laptop-headless')).toBe('sonnet')
+    expect(openRouterModelFor(choices, 'laptop-headless')).toBeNull()
+  })
+
+  it('leaves the dialog on its own defaults without a line', () => {
+    expect(choicesFromTicketAgent(null)).toEqual(dialogDefaults)
+  })
+})
+
+describe('ticketAgentAfterAgentChange', () => {
+  it('switches the agent and keeps the target and a model the new agent can run', () => {
+    expect(
+      ticketAgentAfterAgentChange({ state: 'set', choice: { agent: 'claude', target: 'laptop-headless', model: 'anthropic/claude-sonnet-4.5' } }, 'opencode'),
+    ).toEqual({ agent: 'opencode', target: 'laptop-headless', model: 'anthropic/claude-sonnet-4.5' })
+  })
+
+  it('drops a Claude model that OpenCode cannot run, and moves OpenCode to a place it runs', () => {
+    expect(ticketAgentAfterAgentChange({ state: 'set', choice: { agent: 'claude', target: 'cloud-routine', model: 'sonnet' } }, 'opencode')).toEqual({
+      agent: 'opencode',
+      target: 'laptop-headless',
+      model: null,
+    })
+  })
+
+  it('starts from the unattended laptop when the ticket had no usable line', () => {
+    expect(ticketAgentAfterAgentChange({ state: 'missing' }, 'claude')).toEqual({ agent: 'claude', target: 'laptop-headless', model: null })
+    expect(ticketAgentAfterAgentChange({ state: 'invalid', text: 'Agent: x', problem: 'p' }, 'opencode')).toEqual({
+      agent: 'opencode',
+      target: 'laptop-headless',
+      model: null,
+    })
   })
 })

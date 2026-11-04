@@ -26,6 +26,8 @@ import type {
   ServedScriptInfo,
   SessionStartDetails,
   SecretSummary,
+  TicketAgent,
+  TicketAgentLine,
   SecretEntryChange,
   CreatedSecretEntry,
   NewSecretEntry,
@@ -135,6 +137,8 @@ export interface EpicViewRow {
   blockers: IssueReference[]
   pullRequestNumber: number | null
   pullRequestUrl: string | null
+  // What the ticket's Agent: line says; a closed ticket has none.
+  agentLine: TicketAgentLine
 }
 
 export interface RepositoryBoardColumn {
@@ -192,6 +196,7 @@ export interface DashboardApi {
   listSessionStarts: () => Promise<SessionStart[]>
   startSession: (submission: SessionStartSubmission) => Promise<SessionStart>
   createIssue: (repository: RepositoryReference, newIssue: NewIssueRequest) => Promise<CreatedIssue>
+  setTicketAgent: (repository: RepositoryReference, issueNumber: number, choice: TicketAgent) => Promise<void>
   readSessionStart: (startId: string) => Promise<SessionStartDetails>
   retrySessionStart: (startId: string) => Promise<SessionStart>
   testRoutine: (repository: RepositoryReference) => Promise<RoutineTestResult>

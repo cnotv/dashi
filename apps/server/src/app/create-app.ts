@@ -10,7 +10,8 @@ import { authCookieNamesFor, cookieOptionsFor, createAuthRoutes, publicApiPaths 
 import { createSessionRenewer } from '../auth/session-credentials.ts'
 import { fetchPullRequestBodyHtml, fetchRepositoryBoard } from '../github/board.ts'
 import { mediaUrlFromBodyHtml } from '../github/media.ts'
-import { createIssue } from '../github/issues.ts'
+import { ticketAgentSchema } from '../github/agent-line.ts'
+import { createIssue, setIssueAgentLine } from '../github/issues.ts'
 import { closePullRequest, mergePullRequest, setPullRequestDraft } from '../github/pull-request-actions.ts'
 import { fetchPullRequestFiles } from '../github/pull-request-files.ts'
 import type { PullRequestActionResult } from '../github/types.ts'
@@ -45,6 +46,7 @@ const commitShaSchema = z.string().regex(/^[0-9a-f]{7,40}$/)
 const pullRequestNumberSchema = z.coerce.number().int().positive()
 const draftBodySchema = z.object({ draft: z.boolean() })
 const mergeBodySchema = z.object({ title: z.string().trim().min(1).max(256), headSha: z.string().regex(/^[0-9a-f]{40}$/) })
+const issueNumberSchema = z.coerce.number().int().positive()
 const newIssueBodySchema = z.object({ title: z.string().trim().min(1).max(256), body: z.string().max(60000).default('') })
 
 // GitHub answers 403 or 404 when the token may read a repository but not write to it; saying
@@ -353,6 +355,22 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnvironment> =
     }
     forgetBoardsOf(repository)
     return context.json<CreatedIssue>(result.issue, 201)
+  })
+
+  app.put('/api/repositories/:owner/:name/issues/:number/agent', async (context) => {
+    const repository = findRepository(repositories, context.req.param('owner'), context.req.param('name'))
+    if (repository === undefined) return context.json({ error: 'Unknown repository' }, 404)
+    const issueNumber = issueNumberSchema.parse(context.req.param('number'))
+    const choice = ticketAgentSchema.parse(await readJsonBody(context.req.raw))
+    const githubToken = githubTokenOf(context.get('session'))
+    if (githubToken === null) return context.json(missingTokenError, 412)
+    const result = await setIssueAgentLine(dependencies.createGithubRestFetcher(githubToken), repository, issueNumber, choice)
+    if (!result.ok) {
+      const actionError = actionErrorOf(result, issueWriteHint)
+      return context.json(actionError.body, actionError.status)
+    }
+    forgetBoardsOf(repository)
+    return context.body(null, 204)
   })
 
   app.post('/api/repositories/:owner/:name/pulls/:number/merge', async (context) => {

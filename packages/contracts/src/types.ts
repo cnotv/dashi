@@ -85,6 +85,20 @@ export interface IssueReference {
   state: IssueState
 }
 
+// What a ticket's `Agent: <agent> <target> [model]` line asks for. The model is free text, matched
+// against the patterns a start accepts; null leaves it to the agent's default.
+export interface TicketAgent {
+  agent: StartAgent
+  target: StartTarget
+  model: string | null
+}
+
+// What the line of an issue body says: nothing, a choice, or text that is not one, with why.
+export type TicketAgentLine =
+  | { state: 'missing' }
+  | { state: 'set'; choice: TicketAgent }
+  | { state: 'invalid'; text: string; problem: string }
+
 export interface IssueSummary {
   number: number
   title: string
@@ -97,6 +111,7 @@ export interface IssueSummary {
   parent: Omit<IssueReference, 'state'> | null
   subIssues: IssueReference[]
   blockedBy: IssueReference[]
+  agentLine: TicketAgentLine
 }
 
 export type IssueStatus =

@@ -10,6 +10,7 @@ import type {
   SecretSummary,
   SessionStart,
   SessionState,
+  TicketAgent,
   VaultState,
   WorkflowSkillsPullRequest,
 } from '@dashi/contracts'
@@ -26,7 +27,7 @@ import {
   sampleSessionsOverview,
   sampleUsageReport,
 } from './sample-activity'
-import { applyDemoPullRequestOutcomes, demoMediaUrls, sampleBoardColumns, samplePullRequestFiles } from './sample-board'
+import { applyDemoPullRequestOutcomes, applyDemoTicketAgents, demoMediaUrls, sampleBoardColumns, samplePullRequestFiles } from './sample-board'
 import { demoUser, sampleOpenRouterModels, sampleRepositories, sampleSecrets } from './sample-data'
 
 // The same limits the server answers with, so the dialog behaves as it would against one.
@@ -65,6 +66,7 @@ export const createDemoApi = (): DashboardApi => {
     netlifyRepositoryKeys: Set<string>
     chatMessages: Map<string, ChatMessage[]>
     createdIssues: Map<string, IssueSummary[]>
+    ticketAgents: Map<number, TicketAgent>
     workflowSkillsPullRequests: Map<string, WorkflowSkillsPullRequest>
   } = {
     secrets: sampleSecrets.map((secret) => ({ ...secret })),
@@ -75,6 +77,7 @@ export const createDemoApi = (): DashboardApi => {
     netlifyRepositoryKeys: new Set(['cnotv/example']),
     chatMessages: new Map(),
     createdIssues: new Map(),
+    ticketAgents: new Map(),
     workflowSkillsPullRequests: new Map(),
   }
   const chatMessagesOf = (chatKey: string, isCloud: boolean): ChatMessage[] =>
@@ -135,7 +138,10 @@ export const createDemoApi = (): DashboardApi => {
     readBoard: async (repository) => ({
       repository,
       columns: withCreatedIssues(
-        applyDemoPullRequestOutcomes(sampleBoardColumns, demoMemory.pullRequestOutcomes, new Date().toISOString()),
+        applyDemoTicketAgents(
+          applyDemoPullRequestOutcomes(sampleBoardColumns, demoMemory.pullRequestOutcomes, new Date().toISOString()),
+          demoMemory.ticketAgents,
+        ),
         demoMemory.createdIssues.get(repositoryKey(repository)) ?? [],
       ),
       fetchedAt: new Date().toISOString(),
@@ -227,9 +233,13 @@ export const createDemoApi = (): DashboardApi => {
         parent: null,
         subIssues: [],
         blockedBy: [],
+        agentLine: { state: 'missing' },
       }
       demoMemory.createdIssues = new Map([...demoMemory.createdIssues, [repositoryKey(repository), [issue, ...createdIssues]]])
       return { number: issueNumber, url }
+    },
+    setTicketAgent: async (_repository, issueNumber, choice) => {
+      demoMemory.ticketAgents = new Map([...demoMemory.ticketAgents, [issueNumber, choice]])
     },
     listOpenRouterModels: async () => sampleOpenRouterModels,
     listSessionStarts: async () => demoMemory.sessionStarts,

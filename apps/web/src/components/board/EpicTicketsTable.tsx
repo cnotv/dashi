@@ -1,14 +1,23 @@
 import { Badge, Flex, Link, Text } from '@radix-ui/themes'
 import { createColumnHelper } from '@tanstack/react-table'
+import type { StartAgent } from '@dashi/contracts'
 import { SortableTable } from '@/components/tables/SortableTable'
 import type { sortableTableFeatures } from '@/components/tables/sortable-table-features'
 import { epicTicketStateColors, epicTicketStateLabels } from '@/lib/presentation'
 import type { EpicViewRow } from '@/lib/types'
+import { TicketAgentControl } from './TicketAgentControl'
 
 const columnHelper = createColumnHelper<typeof sortableTableFeatures, EpicViewRow>()
 
+interface EpicTicketsTableProps {
+  rows: EpicViewRow[]
+  // The ticket whose Agent: line is being written, which holds its menu until GitHub answers.
+  savingNumber: number | null
+  onAgentChange: (ticket: EpicViewRow, agent: StartAgent) => void
+}
+
 // Blockers first is the point of the view, so the headings do not re-sort the rows.
-const epicColumns = columnHelper.columns([
+const epicColumnsFor = ({ savingNumber, onAgentChange }: Pick<EpicTicketsTableProps, 'savingNumber' | 'onAgentChange'>) => columnHelper.columns([
   columnHelper.display({
     id: 'ticket',
     header: 'Ticket',
@@ -55,8 +64,9 @@ const epicColumns = columnHelper.columns([
     id: 'agent',
     header: 'Agent',
     enableSorting: false,
-    // The Agent: line of the ticket body is read by a later change; until then no ticket has one.
-    cell: () => <Text color="gray">Not set</Text>,
+    cell: ({ row: { original: ticket } }) => (
+      <TicketAgentControl ticket={ticket} isSaving={savingNumber === ticket.number} onChange={onAgentChange} />
+    ),
   }),
   columnHelper.display({
     id: 'pullRequest',
@@ -74,8 +84,10 @@ const epicColumns = columnHelper.columns([
 ])
 
 /** An epic's tickets as a table, blockers first, each with its state, blockers, agent and pull request. */
-export const EpicTicketsTable = ({ rows }: { rows: EpicViewRow[] }) => (
-  <div className="epic-table-scroll">
-    <SortableTable columns={epicColumns} rows={rows} rowKeyOf={(row) => String(row.number)} numericColumnIds={[]} />
-  </div>
-)
+export const EpicTicketsTable = ({ rows, savingNumber, onAgentChange }: EpicTicketsTableProps) => {
+  return (
+    <div className="epic-table-scroll">
+      <SortableTable columns={epicColumnsFor({ savingNumber, onAgentChange })} rows={rows} rowKeyOf={(row) => String(row.number)} numericColumnIds={[]} />
+    </div>
+  )
+}

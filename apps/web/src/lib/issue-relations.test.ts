@@ -18,6 +18,7 @@ const issueWith = (relations: Pick<IssueSummary, 'parent' | 'blockedBy'>): Issue
   labels: [],
   linkedPullRequestNumbers: [],
   subIssues: [],
+  agentLine: { state: 'missing' },
   ...relations,
 })
 

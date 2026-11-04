@@ -7,7 +7,8 @@
     "./claude-models": "./src/claude-models.ts",
     "./first-message": "./src/first-message.ts",
     "./open-router": "./src/open-router.ts",
-    "./opencode-models": "./src/opencode-models.ts"
+    "./opencode-models": "./src/opencode-models.ts",
+    "./ticket-agent": "./src/ticket-agent.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p .",

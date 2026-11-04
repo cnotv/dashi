@@ -1,11 +1,11 @@
 import { ExclamationTriangleIcon, PlayIcon } from '@radix-ui/react-icons'
-import { Button, Code, Dialog, Flex, IconButton, Text, TextArea, Tooltip } from '@radix-ui/themes'
+import { Button, Callout, Code, Dialog, Flex, IconButton, Text, TextArea, Tooltip } from '@radix-ui/themes'
 import { useState, type FormEvent } from 'react'
 import type { IssueSummary, PullRequestSummary, RepositoryReference, SessionStart } from '@dashi/contracts'
 import { useStartChoices } from '@/hooks/useSessionStarts'
 import { useToast } from '@/hooks/useToast'
 import { dashboardApi } from '@/lib/api'
-import { agentFor, claudeModelFor, opencodeModelFor, openRouterModelFor } from '@/lib/start-session'
+import { agentFor, choicesFromTicketAgent, claudeModelFor, opencodeModelFor, openRouterModelFor, ticketAgentOf } from '@/lib/start-session'
 import { StartChoicesFields } from './StartChoicesFields'
 import { StartedSummary } from './StartedSummary'
 
@@ -35,9 +35,13 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
       ? `Start #${issue.number}`
       : 'Start a session'
 
+  const agentLine = issue?.agentLine ?? { state: 'missing' as const }
+
+  // Each opening starts from the ticket's Agent: line as it reads now, whatever was changed last time.
   const changeOpen = (nextOpen: boolean): void => {
     setIsOpen(nextOpen)
-    if (!nextOpen) setStarted(null)
+    if (nextOpen) setChoices(choicesFromTicketAgent(ticketAgentOf(agentLine)))
+    else setStarted(null)
   }
 
   const start = async (submitEvent: FormEvent): Promise<void> => {
@@ -100,6 +104,13 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
                   resolves the conflicts, runs the checks and pushes. It asks you when both sides changed the same logic. The
                   pull request goes back to draft until the session marks it ready again.
                 </Text>
+              )}
+              {agentLine.state === 'invalid' && (
+                <Callout.Root color="red" size="1">
+                  <Callout.Text>
+                    The ticket&apos;s <Code>Agent:</Code> line was not used. {agentLine.problem}.
+                  </Callout.Text>
+                </Callout.Root>
               )}
               <StartChoicesFields
                 choices={choices}

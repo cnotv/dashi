@@ -8,6 +8,7 @@
             "title": "Add a camera preset",
             "url": "https://github.com/cnotv/generative-art/issues/12",
             "updatedAt": "2026-09-27T10:00:00Z",
+            "body": "Build it.\n\nAgent: claude laptop-headless sonnet\n",
             "labels": {
               "nodes": [
                 {
@@ -50,6 +51,7 @@
             "title": "Fix marble stickiness",
             "url": "https://github.com/cnotv/generative-art/issues/7",
             "updatedAt": "2026-09-26T10:00:00Z",
+            "body": "Fix it.\n\nAgent: gemini laptop-headless\n",
             "labels": {
               "nodes": []
             },
@@ -85,6 +87,7 @@
             "title": "Epic: camera presets",
             "url": "https://github.com/cnotv/generative-art/issues/10",
             "updatedAt": "2026-09-25T10:00:00Z",
+            "body": "The spec.\n",
             "closedAt": null,
             "labels": {
               "nodes": []
@@ -128,6 +131,7 @@
             "title": "Show the frame rate",
             "url": "https://github.com/cnotv/generative-art/issues/4",
             "updatedAt": "2026-09-20T10:00:00Z",
+            "body": "Show it.\n",
             "closedAt": "2026-09-20T10:00:00Z",
             "labels": {
               "nodes": []

@@ -1,7 +1,8 @@
-import type { StartAgent, StartOptions, StartTarget } from '@dashi/contracts'
+import type { StartAgent, StartOptions, StartTarget, TicketAgent, TicketAgentLine } from '@dashi/contracts'
 import { claudeModelPattern, takesClaudeModel } from '@dashi/contracts/claude-models'
 import { openRouterModelPattern, takesOpenCode, takesOpenRouterModel } from '@dashi/contracts/open-router'
 import { opencodeModelPattern } from '@dashi/contracts/opencode-models'
+import { ticketModelKindOf } from '@dashi/contracts/ticket-agent'
 import { permissionModeOrders, startModelSourceOrders } from './presentation'
 import type { StartChoices, StartModelSource, StartTargetAvailability } from './types'
 
@@ -141,3 +142,54 @@ export const choicesWithAgent = (choices: StartChoices, agent: StartAgent): Star
   permissionMode: permissionModeOrders[agent].includes(choices.permissionMode) ? choices.permissionMode : 'auto',
   modelSource: startModelSourceOrders[agent].includes(choices.modelSource) ? choices.modelSource : 'default',
 })
+
+/**
+ * The choice a ticket's Agent: line makes, when it makes one.
+ * @param line What the ticket's body says.
+ * @returns The agent, target and model, or null for a missing or wrong line.
+ */
+export const ticketAgentOf = (line: TicketAgentLine): TicketAgent | null => (line.state === 'set' ? line.choice : null)
+
+/**
+ * What a Start dialog holds when it opens: the ticket's agent, target and model when its line
+ * names them, the dialog's own defaults otherwise. All of it can still be changed.
+ * @param choice The ticket's choice, or null when it has none.
+ * @returns The dialog's choices.
+ */
+export const choicesFromTicketAgent = (choice: TicketAgent | null): StartChoices => {
+  const defaults: StartChoices = {
+    target: null,
+    agent: 'claude',
+    permissionMode: 'auto',
+    modelSource: 'default',
+    openRouterModel: '',
+    opencodeModel: '',
+    claudeModel: '',
+  }
+  if (choice === null) return defaults
+  const model = choice.model ?? ''
+  const modelKind = choice.model === null ? null : ticketModelKindOf(choice.agent, choice.model)
+  return {
+    ...defaults,
+    target: choice.target,
+    agent: choice.agent,
+    modelSource: modelKind ?? 'default',
+    openRouterModel: modelKind === 'openrouter' ? model : '',
+    opencodeModel: modelKind === 'opencode' ? model : '',
+    claudeModel: modelKind === 'claude' ? model : '',
+  }
+}
+
+/**
+ * The choice to write back to a ticket when its agent is changed: the target stays where the new
+ * agent can run there, and so does the model while the new agent can run it.
+ * @param line What the ticket's body says now.
+ * @param agent The agent picked.
+ * @returns The agent, target and model for the new line.
+ */
+export const ticketAgentAfterAgentChange = (line: TicketAgentLine, agent: StartAgent): TicketAgent => {
+  const current = ticketAgentOf(line)
+  const target = current !== null && (agent === 'claude' || takesOpenCode(current.target)) ? current.target : 'laptop-headless'
+  const currentModel = current?.model ?? null
+  return { agent, target, model: currentModel !== null && ticketModelKindOf(agent, currentModel) !== null ? currentModel : null }
+}
