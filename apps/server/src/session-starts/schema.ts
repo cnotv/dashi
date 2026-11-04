@@ -14,7 +14,7 @@ export const sessionStartRequestSchema = z.object({
   repository: repositorySchema,
   issueNumber: z.number().int().positive().nullable(),
   pullRequestNumber: z.number().int().positive().nullable().default(null),
-  workflow: z.enum(['conflicts']).nullable().default(null),
+  workflow: z.enum(['conflicts', 'review']).nullable().default(null),
   target: z.enum(['laptop-remote-control', 'laptop-headless', 'laptop-cloud', 'cloud-routine']),
   agent: z.enum(['claude', 'opencode']).default('claude'),
   permissionMode: z.enum(['auto', 'acceptEdits', 'dontAsk']).default('auto'),
@@ -25,13 +25,13 @@ export const sessionStartRequestSchema = z.object({
 })
 
 // A start stored before the agent picked its own workflow names one, such as fix; it reads back
-// as null, so the agent picks again on a retry. Only a conflicts start keeps its workflow.
+// as null, so the agent picks again on a retry. Only a conflicts or review start keeps its workflow.
 export const storedSessionStartRequestSchema = sessionStartRequestSchema.extend({
   workflow: z
     .string()
     .nullable()
     .default(null)
-    .transform((workflow) => (workflow === 'conflicts' ? workflow : null)),
+    .transform((workflow) => (workflow === 'conflicts' || workflow === 'review' ? workflow : null)),
 })
 
 // The runner writes each name as a file name, so it is a plain base name and nothing else.

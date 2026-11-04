@@ -1,11 +1,11 @@
-import { ExclamationTriangleIcon, PlayIcon } from '@radix-ui/react-icons'
+import { EyeOpenIcon, ExclamationTriangleIcon, PlayIcon } from '@radix-ui/react-icons'
 import { Button, Callout, Code, Dialog, Flex, IconButton, Text, TextArea, Tooltip } from '@radix-ui/themes'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import type { IssueSummary, PullRequestSummary, RepositoryReference, SessionStart } from '@dashi/contracts'
-import { useStartChoices } from '@/hooks/useSessionStarts'
+import { useImplementerModel, useStartChoices } from '@/hooks/useSessionStarts'
 import { useToast } from '@/hooks/useToast'
 import { dashboardApi } from '@/lib/api'
-import { choicesFromTicketAgent, issueStartSubmissionFor, ticketAgentOf } from '@/lib/start-session'
+import { choicesFromTicketAgent, issueStartSubmissionFor, reviewerChoicesFor, ticketAgentOf } from '@/lib/start-session'
 import { StartChoicesFields } from './StartChoicesFields'
 import { StartedSummary } from './StartedSummary'
 
@@ -13,36 +13,53 @@ interface StartSessionDialogProps {
   repository: RepositoryReference
   issue: IssueSummary | null
   conflictingPullRequest?: PullRequestSummary
+  reviewedPullRequest?: PullRequestSummary
 }
 
 /**
  * The Start button on a board card and its dialog: pick where the session runs and add an
  * optional note, then start it on the laptop runner or a Claude Code routine; the session's start
  * skill picks the workflow. Given a pull request with merge conflicts, it is that pull request's
- * red warning instead, and starts the conflicts workflow on its branch.
+ * red warning instead, and starts the conflicts workflow on its branch. Given a pull request to
+ * review, it is that pull request's Review action, and starts a reviewer session that changes nothing.
  */
-export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }: StartSessionDialogProps) => {
+export const StartSessionDialog = ({ repository, issue, conflictingPullRequest, reviewedPullRequest }: StartSessionDialogProps) => {
   const toast = useToast()
   const [isOpen, setIsOpen] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
   const [started, setStarted] = useState<SessionStart | null>(null)
   const [note, setNote] = useState('')
   const { choices, setChoices, options, errorMessage, chosenTarget, chosenAvailability, modelProblem } = useStartChoices(repository, isOpen, 0)
-  const triggerLabel = conflictingPullRequest ? 'Merge conflict: start a session to fix it' : 'Start a session'
+  const implementerModel = useImplementerModel(repository, issue?.number ?? null, isOpen && reviewedPullRequest !== undefined)
+  const pullRequest = conflictingPullRequest ?? reviewedPullRequest
+  const workflow = conflictingPullRequest ? 'conflicts' : reviewedPullRequest ? 'review' : null
+  const triggerLabel = conflictingPullRequest
+    ? 'Merge conflict: start a session to fix it'
+    : reviewedPullRequest
+      ? 'Review: start a reviewer session'
+      : 'Start a session'
   const dialogTitle = conflictingPullRequest
     ? `Fix the conflicts in #${conflictingPullRequest.number}`
-    : issue
-      ? `Start #${issue.number}`
-      : 'Start a session'
+    : reviewedPullRequest
+      ? `Review #${reviewedPullRequest.number}`
+      : issue
+        ? `Start #${issue.number}`
+        : 'Start a session'
 
   const agentLine = issue?.agentLine ?? { state: 'missing' as const }
 
-  // Each opening starts from the ticket's Agent: line as it reads now, whatever was changed last time.
+  // Each opening starts from the ticket's Agent: line as it reads now, whatever was changed last
+  // time; a review starts from a model other than the implementer's instead.
   const changeOpen = (nextOpen: boolean): void => {
     setIsOpen(nextOpen)
-    if (nextOpen) setChoices(choicesFromTicketAgent(ticketAgentOf(agentLine)))
+    if (nextOpen) setChoices(reviewedPullRequest ? reviewerChoicesFor(implementerModel) : choicesFromTicketAgent(ticketAgentOf(agentLine)))
     else setStarted(null)
   }
+
+  // The starts arrive after the dialog opens; the reviewer's model follows them until it is edited.
+  useEffect(() => {
+    if (isOpen && reviewedPullRequest !== undefined) setChoices(reviewerChoicesFor(implementerModel))
+  }, [implementerModel, isOpen, reviewedPullRequest, setChoices])
 
   const start = async (submitEvent: FormEvent): Promise<void> => {
     submitEvent.preventDefault()
@@ -51,8 +68,8 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
     try {
       const sessionStart = await dashboardApi.startSession({
         ...issueStartSubmissionFor(repository, issue?.number ?? null, choices, chosenTarget, note),
-        pullRequestNumber: conflictingPullRequest?.number ?? null,
-        workflow: conflictingPullRequest ? 'conflicts' : null,
+        pullRequestNumber: pullRequest?.number ?? null,
+        workflow,
       })
       if (sessionStart.state === 'failed') toast.notifyError(sessionStart.message ?? 'The session did not start')
       setStarted(sessionStart)
@@ -68,14 +85,14 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
       <Tooltip content={triggerLabel}>
         <Dialog.Trigger>
           <IconButton size="1" variant="ghost" color={conflictingPullRequest ? 'red' : undefined} aria-label={triggerLabel}>
-            {conflictingPullRequest ? <ExclamationTriangleIcon /> : <PlayIcon />}
+            {conflictingPullRequest ? <ExclamationTriangleIcon /> : reviewedPullRequest ? <EyeOpenIcon /> : <PlayIcon />}
           </IconButton>
         </Dialog.Trigger>
       </Tooltip>
       <Dialog.Content maxWidth="560px">
         <Dialog.Title>{dialogTitle}</Dialog.Title>
         <Dialog.Description size="2" color="gray" mb="4">
-          {conflictingPullRequest?.title ?? issue?.title ?? `${repository.owner}/${repository.name}`}
+          {pullRequest?.title ?? issue?.title ?? `${repository.owner}/${repository.name}`}
         </Dialog.Description>
         {started ? (
           <Flex direction="column" gap="4">
@@ -96,7 +113,13 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
                   pull request goes back to draft until the session marks it ready again.
                 </Text>
               )}
-              {agentLine.state === 'invalid' && (
+              {reviewedPullRequest && (
+                <Text size="2">
+                  The session reads the diff of <Code>{reviewedPullRequest.headRefName}</Code> and the ticket it closes, changes
+                  nothing, and posts its findings on the pull request as a review comment. The pull request stays as it is.
+                </Text>
+              )}
+              {!reviewedPullRequest && agentLine.state === 'invalid' && (
                 <Callout.Root color="red" size="1">
                   <Callout.Text>
                     The ticket&apos;s <Code>Agent:</Code> line was not used. {agentLine.problem}.

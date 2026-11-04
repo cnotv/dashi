@@ -62,6 +62,13 @@ const followUpSteps = [
   'End with a short report: what changed, which checks you saw pass, what is left, and the link to the pull request.',
 ]
 
+const reviewSteps = [
+  'Review only: change nothing. No issue, branch, commit or push, and leave the pull request as it is, draft or ready.',
+  'Read the diff of the pull request and the ticket it closes. Check the change against the ticket (its acceptance criteria, and nothing missing or beyond it) and against the repository\'s standards in AGENTS.md, as two independent passes.',
+  'Post the findings as one review comment on the pull request (`gh pr review <number> --comment`), never approving or requesting changes. Give each finding its file and line, and say plainly when there is nothing to fix.',
+  'End with a short report: the verdict, the findings, and the link to the review comment.',
+]
+
 const pullRequestStepsFor = (start: PromptStart): string[] => [
   "Work on the pull request's own branch: no new issue, branch or pull request. Dashi turned it back to draft for this session.",
   start.workflow === 'conflicts'
@@ -87,7 +94,10 @@ const changeStepsFor = (start: PromptStart): string[] => {
   ]
 }
 
-const workflowStepsFor = (start: PromptStart): string[] => (start.pullRequestNumber === null ? changeStepsFor(start) : pullRequestStepsFor(start))
+const workflowStepsFor = (start: PromptStart): string[] => {
+  if (start.workflow === 'review') return reviewSteps
+  return start.pullRequestNumber === null ? changeStepsFor(start) : pullRequestStepsFor(start)
+}
 
 const briefFor = (start: PromptStart, commandArguments: string): string => {
   const subjectUrl = subjectUrlOf(start)

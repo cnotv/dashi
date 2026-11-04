@@ -1,13 +1,16 @@
 import { CheckCircledIcon, CrossCircledIcon, Pencil2Icon, PaperPlaneIcon } from '@radix-ui/react-icons'
 import { AlertDialog, Button, Flex, IconButton, Tooltip } from '@radix-ui/themes'
 import { useState } from 'react'
-import type { PullRequestSummary, RepositoryReference } from '@dashi/contracts'
+import type { IssueSummary, PullRequestSummary, RepositoryReference } from '@dashi/contracts'
 import { useToast } from '@/hooks/useToast'
 import { dashboardApi } from '@/lib/api'
+import { StartSessionDialog } from './StartSessionDialog'
 
 interface PullRequestActionsProps {
   repository: RepositoryReference
   pullRequest: PullRequestSummary
+  // The issue the pull request closes, which tells the Review dialog which model wrote it.
+  issue: IssueSummary | null
   onChanged: () => void
 }
 
@@ -21,11 +24,11 @@ const mergeBlockerOf = (pullRequest: PullRequestSummary): string | null => {
 }
 
 /**
- * The draft, Merge and Close icons at the end of a board card's icon row. Back to draft and Ready
+ * The Review, draft, Merge and Close icons at the end of a board card's icon row. Back to draft and Ready
  * for review act at once, since each undoes the other; Merge and Close ask for confirmation,
  * because neither is undone from here. Afterwards the board reloads.
  */
-export const PullRequestActions = ({ repository, pullRequest, onChanged }: PullRequestActionsProps) => {
+export const PullRequestActions = ({ repository, pullRequest, issue, onChanged }: PullRequestActionsProps) => {
   const toast = useToast()
   const [isWorking, setIsWorking] = useState(false)
   const mergeBlocker = mergeBlockerOf(pullRequest)
@@ -45,6 +48,7 @@ export const PullRequestActions = ({ repository, pullRequest, onChanged }: PullR
 
   return (
     <Flex gap="2" align="center" ml="auto">
+      <StartSessionDialog repository={repository} issue={issue} reviewedPullRequest={pullRequest} />
       <Tooltip content={pullRequest.isDraft ? 'Ready for review: the change is done' : 'Back to draft: a change is being made'}>
         <IconButton
           size="1"

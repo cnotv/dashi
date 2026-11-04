@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { OpenRouterModel, RepositoryReference, StartOptions } from '@dashi/contracts'
 import { dashboardApi } from '@/lib/api'
 import { errorMessageOf } from '@/lib/presentation'
-import { choicesFromTicketAgent, defaultTargetFor, startModelProblemFor, targetAvailabilityFor } from '@/lib/start-session'
+import { choicesFromTicketAgent, defaultTargetFor, implementerModelOf, startModelProblemFor, targetAvailabilityFor } from '@/lib/start-session'
 import type { StartChoices } from '@/lib/types'
 import { usePolledResource } from './usePolledResource'
 
@@ -78,4 +78,31 @@ export const useStartChoices = (repository: RepositoryReference, isOpen: boolean
   const chosenAvailability = chosenTarget && options ? targetAvailabilityFor(chosenTarget, options, attachmentBytes) : null
   const modelProblem = chosenTarget ? startModelProblemFor(choices, chosenTarget) : null
   return { choices, setChoices, options, errorMessage, chosenTarget, chosenAvailability, modelProblem }
+}
+
+/**
+ * Reads the model that wrote a pull request from the starts on the issue it closes, while a Review
+ * dialog is open.
+ * @param repository The repository of the pull request.
+ * @param issueNumber The issue the pull request closes, or null when it closes none.
+ * @param isOpen Whether the dialog is open; nothing is read while it is closed.
+ * @returns The model, or null until the starts arrive or when none named one.
+ */
+export const useImplementerModel = (repository: RepositoryReference, issueNumber: number | null, isOpen: boolean): string | null => {
+  const [implementerModel, setImplementerModel] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    const request = { isCurrent: true }
+    dashboardApi
+      .listSessionStarts()
+      .then((starts) => request.isCurrent && setImplementerModel(implementerModelOf(starts, repository, issueNumber)))
+      // The review still starts without it, on the default model.
+      .catch(() => undefined)
+    return () => {
+      request.isCurrent = false
+    }
+  }, [repository, issueNumber, isOpen])
+
+  return implementerModel
 }

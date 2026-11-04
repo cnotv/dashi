@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { StartOptions, StartTarget, TicketAgent } from '@dashi/contracts'
+import type { SessionStart, StartOptions, StartTarget, TicketAgent } from '@dashi/contracts'
 import { runnerLaunchAgentCommands, runnerReviewCommands, runnerSystemdCommands, runnerTryCommands } from './runner-setup'
 import {
   agentFor,
@@ -7,9 +7,11 @@ import {
   choicesWithAgent,
   claudeModelFor,
   defaultTargetFor,
+  implementerModelOf,
   modelSourcesFor,
   opencodeModelFor,
   openRouterModelFor,
+  reviewerChoicesFor,
   startModelProblemFor,
   targetAvailabilityFor,
   ticketAgentAfterAgentChange,
@@ -278,5 +280,64 @@ describe('a proposed agent', () => {
 
   it('keeps its target and model when the owner changes the agent, which writes the line', () => {
     expect(ticketAgentAfterAgentChange(proposed, 'opencode')).toEqual(proposed.choice)
+  })
+})
+
+const startOf = (overrides: Partial<SessionStart>): SessionStart => ({
+  startId: 'start-1',
+  repository: { owner: 'cnotv', name: 'dashi' },
+  issueNumber: 137,
+  pullRequestNumber: null,
+  workflow: null,
+  target: 'laptop-headless',
+  agent: 'claude',
+  permissionMode: 'auto',
+  openRouterModel: null,
+  opencodeModel: null,
+  claudeModel: 'sonnet',
+  note: '',
+  state: 'started',
+  runnerLabel: null,
+  sessionUrl: null,
+  message: null,
+  createdAt: '2026-11-04T10:00:00Z',
+  updatedAt: '2026-11-04T10:00:00Z',
+  ...overrides,
+})
+
+describe('implementerModelOf', () => {
+  const dashi = { owner: 'cnotv', name: 'dashi' }
+
+  it('reads the model of the newest start on the issue that opened the pull request', () => {
+    const starts = [startOf({ startId: 'new', claudeModel: 'opus' }), startOf({ startId: 'old', claudeModel: 'haiku' })]
+    expect(implementerModelOf(starts, dashi, 137)).toBe('opus')
+  })
+
+  it('skips starts on other issues, other repositories, pull requests and other agents', () => {
+    const starts = [
+      startOf({ issueNumber: 5 }),
+      startOf({ repository: { owner: 'cnotv', name: 'other' } }),
+      startOf({ pullRequestNumber: 43, workflow: 'review', claudeModel: 'opus' }),
+      startOf({ agent: 'opencode', claudeModel: null, opencodeModel: 'opencode/free' }),
+    ]
+    expect(implementerModelOf(starts, dashi, 137)).toBeNull()
+  })
+
+  it('does not know the model of a start on the login default, or of no issue', () => {
+    expect(implementerModelOf([startOf({ claudeModel: null })], dashi, 137)).toBeNull()
+    expect(implementerModelOf([startOf({})], dashi, null)).toBeNull()
+  })
+})
+
+describe('reviewerChoicesFor', () => {
+  it('runs unattended on Claude, on a model other than the implementer\'s', () => {
+    expect(reviewerChoicesFor('sonnet')).toMatchObject({ target: 'laptop-headless', agent: 'claude', modelSource: 'claude', claudeModel: 'opus' })
+    expect(reviewerChoicesFor('opus').claudeModel).toBe('sonnet')
+    expect(reviewerChoicesFor('haiku').claudeModel).toBe('sonnet')
+    expect(reviewerChoicesFor('claude-sonnet-4-5').claudeModel).toBe('opus')
+  })
+
+  it('falls back to sonnet when the implementer\'s model is not known', () => {
+    expect(reviewerChoicesFor(null).claudeModel).toBe('sonnet')
   })
 })
