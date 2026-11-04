@@ -10,6 +10,9 @@ const issueUpdatedAt = (issueNumber: number, updatedAt: string): IssueSummary =>
   closedAt: null,
   labels: [],
   linkedPullRequestNumbers: [],
+  parent: null,
+  subIssues: [],
+  blockedBy: [],
 })
 
 const issueCard = (issue: IssueSummary): BoardCard => ({ issues: [issue], pullRequest: null, status: 'no-pull-request' })

@@ -3,6 +3,8 @@ import type {
   BoardColumn,
   CheckGate,
   IssueLabel,
+  IssueReference,
+  IssueState,
   IssueSummary,
   PreviewMediaKind,
   PullRequestFiles,
@@ -17,15 +19,36 @@ export const demoMediaUrls: Record<PreviewMediaKind, string> = {
   before: '/demo-media/before.png',
 }
 
-const issueOf = (issueNumber: number, title: string, linkedPullRequestNumbers: number[], labels: IssueLabel[] = []): IssueSummary => ({
+const issueUrlOf = (issueNumber: number): string => `https://github.com/cnotv/example/issues/${issueNumber}`
+
+const referenceOf = (issueNumber: number, title: string, state: IssueState): IssueReference => ({
   number: issueNumber,
   title,
-  url: `https://github.com/cnotv/example/issues/${issueNumber}`,
+  url: issueUrlOf(issueNumber),
+  state,
+})
+
+const issueOf = (
+  issueNumber: number,
+  title: string,
+  linkedPullRequestNumbers: number[],
+  labels: IssueLabel[] = [],
+  relations: Pick<Partial<IssueSummary>, 'parent' | 'subIssues' | 'blockedBy'> = {},
+): IssueSummary => ({
+  number: issueNumber,
+  title,
+  url: issueUrlOf(issueNumber),
   updatedAt: '2026-09-27T10:00:00Z',
   closedAt: null,
   labels,
   linkedPullRequestNumbers,
+  parent: null,
+  subIssues: [],
+  blockedBy: [],
+  ...relations,
 })
+
+const demoEpic = { number: 20, title: 'Epic: marble arena', url: issueUrlOf(20) }
 
 const runUrl = (runNumber: number): string => `https://github.com/cnotv/example/runs/${runNumber}`
 
@@ -80,6 +103,39 @@ export const sampleBoardColumns: BoardColumn[] = [
     cards: [
       {
         issues: [issueOf(12, 'Add a camera preset', [], [{ name: 'enhancement', color: 'a2eeef' }])],
+        pullRequest: null,
+        status: 'no-pull-request',
+      },
+      {
+        issues: [
+          issueOf(20, 'Epic: marble arena', [], [], {
+            subIssues: [
+              referenceOf(18, 'Add the arena floor', 'closed'),
+              referenceOf(21, 'Add the ramp editor', 'open'),
+              referenceOf(22, 'Show the ramp angle on screen', 'open'),
+            ],
+          }),
+        ],
+        pullRequest: null,
+        status: 'no-pull-request',
+      },
+      {
+        issues: [
+          issueOf(21, 'Add the ramp editor', [], [], {
+            parent: demoEpic,
+            blockedBy: [referenceOf(18, 'Add the arena floor', 'closed')],
+          }),
+        ],
+        pullRequest: null,
+        status: 'no-pull-request',
+      },
+      {
+        issues: [
+          issueOf(22, 'Show the ramp angle on screen', [], [], {
+            parent: demoEpic,
+            blockedBy: [referenceOf(21, 'Add the ramp editor', 'open')],
+          }),
+        ],
         pullRequest: null,
         status: 'no-pull-request',
       },

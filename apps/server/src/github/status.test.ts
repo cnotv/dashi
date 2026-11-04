@@ -20,6 +20,9 @@ const makeIssue = (number: number, linkedPullRequestNumbers: number[] = []): Iss
   closedAt: null,
   labels: [],
   linkedPullRequestNumbers,
+  parent: null,
+  subIssues: [],
+  blockedBy: [],
 })
 
 const makePullRequest = (overrides: Partial<PullRequestSummary>): PullRequestSummary => {

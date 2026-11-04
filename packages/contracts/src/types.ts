@@ -75,6 +75,16 @@ export interface IssueLabel {
   color: string
 }
 
+export type IssueState = 'open' | 'closed'
+
+// An issue another issue points at: its epic, one of its sub-issues or one of its blockers.
+export interface IssueReference {
+  number: number
+  title: string
+  url: string
+  state: IssueState
+}
+
 export interface IssueSummary {
   number: number
   title: string
@@ -83,6 +93,10 @@ export interface IssueSummary {
   closedAt: string | null
   labels: IssueLabel[]
   linkedPullRequestNumbers: number[]
+  // The epic this ticket is a sub-issue of; null for an issue outside any epic.
+  parent: Omit<IssueReference, 'state'> | null
+  subIssues: IssueReference[]
+  blockedBy: IssueReference[]
 }
 
 export type IssueStatus =
