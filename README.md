@@ -558,6 +558,9 @@ terminal. The runner is one file, `apps/runner/src/runner.ts`, served by the das
 command checks the download against it before anything runs, stopping on a mismatch. A
 **read it first** snippet downloads and checks it and opens it in `less`, installing nothing.
 
+The runner starts agents as you, with your home directory and network. Which isolation layer sandboxed
+starts will use is decided in [docs/sandbox-isolation.md](docs/sandbox-isolation.md).
+
 - **macOS**: a login agent that starts with the Mac and restarts if it stops; its log is
   `~/dashi/runner.log`. Install it from Terminal on the Mac itself, since launchd starts login agents
   only inside a GUI login, not over SSH. `launchctl print gui/$(id -u)/dev.dashi.runner` shows its state.
