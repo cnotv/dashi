@@ -48,7 +48,16 @@ const demoCostOf = (tokens: TokenTotals): CostTotals => ({
   unpricedTokens: 0,
 })
 
-const withCost = <Row extends { tokens: TokenTotals }>(row: Row): Row & { cost: CostTotals } => ({ ...row, cost: demoCostOf(row.tokens) })
+// The share of demo tokens spent on claude-haiku-demo, a model with no price; every aggregate over
+// several models therefore carries unpriced tokens, as a real report with an unlisted model does.
+const demoUnpricedShare = 0.28
+
+const mixedCostOf = (tokens: TokenTotals): CostTotals => ({
+  usd: demoCostOf(tokens).usd * (1 - demoUnpricedShare),
+  unpricedTokens: Math.round(tokens.total * demoUnpricedShare),
+})
+
+const withCost = <Row extends { tokens: TokenTotals }>(row: Row): Row & { cost: CostTotals } => ({ ...row, cost: mixedCostOf(row.tokens) })
 
 // Each sample session is a list of [minutes ago, state] changes, newest last.
 interface SampleSession {
@@ -250,7 +259,7 @@ export const sampleUsageReport = (days: number, now: number): UsageReport => {
     windowStartedAt,
     generatedAt: new Date(now).toISOString(),
     totals,
-    totalCost: demoCostOf(totals),
+    totalCost: mixedCostOf(totals),
     sessionCount: 23,
     byRepository: [
       { repository: firstRepository ?? null, tokens: scaled(0.64), sessionCount: 15 },
@@ -267,9 +276,9 @@ export const sampleUsageReport = (days: number, now: number): UsageReport => {
     ].map(withCost),
     byDay,
     byModel: [
-      withCost({ model: 'claude-opus-demo', tokens: scaled(0.72) }),
+      { model: 'claude-opus-demo', tokens: scaled(1 - demoUnpricedShare), cost: demoCostOf(scaled(1 - demoUnpricedShare)) },
       // A model with no price: tokens and no cost, as for any model missing from config/model-prices.json.
-      { model: 'claude-haiku-demo', tokens: scaled(0.28), cost: { usd: 0, unpricedTokens: scaled(0.28).total } },
+      { model: 'claude-haiku-demo', tokens: scaled(demoUnpricedShare), cost: { usd: 0, unpricedTokens: scaled(demoUnpricedShare).total } },
     ],
     byTrigger: [
       { sourceKey: 'Dashi board (laptop runner)', label: 'Dashi board (laptop runner)', note: null, sessionCount: 6, tokens: scaled(0.34) },

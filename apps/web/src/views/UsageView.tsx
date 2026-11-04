@@ -80,7 +80,7 @@ export const UsageView = () => {
 
       {report && (
         <>
-          <Grid columns={{ initial: '2', md: '6' }} gap="4">
+          <Grid columns={{ initial: '2', md: '3', lg: '6' }} gap="4">
             <StatTile
               label="Tokens, all repositories"
               value={formatCompactCount(report.totals.total)}
