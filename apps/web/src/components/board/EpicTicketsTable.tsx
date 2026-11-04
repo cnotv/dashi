@@ -75,5 +75,7 @@ const epicColumns = columnHelper.columns([
 
 /** An epic's tickets as a table, blockers first, each with its state, blockers, agent and pull request. */
 export const EpicTicketsTable = ({ rows }: { rows: EpicViewRow[] }) => (
-  <SortableTable columns={epicColumns} rows={rows} rowKeyOf={(row) => String(row.number)} numericColumnIds={[]} />
+  <div className="epic-table-scroll">
+    <SortableTable columns={epicColumns} rows={rows} rowKeyOf={(row) => String(row.number)} numericColumnIds={[]} />
+  </div>
 )

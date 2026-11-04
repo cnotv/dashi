@@ -840,3 +840,12 @@ body {
   border-block-end: 1px solid var(--gray-a8);
   border-end-start-radius: var(--radius-2);
 }
+
+/* On a phone the table scrolls sideways instead of squeezing the ticket titles. */
+.epic-table-scroll {
+  overflow-x: auto;
+}
+
+.epic-table-scroll .epic-ticket {
+  min-width: 16rem;
+}
