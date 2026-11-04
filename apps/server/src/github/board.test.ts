@@ -9,7 +9,13 @@ describe('fetchRepositoryBoard', () => {
     const board = await fetchRepositoryBoard(async () => boardResponseFixture, repository)
     const cardsByStatus = Object.fromEntries(board.columns.map((column) => [column.status, column.cards]))
 
-    expect(cardsByStatus['no-pull-request']?.map((card) => card.issues.map((issue) => issue.number))).toEqual([[12], [10]])
+    expect(cardsByStatus['no-pull-request']?.map((card) => card.issues.map((issue) => issue.number))).toEqual([[10]])
+    expect(
+      cardsByStatus['no-pull-request']?.[0]?.tickets.map((ticket) => [ticket.issue.number, ticket.pullRequest?.number ?? null]),
+    ).toEqual([
+      [12, null],
+      [7, 30],
+    ])
     expect(cardsByStatus['checks-failing']?.map((card) => card.issues.map((issue) => issue.number))).toEqual([[7]])
 
     const failingPullRequest = cardsByStatus['checks-failing']?.[0]?.pullRequest
@@ -28,7 +34,7 @@ describe('fetchRepositoryBoard', () => {
 
   it("reads each issue's epic, sub-issues and blockers with their state", async () => {
     const board = await fetchRepositoryBoard(async () => boardResponseFixture, repository)
-    const issues = board.columns.flatMap((column) => column.cards.flatMap((card) => card.issues))
+    const issues = board.columns.flatMap((column) => column.cards.flatMap((card) => [...card.issues, ...card.tickets.map((ticket) => ticket.issue)]))
     const issueOf = (issueNumber: number) => issues.find((issue) => issue.number === issueNumber)
 
     expect(issueOf(12)?.parent).toEqual({ number: 10, title: 'Epic: camera presets', url: 'https://github.com/cnotv/generative-art/issues/10' })

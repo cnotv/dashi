@@ -817,3 +817,26 @@ body {
 .credential-call {
   overflow-wrap: anywhere;
 }
+
+/* An epic's tickets: a ticket waiting on another is indented beneath it behind an L shaped connector. */
+.epic-tickets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.epic-ticket {
+  position: relative;
+}
+
+.epic-ticket-nested::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: calc(-1 * var(--space-3));
+  top: calc(-1 * var(--space-2));
+  width: var(--space-2);
+  height: calc(var(--space-2) + 0.7em);
+  border-inline-start: 1px solid var(--gray-a8);
+  border-block-end: 1px solid var(--gray-a8);
+  border-end-start-radius: var(--radius-2);
+}

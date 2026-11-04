@@ -7,6 +7,7 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
 import { ToastProvider } from '@/components/layout/ToastProvider'
 import { useColorScheme } from '@/hooks/useColorScheme'
+import { EpicView } from '@/views/EpicView'
 import { CredentialsView } from '@/views/CredentialsView'
 import { IssuesBoardView } from '@/views/IssuesBoardView'
 import { PairView } from '@/views/PairView'
@@ -20,6 +21,7 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/sessions" replace /> },
       { path: 'sessions', element: <SessionsView />, handle: { title: 'Sessions' } },
       { path: 'issues', element: <IssuesBoardView />, handle: { title: 'Issues' } },
+      { path: 'epics/:owner/:name/:number', element: <EpicView />, handle: { title: 'Epic' } },
       { path: 'usage', element: <UsageView />, handle: { title: 'Usage' } },
       { path: 'credentials', element: <CredentialsView />, handle: { title: 'Credentials' } },
       { path: 'pair', element: <PairView />, handle: { title: 'Connect a machine' } },
