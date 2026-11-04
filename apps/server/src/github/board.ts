@@ -1,6 +1,8 @@
 import type { Board, CheckGate, IssueReference, IssueSummary, PullRequestSummary, RepositoryReference } from '@dashi/contracts'
 import { deployPreviewUrlFromGates, previewPageUrl } from '../netlify/deploy-preview.ts'
 import { parseAgentLine } from './agent-line.ts'
+import { proposeAgentLine } from './agent-routing.ts'
+import type { AgentRouting } from './agent-routing.ts'
 import { mediaPresenceFromMarkdown } from './media.ts'
 import { boardQuery, boardResponseSchema, graphqlErrorsSchema, pullRequestBodyHtmlQuery, pullRequestBodyHtmlResponseSchema } from './schema.ts'
 import { buildBoard, gateStateFromCheckRun, gateStateFromStatusContext, summariseGates } from './status.ts'
@@ -56,9 +58,10 @@ const mapIssueReferenceNode = (node: IssueNode['blockedBy']['nodes'][number]): I
 /**
  * Turns an issue from the board query into the summary the board shows.
  * @param node The issue from GitHub.
+ * @param routing The routing rules that propose an agent for an issue with no Agent: line.
  * @returns The summary, with the pull requests that close it.
  */
-export const mapIssueNode = (node: IssueNode): IssueSummary => ({
+export const mapIssueNode = (node: IssueNode, routing: AgentRouting): IssueSummary => ({
   number: node.number,
   title: node.title,
   url: node.url,
@@ -69,20 +72,21 @@ export const mapIssueNode = (node: IssueNode): IssueSummary => ({
   parent: node.parent,
   subIssues: node.subIssues.nodes.map(mapIssueReferenceNode),
   blockedBy: node.blockedBy.nodes.map(mapIssueReferenceNode),
-  agentLine: parseAgentLine(node.body),
+  agentLine: proposeAgentLine(parseAgentLine(node.body), node.labels.nodes, routing),
 })
 
 /**
  * Turns a closed issue from the board query into its summary and the pull request that closed it.
  * @param node The closed issue from GitHub, with the pull requests that reference it.
+ * @param routing The routing rules that propose an agent for an issue with no Agent: line.
  * @returns The summary, and the most recently updated merged pull request, or null when the issue
  * was closed by hand.
  */
-export const mapClosedIssueNode = (node: ClosedIssueNode): ClosedIssue => {
+export const mapClosedIssueNode = (node: ClosedIssueNode, routing: AgentRouting): ClosedIssue => {
   const mergedPullRequest = node.closedByPullRequestsReferences.nodes
     .filter((reference) => reference.merged)
     .toSorted((first, second) => second.updatedAt.localeCompare(first.updatedAt))[0]
-  return { issue: mapIssueNode(node), pullRequest: mergedPullRequest === undefined ? null : mapPullRequestNode(mergedPullRequest) }
+  return { issue: mapIssueNode(node, routing), pullRequest: mergedPullRequest === undefined ? null : mapPullRequestNode(mergedPullRequest) }
 }
 
 /**
@@ -118,16 +122,20 @@ const boardErrorMessageOf = (rawResponse: unknown, repository: RepositoryReferen
  * query and sorts them into board columns.
  * @param fetchGraphql The GraphQL caller.
  * @param repository The repository to read.
+ * @param routing The routing rules that propose an agent for an issue with no Agent: line.
  * @returns The board.
  */
-export const fetchRepositoryBoard = async (fetchGraphql: GraphqlFetcher, repository: RepositoryReference): Promise<Board> => {
+export const fetchRepositoryBoard = async (fetchGraphql: GraphqlFetcher, repository: RepositoryReference, routing: AgentRouting): Promise<Board> => {
   const rawResponse = await fetchGraphql(boardQuery, { owner: repository.owner, name: repository.name })
   const parsedResponse = boardResponseSchema.safeParse(rawResponse)
   if (!parsedResponse.success) throw new Error(boardErrorMessageOf(rawResponse, repository))
   const { issues, closedIssues, pullRequests } = parsedResponse.data.data.repository
   return buildBoard(
     repository,
-    { open: issues.nodes.map(mapIssueNode), closed: closedIssues.nodes.map(mapClosedIssueNode) },
+    {
+      open: issues.nodes.map((node) => mapIssueNode(node, routing)),
+      closed: closedIssues.nodes.map((node) => mapClosedIssueNode(node, routing)),
+    },
     pullRequests.nodes.map(mapPullRequestNode),
     new Date().toISOString(),
   )

@@ -9,6 +9,7 @@ import { createMachineTokenStore } from './machine-tokens/machine-token-store.ts
 import { createApp } from './app/create-app.ts'
 import { createGitHubAuthClient } from './auth/github-auth.ts'
 import { createSessionStore } from './auth/session-store.ts'
+import { loadAgentRouting } from './github/agent-routing.ts'
 import { createGithubGraphqlFetcher } from './github/board.ts'
 import { createGithubRestFetcher } from './github/rest.ts'
 import { createNetlifyFetcher } from './netlify/rest.ts'
@@ -71,6 +72,7 @@ const app = createApp({
     now: Date.now,
   },
   repositories: loadRepositories(settings.repositoriesFile),
+  agentRouting: loadAgentRouting(join(workspaceRoot, 'config/agent-routing.json')),
   secretDefinitions,
   testSecret: testSecretAgainstProvider,
   createGraphqlFetcher: createGithubGraphqlFetcher,

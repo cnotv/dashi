@@ -93,10 +93,13 @@ export interface TicketAgent {
   model: string | null
 }
 
-// What the line of an issue body says: nothing, a choice, or text that is not one, with why.
+// What the line of an issue body says: nothing, a choice, or text that is not one, with why. A
+// ticket with no line and a rule in the routing file that fits it is proposed that rule's choice
+// until the owner writes a line; an explicit line always wins.
 export type TicketAgentLine =
   | { state: 'missing' }
   | { state: 'set'; choice: TicketAgent }
+  | { state: 'proposed'; choice: TicketAgent; reason: string }
   | { state: 'invalid'; text: string; problem: string }
 
 export interface IssueSummary {

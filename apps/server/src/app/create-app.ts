@@ -316,7 +316,7 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnvironment> =
     const githubToken = githubTokenOf(session)
     if (githubToken === null) return context.json(missingTokenError, 412)
     const [boardFromGithub, artifactsBySha] = await Promise.all([
-      fetchRepositoryBoard(dependencies.createGraphqlFetcher(githubToken), repository),
+      fetchRepositoryBoard(dependencies.createGraphqlFetcher(githubToken), repository, dependencies.agentRouting),
       readPreviewArtifacts(cacheKey, () => fetchPreviewArtifacts(dependencies.createGithubRestFetcher(githubToken), repository), true),
     ])
     const board = withPreviewMedia(boardFromGithub, artifactsBySha)

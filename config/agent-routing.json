@@ -1,0 +1,50 @@
+{
+  "rules": [
+    {
+      "name": "security",
+      "labels": ["security", "auth", "secrets"],
+      "agent": "claude",
+      "target": "laptop-headless",
+      "model": "opus",
+      "reason": "Security, auth and secrets work never goes to a free model under this repository's credential rules"
+    },
+    {
+      "name": "plan",
+      "labels": ["epic", "plan"],
+      "agent": "claude",
+      "target": "laptop-remote-control",
+      "model": "opus",
+      "reason": "Planning and splitting an epic needs the owner's answers, steered from the phone"
+    },
+    {
+      "name": "design",
+      "labels": ["design", "ui", "accessibility"],
+      "agent": "claude",
+      "target": "laptop-remote-control",
+      "model": null,
+      "reason": "Screenshots need the owner's eye, steered from the phone"
+    },
+    {
+      "name": "review",
+      "labels": ["review"],
+      "agent": "claude",
+      "target": "laptop-headless",
+      "model": "opus",
+      "reason": "An independent second opinion, on a different model from the Sonnet that writes the feature"
+    },
+    {
+      "name": "chore",
+      "labels": ["chore", "documentation", "docs", "tests", "good first issue"],
+      "agent": "opencode",
+      "target": "laptop-headless",
+      "model": "opencode/big-pickle",
+      "reason": "A small chore, docs or tests ticket on a free model, nearly free unattended"
+    }
+  ],
+  "fallback": {
+    "agent": "claude",
+    "target": "laptop-headless",
+    "model": "sonnet",
+    "reason": "A feature or fix across several files, and anything unlabelled, on the reliable default"
+  }
+}
