@@ -1,4 +1,4 @@
-import { Flex, Select, Text } from '@radix-ui/themes'
+import { Badge, Flex, Select, Text } from '@radix-ui/themes'
 import type { StartAgent } from '@dashi/contracts'
 import { startAgentLabels, startAgentOrder, startTargetLabels } from '@/lib/presentation'
 import type { EpicViewRow } from '@/lib/types'
@@ -11,7 +11,9 @@ interface TicketAgentControlProps {
 
 /**
  * The agent a ticket's Agent: line names, with a menu to change it. The target and model show
- * beneath it; a line that is wrong shows what is wrong with it in red instead.
+ * beneath it; a line that is wrong shows what is wrong with it in red instead. A ticket with no
+ * line shows the agent the routing file proposes, marked as proposed with its reason, until the
+ * menu writes a line.
  */
 export const TicketAgentControl = ({ ticket, isSaving, onChange }: TicketAgentControlProps) => {
   const { agentLine } = ticket
@@ -20,7 +22,7 @@ export const TicketAgentControl = ({ ticket, isSaving, onChange }: TicketAgentCo
     <Flex direction="column" gap="1" align="start">
       <Select.Root
         size="1"
-        value={agentLine.state === 'set' ? agentLine.choice.agent : undefined}
+        value={agentLine.state === 'set' || agentLine.state === 'proposed' ? agentLine.choice.agent : undefined}
         disabled={isSaving}
         onValueChange={(value) => onChange(ticket, startAgentOrder.find((agent) => agent === value) ?? 'claude')}
       >
@@ -33,11 +35,21 @@ export const TicketAgentControl = ({ ticket, isSaving, onChange }: TicketAgentCo
           ))}
         </Select.Content>
       </Select.Root>
-      {agentLine.state === 'set' && (
+      {(agentLine.state === 'set' || agentLine.state === 'proposed') && (
         <Text size="1" color="gray">
           {startTargetLabels[agentLine.choice.target].name}
           {agentLine.choice.model !== null && `, ${agentLine.choice.model}`}
         </Text>
+      )}
+      {agentLine.state === 'proposed' && (
+        <Flex direction="column" gap="1" align="start">
+          <Badge size="1" color="amber" variant="soft">
+            Proposed
+          </Badge>
+          <Text size="1" color="gray">
+            {agentLine.reason}
+          </Text>
+        </Flex>
       )}
       {agentLine.state === 'invalid' && (
         <Text size="1" color="red">

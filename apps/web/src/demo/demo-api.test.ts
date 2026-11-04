@@ -12,7 +12,7 @@ describe('setTicketAgent in demo mode', () => {
       const tickets = board.columns.flatMap((column) => column.cards.flatMap((card) => card.tickets))
       return tickets.find((ticket) => ticket.issue.number === issueNumber)?.issue.agentLine
     }
-    expect(await lineOf(23)).toEqual({ state: 'missing' })
+    expect(await lineOf(23)).toMatchObject({ state: 'proposed', choice: { agent: 'claude', target: 'laptop-headless', model: 'sonnet' } })
     await demoApi.setTicketAgent(firstRepository!, 23, { agent: 'opencode', target: 'laptop-headless', model: 'opencode/big-pickle' })
     expect(await lineOf(23)).toEqual({ state: 'set', choice: { agent: 'opencode', target: 'laptop-headless', model: 'opencode/big-pickle' } })
   })
@@ -34,6 +34,7 @@ describe('createDemoApi', () => {
     const board = await demoApi.readBoard(firstRepository!, false)
     const noPullRequestCards = board.columns.find((column) => column.status === 'no-pull-request')?.cards ?? []
     expect(noPullRequestCards[0]?.issues[0]).toMatchObject({ number: createdIssue.number, title: 'Show the frame time' })
+    expect(noPullRequestCards[0]?.issues[0]?.agentLine).toMatchObject({ state: 'proposed', choice: { agent: 'claude', target: 'laptop-headless', model: 'sonnet' } })
     const screenshot = { name: 'corner.png', mediaType: 'image/png', base64: 'aGVsbG8=' }
     const start = await demoApi.startSession({
       repository: firstRepository!,

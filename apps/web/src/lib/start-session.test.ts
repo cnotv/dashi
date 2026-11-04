@@ -13,6 +13,7 @@ import {
   startModelProblemFor,
   targetAvailabilityFor,
   ticketAgentAfterAgentChange,
+  ticketAgentOf,
 } from './start-session'
 
 const onlineRunner = { label: 'Mac mini', lastSeenAt: '2026-09-30T10:00:00Z', isOnline: true }
@@ -264,5 +265,18 @@ describe('ticketAgentAfterAgentChange', () => {
       target: 'laptop-headless',
       model: null,
     })
+  })
+})
+
+describe('a proposed agent', () => {
+  const proposed = { state: 'proposed', choice: { agent: 'opencode', target: 'laptop-headless', model: 'opencode/big-pickle' }, reason: 'A small chore' } as const
+
+  it('opens the Start dialog like an explicit line does, so it can still be changed', () => {
+    expect(ticketAgentOf(proposed)).toEqual(proposed.choice)
+    expect(choicesFromTicketAgent(ticketAgentOf(proposed))).toMatchObject({ agent: 'opencode', target: 'laptop-headless', opencodeModel: 'opencode/big-pickle' })
+  })
+
+  it('keeps its target and model when the owner changes the agent, which writes the line', () => {
+    expect(ticketAgentAfterAgentChange(proposed, 'opencode')).toEqual(proposed.choice)
   })
 })

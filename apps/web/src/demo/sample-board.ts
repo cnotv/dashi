@@ -10,6 +10,7 @@ import type {
   PullRequestFiles,
   PullRequestSummary,
   TicketAgent,
+  TicketAgentLine,
 } from '@dashi/contracts'
 import type { DemoPullRequestOutcome } from '@/lib/types'
 
@@ -100,6 +101,13 @@ const closedIssueOf = (issueNumber: number, title: string, closedAt: string, pul
   tickets: [],
 })
 
+/** What the routing file proposes for a ticket with no Agent: line and no label that fits a rule. */
+export const demoProposedAgentLine: TicketAgentLine = {
+  state: 'proposed',
+  choice: { agent: 'claude', target: 'laptop-headless', model: 'sonnet' },
+  reason: 'A feature or fix across several files, and anything unlabelled, on the reliable default',
+}
+
 const rampEditorTicket = issueOf(21, 'Add the ramp editor', [], [], {
   parent: demoEpic,
   blockedBy: [referenceOf(18, 'Add the arena floor', 'closed')],
@@ -112,6 +120,7 @@ const rampAngleTicket = issueOf(22, 'Show the ramp angle on screen', [], [], {
 })
 const saveRampsTicket = issueOf(23, 'Save ramps between rounds', [], [], {
   parent: demoEpic,
+  agentLine: demoProposedAgentLine,
   blockedBy: [referenceOf(21, 'Add the ramp editor', 'open')],
 })
 const shareRampsTicket = issueOf(25, 'Share a ramp as a link', [], [], {

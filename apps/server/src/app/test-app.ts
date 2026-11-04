@@ -12,8 +12,11 @@ import { generateKeyMaterial } from '../secrets/crypto.ts'
 import { secretDefinitions } from '../secrets/definitions.ts'
 import { createVault } from '../secrets/vault.ts'
 import { createRoutineStore, createSessionStartStore } from '../session-starts/start-store.ts'
+import { loadAgentRouting } from '../github/agent-routing.ts'
 import { createApp } from './create-app.ts'
 import type { AppDependencies, ReceivedRestRequest } from './types.ts'
+
+const testAgentRouting = loadAgentRouting(fileURLToPath(new URL('../../../../config/agent-routing.json', import.meta.url)))
 
 export const testHost = 'localhost:4317'
 
@@ -82,6 +85,7 @@ export const createTestApp = (
       runnerScriptPath: fileURLToPath(new URL('../../../runner/src/runner.ts', import.meta.url)),
     },
     repositories: [{ owner: 'cnotv', name: 'generative-art' }],
+    agentRouting: testAgentRouting,
     secretDefinitions,
     testSecret: async () => ({ ok: true, status: 200, message: 'The provider accepted the key' }),
     createGraphqlFetcher: (token) => async (query) => {

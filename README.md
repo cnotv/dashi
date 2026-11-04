@@ -376,6 +376,46 @@ In the epic view, the agent menu on a ticket rewrites that line in the issue on 
 the end of the body when there is none) and leaves the rest of the body as it was. It needs write
 access to issues, like opening one from the board does.
 
+### Default agent from the routing file
+
+A ticket with no `Agent:` line is proposed one from `config/agent-routing.json`, matched on the
+ticket's labels. The epic view and the Start dialog mark the agent as **Proposed** and say why; the
+dialog still opens on it and can change it, and picking an agent in the epic view writes a real line.
+An explicit `Agent:` line always wins, and a line that is wrong stays a problem to fix instead of
+being replaced by a proposal.
+
+The file is data only:
+
+```json
+{
+  "rules": [
+    {
+      "name": "security",
+      "labels": ["security", "auth", "secrets"],
+      "agent": "claude",
+      "target": "laptop-headless",
+      "model": "opus",
+      "reason": "Why this rule picks this agent, shown next to the proposal"
+    }
+  ],
+  "fallback": { "agent": "claude", "target": "laptop-headless", "model": "sonnet", "reason": "..." }
+}
+```
+
+- The first rule in the file with a label the ticket has wins, compared without regard to case, so
+  put the stricter rules first. A rule with no `labels` is refused.
+- `agent`, `target` and `model` are the same as on an `Agent:` line, and a rule that a start would
+  refuse (OpenCode anywhere but `laptop-headless`, a Claude model on a cloud routine, an unknown
+  model) is refused too. `model` can be `null` for the agent's own default.
+- `fallback` is used when no rule matches. Nothing else is read: an unknown key is an error.
+- The file is read once at startup. A broken one stops the server with the field named.
+
+The shipped defaults follow the table in epic #130: security, auth and secrets work on Claude Opus
+unattended (never a free model), epics planned on Opus steered from the phone, design and UI on
+Claude steered from the phone, a review on Opus, a chore, docs or tests ticket on OpenCode with a
+free model, and everything else on Claude Sonnet unattended. Dashi cannot tell a ticket's kind from
+anything but its labels, so a label such as `security`, `design` or `chore` is what selects a rule.
+
 ## Netlify
 
 The button at the top of the board is green, and opens the site in Netlify, when a Netlify

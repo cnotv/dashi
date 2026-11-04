@@ -1,6 +1,7 @@
 import type { RepositoryReference } from '@dashi/contracts'
 import type { ActivityDependencies } from '../activity/types.ts'
 import type { AuthDependencies, DashboardSession } from '../auth/types.ts'
+import type { AgentRouting } from '../github/agent-routing.ts'
 import type { GithubRestFetcher, GithubRestRequest, GraphqlFetcher } from '../github/types.ts'
 import type { NetlifyFetcher } from '../netlify/types.ts'
 import type { SessionStartServices } from '../session-starts/types.ts'
@@ -12,6 +13,7 @@ export interface AppDependencies {
   activity: ActivityDependencies
   sessionStarts: SessionStartServices
   repositories: RepositoryReference[]
+  agentRouting: AgentRouting
   secretDefinitions: SecretDefinitionWithTester[]
   testSecret: SecretTestRunner
   createGraphqlFetcher: (token: string) => GraphqlFetcher

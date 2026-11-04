@@ -4,8 +4,8 @@ import type { TicketAgent, TicketAgentLine } from '@dashi/contracts'
 import { sessionStartRequestSchema } from '../session-starts/schema.ts'
 
 // The agent and the places to run are the ones a start accepts, so a line never names what a start would refuse.
-const agentSchema = sessionStartRequestSchema.shape.agent.unwrap()
-const targetSchema = sessionStartRequestSchema.shape.target
+export const agentSchema = sessionStartRequestSchema.shape.agent.unwrap()
+export const targetSchema = sessionStartRequestSchema.shape.target
 
 /** A ticket's agent choice as the write route and the line parser both check it. */
 export const ticketAgentSchema = z

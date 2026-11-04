@@ -1,12 +1,15 @@
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { fetchRepositoryBoard } from './board.ts'
+import { loadAgentRouting } from './agent-routing.ts'
 import boardResponseFixture from './fixtures/board-response.json' with { type: 'json' }
 
 const repository = { owner: 'cnotv', name: 'generative-art' }
+const routing = loadAgentRouting(fileURLToPath(new URL('../../../../config/agent-routing.json', import.meta.url)))
 
 describe('fetchRepositoryBoard', () => {
   it('maps a GitHub response into columns', async () => {
-    const board = await fetchRepositoryBoard(async () => boardResponseFixture, repository)
+    const board = await fetchRepositoryBoard(async () => boardResponseFixture, repository, routing)
     const cardsByStatus = Object.fromEntries(board.columns.map((column) => [column.status, column.cards]))
 
     expect(cardsByStatus['no-pull-request']?.map((card) => card.issues.map((issue) => issue.number))).toEqual([[10]])
@@ -33,7 +36,7 @@ describe('fetchRepositoryBoard', () => {
   })
 
   it("reads each issue's epic, sub-issues and blockers with their state", async () => {
-    const board = await fetchRepositoryBoard(async () => boardResponseFixture, repository)
+    const board = await fetchRepositoryBoard(async () => boardResponseFixture, repository, routing)
     const issues = board.columns.flatMap((column) => column.cards.flatMap((card) => [...card.issues, ...card.tickets.map((ticket) => ticket.issue)]))
     const issueOf = (issueNumber: number) => issues.find((issue) => issue.number === issueNumber)
 
@@ -52,13 +55,13 @@ describe('fetchRepositoryBoard', () => {
   })
 
   it("reads each ticket's Agent: line and keeps a wrong one as a problem", async () => {
-    const board = await fetchRepositoryBoard(async () => boardResponseFixture, repository)
+    const board = await fetchRepositoryBoard(async () => boardResponseFixture, repository, routing)
     const issues = board.columns.flatMap((column) => column.cards.flatMap((card) => [...card.issues, ...card.tickets.map((ticket) => ticket.issue)]))
     const lineOf = (issueNumber: number) => issues.find((issue) => issue.number === issueNumber)?.agentLine
 
     expect(lineOf(12)).toEqual({ state: 'set', choice: { agent: 'claude', target: 'laptop-headless', model: 'sonnet' } })
     expect(lineOf(7)).toMatchObject({ state: 'invalid', text: 'Agent: gemini laptop-headless', problem: expect.stringContaining('gemini') })
-    expect(lineOf(10)).toEqual({ state: 'missing' })
+    expect(lineOf(10)).toMatchObject({ state: 'proposed', choice: { agent: 'claude', target: 'laptop-headless', model: 'sonnet' } })
   })
 
   it('rejects an issue whose blocker has an unknown state', async () => {
@@ -66,11 +69,11 @@ describe('fetchRepositoryBoard', () => {
     const firstIssue = brokenResponse.data.repository.issues.nodes[0]
     if (firstIssue === undefined) throw new Error('fixture has no issue')
     firstIssue.blockedBy.nodes[0] = { number: 7, title: 'x', url: 'https://github.com/o/r/issues/7', state: 'MERGED' }
-    await expect(fetchRepositoryBoard(async () => brokenResponse, repository)).rejects.toThrow('Unexpected GitHub response')
+    await expect(fetchRepositoryBoard(async () => brokenResponse, repository, routing)).rejects.toThrow('Unexpected GitHub response')
   })
 
   it("keeps a closed issue's merged pull request, with its preview, and ignores one that was never merged", async () => {
-    const board = await fetchRepositoryBoard(async () => boardResponseFixture, repository)
+    const board = await fetchRepositoryBoard(async () => boardResponseFixture, repository, routing)
     const closedPullRequest = board.columns.find((column) => column.status === 'closed')?.cards[0]?.pullRequest
     expect(closedPullRequest?.number).toBe(5)
     expect(closedPullRequest?.headSha).toBe('feedface')
@@ -82,7 +85,7 @@ describe('fetchRepositoryBoard', () => {
     await fetchRepositoryBoard(async (_query, variables) => {
       receivedVariables.push(variables)
       return boardResponseFixture
-    }, repository)
+    }, repository, routing)
     expect(receivedVariables).toEqual([{ owner: 'cnotv', name: 'generative-art' }])
   })
 
@@ -91,13 +94,13 @@ describe('fetchRepositoryBoard', () => {
       data: { repository: null },
       errors: [{ type: 'NOT_FOUND', message: "Could not resolve to a Repository with the name 'cnotv/generative-art'." }],
     }
-    await expect(fetchRepositoryBoard(async () => notFoundResponse, repository)).rejects.toThrow(
+    await expect(fetchRepositoryBoard(async () => notFoundResponse, repository, routing)).rejects.toThrow(
       "Could not resolve to a Repository with the name 'cnotv/generative-art'. Check that cnotv/generative-art in config/repos.json",
     )
   })
 
   it('rejects a response of the wrong shape', async () => {
-    await expect(fetchRepositoryBoard(async () => ({ data: { repository: null } }), repository)).rejects.toThrow(
+    await expect(fetchRepositoryBoard(async () => ({ data: { repository: null } }), repository, routing)).rejects.toThrow(
       'Unexpected GitHub response',
     )
   })
