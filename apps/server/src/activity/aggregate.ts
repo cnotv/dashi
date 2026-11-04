@@ -2,6 +2,7 @@ import type {
   AgentProvider,
   AgentSessionState,
   AgentSessionSummary,
+  CostTotals,
   RepositoryReference,
   SessionTimelineSegment,
   SessionsOverview,
@@ -15,6 +16,7 @@ import type {
 } from '@dashi/contracts'
 import { issueNumberFromBranch } from '../github/status.ts'
 import { agentProviderOf } from './ingest.ts'
+import { costOfSamples } from './model-prices.ts'
 import { billingLabelOf, originNoteOf, triggerLabelerFor } from './origin.ts'
 import type { StoredEvent, StoredSession, StoredTokenSample, UsageSourceLookups } from './types.ts'
 
@@ -95,7 +97,7 @@ export const buildSessionsOverview = (
   samples: StoredTokenSample[],
   windowStartedAt: string,
   now: number,
-  lookups: Pick<UsageSourceLookups, 'starts'>,
+  lookups: Pick<UsageSourceLookups, 'starts' | 'modelPrices'>,
 ): SessionsOverview => {
   const samplesBySession = groupBy(samples, (sample) => sample.sessionId)
   const triggerOf = triggerLabelerFor(lookups.starts)
@@ -114,6 +116,7 @@ export const buildSessionsOverview = (
         startedAt: session.startedAt,
         lastEventAt: session.lastEventAt,
         tokens: sumTokens(samplesBySession.get(session.sessionId) ?? []),
+        cost: costOfSamples(samplesBySession.get(session.sessionId) ?? [], lookups.modelPrices),
         triggeredBy: triggerOf(session, samplesBySession.get(session.sessionId)?.[0]?.launchHint ?? null),
         billedThrough: billingLabelOf(session, samplesBySession.get(session.sessionId)?.[0]),
       }),
@@ -191,6 +194,7 @@ export const buildUsageReport = (
   const firstSessionOf = (group: StoredTokenSample[]): StoredSession | undefined =>
     group[0] === undefined ? undefined : sessionOf(group[0])
 
+  const costOf = (group: StoredTokenSample[]): CostTotals => costOfSamples(group, lookups.modelPrices)
   const triggerOf = triggerLabelerFor(lookups.starts)
   const triggerOfSample = (sample: StoredTokenSample): string => triggerOf(sessionOf(sample), sample.launchHint)
   const billingOfSample = (sample: StoredTokenSample): string => billingLabelOf(sessionOf(sample), sample)
@@ -200,6 +204,7 @@ export const buildUsageReport = (
       (group): UsageByRepository => ({
         repository: firstSessionOf(group)?.repository ?? null,
         tokens: sumTokens(group),
+        cost: costOf(group),
         sessionCount: distinctSessions(group),
       }),
     )
@@ -222,17 +227,18 @@ export const buildUsageReport = (
         triggeredBy: labelsByTokens(group, triggerOfSample),
         billedThrough: labelsByTokens(group, billingOfSample),
         tokens: sumTokens(group),
+        cost: costOf(group),
         sessionCount: distinctSessions(group),
       }
     })
     .sort(byTotalDescending)
 
   const byDay = [...groupBy(samples, (sample) => sample.recordedAt.slice(0, 10)).entries()]
-    .map(([day, group]): UsageByDay => ({ day, tokens: sumTokens(group) }))
+    .map(([day, group]): UsageByDay => ({ day, tokens: sumTokens(group), cost: costOf(group) }))
     .sort((first, second) => (first.day < second.day ? -1 : 1))
 
   const byModel = [...groupBy(samples, (sample) => sample.model).entries()]
-    .map(([model, group]): UsageByModel => ({ model, tokens: sumTokens(group) }))
+    .map(([model, group]): UsageByModel => ({ model, tokens: sumTokens(group), cost: costOf(group) }))
     .sort(byTotalDescending)
 
   // Codex sends no token metrics, so its sessions in the period are counted with no tokens.
@@ -251,6 +257,7 @@ export const buildUsageReport = (
     windowStartedAt,
     generatedAt: new Date(now).toISOString(),
     totals: sumTokens(samples),
+    totalCost: costOf(samples),
     sessionCount: distinctSessions(samples),
     byRepository,
     byWork,

@@ -258,6 +258,13 @@ export interface TokenTotals {
   total: number
 }
 
+// What tokens cost in US dollars at the configured model prices. Tokens of a model with no price
+// are counted apart, never guessed at, so a total with some of them reads as at least `usd`.
+export interface CostTotals {
+  usd: number
+  unpricedTokens: number
+}
+
 export interface AgentSessionSummary {
   sessionId: string
   provider: AgentProvider
@@ -270,6 +277,7 @@ export interface AgentSessionSummary {
   startedAt: string
   lastEventAt: string
   tokens: TokenTotals
+  cost: CostTotals
   // What started the session, such as "Dashi board (laptop runner)" or "CodePilot", and what paid for it.
   triggeredBy: string
   billedThrough: string
@@ -292,6 +300,7 @@ export interface SessionsOverview {
 export interface UsageByRepository {
   repository: RepositoryReference | null
   tokens: TokenTotals
+  cost: CostTotals
   sessionCount: number
 }
 
@@ -304,17 +313,20 @@ export interface UsageByWork {
   triggeredBy: string[]
   billedThrough: string[]
   tokens: TokenTotals
+  cost: CostTotals
   sessionCount: number
 }
 
 export interface UsageByDay {
   day: string
   tokens: TokenTotals
+  cost: CostTotals
 }
 
 export interface UsageByModel {
   model: string
   tokens: TokenTotals
+  cost: CostTotals
 }
 
 // Tokens grouped by where they were spent: what triggered the session, what paid for it, the machine, or the agent.
@@ -331,6 +343,7 @@ export interface UsageReport {
   windowStartedAt: string
   generatedAt: string
   totals: TokenTotals
+  totalCost: CostTotals
   sessionCount: number
   byRepository: UsageByRepository[]
   byWork: UsageByWork[]

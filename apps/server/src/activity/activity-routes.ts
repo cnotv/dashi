@@ -27,7 +27,7 @@ const clampedNumber = (value: string | undefined, fallback: number, minimum: num
  * @param recordCloudHook Takes a cloud session's hooks, which make up its chat.
  * @returns The routes, mounted under /api.
  */
-export const createIngestRoutes = ({ activityStore, ingestTokens, now }: ActivityDependencies, recordCloudHook: CloudHookRecorder) => {
+export const createIngestRoutes = ({ activityStore, ingestTokens, now, modelPrices }: ActivityDependencies, recordCloudHook: CloudHookRecorder) => {
   const routes = new Hono<AppEnvironment & { Variables: { ingestTokenId: string } }>()
   // The token's id is kept so usage can be told apart by the machine that reported it.
   const requireIngestToken = createMiddleware<{ Variables: { ingestTokenId: string } }>(async (context, next) => {
@@ -85,7 +85,7 @@ export const createIngestRoutes = ({ activityStore, ingestTokens, now }: Activit
  * @returns The routes, mounted under /api.
  */
 export const createActivityRoutes = (
-  { activityStore, ingestTokens, now }: ActivityDependencies,
+  { activityStore, ingestTokens, now, modelPrices }: ActivityDependencies,
   findPullRequest: PullRequestFinder,
   listStartsSince: (since: string) => UsageStart[],
 ) => {
@@ -101,7 +101,7 @@ export const createActivityRoutes = (
         activityStore.readTokenSamplesSince(windowStartedAt),
         windowStartedAt,
         now(),
-        { starts: listStartsSince(windowStartedAt) },
+        { starts: listStartsSince(windowStartedAt), modelPrices },
       ),
     )
   })
@@ -118,6 +118,7 @@ export const createActivityRoutes = (
         {
           machineLabelOf: (tokenId) => ingestTokens.listTokens().find((ingestToken) => ingestToken.tokenId === tokenId)?.label ?? null,
           starts: listStartsSince(windowStartedAt),
+          modelPrices,
         },
       ),
     )

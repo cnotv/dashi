@@ -9,6 +9,7 @@ import { createMachineTokenStore } from './machine-tokens/machine-token-store.ts
 import { createApp } from './app/create-app.ts'
 import { createGitHubAuthClient } from './auth/github-auth.ts'
 import { createSessionStore } from './auth/session-store.ts'
+import { loadModelPrices } from './activity/model-prices.ts'
 import { loadAgentRouting } from './github/agent-routing.ts'
 import { createGithubGraphqlFetcher } from './github/board.ts'
 import { createGithubRestFetcher } from './github/rest.ts'
@@ -70,6 +71,7 @@ const app = createApp({
     activityStore: createActivityStore(database),
     ingestTokens: createMachineTokenStore(database, Date.now, 'ingest'),
     now: Date.now,
+    modelPrices: loadModelPrices(join(workspaceRoot, 'config/model-prices.json')),
   },
   repositories: loadRepositories(settings.repositoriesFile),
   agentRouting: loadAgentRouting(join(workspaceRoot, 'config/agent-routing.json')),
