@@ -54,6 +54,27 @@ describe('createDemoApi', () => {
     expect(JSON.stringify(await demoApi.listSessionStarts())).not.toContain(screenshot.base64)
   })
 
+  it('keeps a review start on its pull request, with the workflow it names', async () => {
+    const demoApi = createDemoApi()
+    const [repository] = await demoApi.listRepositories()
+    const start = await demoApi.startSession({
+      repository: repository!,
+      issueNumber: 7,
+      pullRequestNumber: 43,
+      workflow: 'review',
+      target: 'laptop-headless',
+      agent: 'claude',
+      permissionMode: 'auto',
+      openRouterModel: null,
+      opencodeModel: null,
+      claudeModel: 'opus',
+      note: '',
+      attachments: [],
+    })
+    expect(start).toMatchObject({ workflow: 'review', pullRequestNumber: 43, claudeModel: 'opus' })
+    expect((await demoApi.listSessionStarts())[0]).toMatchObject({ startId: start.startId, workflow: 'review' })
+  })
+
   it('keeps several tokens per credential in memory, showing only their last four characters', async () => {
     const demoApi = createDemoApi()
     const entriesOf = async () => (await demoApi.listSecrets()).find((secret) => secret.name === 'openrouter-api-key')?.entries ?? []

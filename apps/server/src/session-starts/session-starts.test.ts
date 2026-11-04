@@ -37,6 +37,21 @@ describe('a start on a pull request', () => {
     ])
   })
 
+  it('leaves the pull request as it is for a review start, which changes nothing', async () => {
+    const github = createDraftGithub(false)
+    const { app, vault } = createTestApp({ createGraphqlFetcher: github.createGraphqlFetcher })
+    vault.saveSecret('github-token', githubToken)
+    const response = await app.request(jsonRequest('POST', '/api/session-starts', startBody({ workflow: 'review', pullRequestNumber: 43 })))
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({ workflow: 'review', pullRequestNumber: 43 })
+    expect(github.receivedCalls).toHaveLength(0)
+  })
+
+  it('refuses a review start that names no pull request', async () => {
+    const { app } = createTestApp()
+    expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ workflow: 'review' })))).status).toBe(422)
+  })
+
   it('still starts when GitHub refuses, and leaves an issue start\'s pull request alone', async () => {
     const github = createDraftGithub(false, { errors: [{ message: 'Resource not accessible by integration' }] })
     const { app, vault } = createTestApp({ createGraphqlFetcher: github.createGraphqlFetcher })
@@ -100,6 +115,32 @@ describe('sessionPromptFor', () => {
     expect(message).toContain('stop and ask which wins')
     expect(message).not.toContain('Branch:')
     expect(sessionNameFor(conflictsStart)).toBe('generative-art #43 conflicts')
+  })
+})
+
+describe('a review start', () => {
+  const reviewStart = { ...issueStart, pullRequestNumber: 43, workflow: 'review' as const }
+  const message = sessionPromptFor(reviewStart, [])
+
+  it('runs the review workflow on the pull request', () => {
+    expect(message.split('\n\n')[0]).toBe('/workflow:start review https://github.com/cnotv/generative-art/pull/43')
+    expect(message).toContain('The workflow is `review`.')
+    expect(sessionNameFor(reviewStart)).toBe('generative-art #43 review')
+  })
+
+  it('reads the diff and the ticket, changes nothing and posts the findings on the pull request', () => {
+    expect(message).toContain('Read the diff of the pull request and the ticket it closes')
+    expect(message).toContain('change nothing')
+    expect(message).toContain('No issue, branch, commit or push')
+    expect(message).toContain('review comment on the pull request')
+    expect(message).toContain('End with a short report')
+  })
+
+  it('does not ask for the steps of a change: no tests, branch, ready mark or draft', () => {
+    expect(message).not.toContain('Branch:')
+    expect(message).not.toContain('Tests first')
+    expect(message).not.toContain('mark the pull request ready')
+    expect(message).not.toContain('turned it back to draft')
   })
 })
 
@@ -288,7 +329,7 @@ describe('laptop starts', () => {
     expect((await app.request(runnerRequest(`/starts/${queuedStartId}`, second, { state: 'started' }))).status).toBe(404)
   })
 
-  it('refuses repositories that are not configured, and any workflow but conflicts, since the agent picks it', async () => {
+  it('refuses repositories that are not configured, and any workflow but conflicts and review, since the agent picks the rest', async () => {
     const { app } = createTestApp()
     expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ repository: { owner: 'someone', name: 'else' } })))).status).toBe(404)
     expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ workflow: 'rm -rf' })))).status).toBe(400)

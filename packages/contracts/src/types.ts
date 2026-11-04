@@ -356,9 +356,10 @@ export interface CreatedMachineToken {
   token: string
 }
 
-// The one workflow a start names itself: a merge-conflict start already knows its job. Every
-// other start leaves the workflow to the agent's start skill, which reads the request.
-export type StartWorkflow = 'conflicts'
+// The workflows a start names itself, because they already know their job: fixing a pull
+// request's merge conflicts, and reviewing a pull request. Every other start leaves the workflow to
+// the agent's start skill, which reads the request.
+export type StartWorkflow = 'conflicts' | 'review'
 
 export type StartTarget = 'laptop-remote-control' | 'laptop-headless' | 'laptop-cloud' | 'cloud-routine'
 

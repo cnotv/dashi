@@ -108,8 +108,8 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
   })
 
   // The attachments are never stored: a laptop start's wait in memory for its runner, and a
-  // routine's go out with the prompt. A start on a pull request turns it back into a draft first,
-  // so the board shows it as being changed until the session marks it ready again.
+  // routine's go out with the prompt. A start that changes a pull request turns it back into a
+  // draft first, so the board shows it as being changed until the session marks it ready again.
   const launchStart = async (
     request: SessionStartRequest,
     attachments: StartAttachment[],
@@ -149,7 +149,11 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
     if (routine !== null && routineText.length > routineTextCharacters) {
       return { ok: false, status: 413, error: `The first message comes to ${routineText.length} characters; a routine takes at most ${routineTextCharacters}` }
     }
-    if (request.pullRequestNumber !== null) await markPullRequestDraft(session, repository, request.pullRequestNumber)
+    if (request.workflow === 'review' && request.pullRequestNumber === null) {
+      return { ok: false, status: 422, error: 'A review needs the pull request to review' }
+    }
+    // A review changes nothing, so the pull request stays as it is.
+    if (request.pullRequestNumber !== null && request.workflow !== 'review') await markPullRequestDraft(session, repository, request.pullRequestNumber)
     if (routine === null) {
       const queuedStart = startStore.createStart({ ...request, repository })
       attachmentRelay.hold(queuedStart.startId, attachments)

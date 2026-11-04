@@ -174,7 +174,7 @@ export const BoardCardItem = ({ card, repository, showRepository, onPullRequestC
                 <PreviewButton previewUrl={card.pullRequest.previewUrl} />
                 <PullRequestMedia repository={repository} pullRequest={card.pullRequest} />
                 <PullRequestFilesDrawer repository={repository} pullRequest={card.pullRequest} />
-                <PullRequestActions repository={repository} pullRequest={card.pullRequest} onChanged={onPullRequestChanged} />
+                <PullRequestActions repository={repository} pullRequest={card.pullRequest} issue={card.issues[0] ?? null} onChanged={onPullRequestChanged} />
               </>
             )}
           </Flex>

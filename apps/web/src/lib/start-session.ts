@@ -1,4 +1,4 @@
-import type { RepositoryReference, SessionStartSubmission, StartAgent, StartOptions, StartTarget, TicketAgent, TicketAgentLine } from '@dashi/contracts'
+import type { RepositoryReference, SessionStart, SessionStartSubmission, StartAgent, StartOptions, StartTarget, TicketAgent, TicketAgentLine } from '@dashi/contracts'
 import { claudeModelPattern, takesClaudeModel } from '@dashi/contracts/claude-models'
 import { openRouterModelPattern, takesOpenCode, takesOpenRouterModel } from '@dashi/contracts/open-router'
 import { opencodeModelPattern } from '@dashi/contracts/opencode-models'
@@ -216,4 +216,41 @@ export const issueStartSubmissionFor = (repository: RepositoryReference, issueNu
   claudeModel: claudeModelFor(choices, target),
   note,
   attachments: [],
+})
+
+/**
+ * The Claude model that wrote a pull request, as far as Dashi knows it: the model of the newest
+ * Claude start on the issue the pull request closes.
+ * @param starts The starts, newest first.
+ * @param repository The repository of the pull request.
+ * @param issueNumber The issue the pull request closes, or null when it closes none.
+ * @returns The model alias or id, or null when no start on that issue named one.
+ */
+export const implementerModelOf = (starts: SessionStart[], repository: RepositoryReference, issueNumber: number | null): string | null =>
+  issueNumber === null
+    ? null
+    : (starts.find(
+        (start) =>
+          start.repository.owner === repository.owner &&
+          start.repository.name === repository.name &&
+          start.issueNumber === issueNumber &&
+          start.pullRequestNumber === null &&
+          start.agent === 'claude' &&
+          start.claudeModel !== null,
+      )?.claudeModel ?? null)
+
+// A second opinion comes from another model: Opus checks Sonnet, and anything else is checked by Sonnet.
+const reviewerModelFor = (implementerModel: string | null): string => (implementerModel?.includes('sonnet') ? 'opus' : 'sonnet')
+
+/**
+ * What a Review dialog holds when it opens: an unattended Claude session on a model other than the
+ * implementer's, Sonnet when the implementer's is not known. All of it can still be changed.
+ * @param implementerModel The model that wrote the pull request, or null when Dashi does not know it.
+ * @returns The dialog's choices.
+ */
+export const reviewerChoicesFor = (implementerModel: string | null): StartChoices => ({
+  ...choicesFromTicketAgent(null),
+  target: 'laptop-headless',
+  modelSource: 'claude',
+  claudeModel: reviewerModelFor(implementerModel),
 })
