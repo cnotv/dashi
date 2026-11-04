@@ -39,6 +39,13 @@ export const pullRequestNodeSchema = z.object({
   }),
 })
 
+const issueReferenceNodeSchema = z.object({
+  number: z.number(),
+  title: z.string(),
+  url: z.string(),
+  state: z.enum(['OPEN', 'CLOSED']),
+})
+
 export const issueNodeSchema = z.object({
   number: z.number(),
   title: z.string(),
@@ -47,6 +54,9 @@ export const issueNodeSchema = z.object({
   closedAt: z.string().nullable(),
   labels: z.object({ nodes: z.array(z.object({ name: z.string(), color: z.string() })) }),
   closedByPullRequestsReferences: z.object({ nodes: z.array(z.object({ number: z.number() })) }),
+  parent: issueReferenceNodeSchema.omit({ state: true }).nullable(),
+  subIssues: z.object({ nodes: z.array(issueReferenceNodeSchema) }),
+  blockedBy: z.object({ nodes: z.array(issueReferenceNodeSchema) }),
 })
 
 export const pullRequestBodyHtmlQuery = `
@@ -84,6 +94,14 @@ export const boardResponseSchema = z.object({
     }),
   }),
 })
+
+// An epic's sub-issues and a ticket's blockers are capped at 50, the most GitHub lets one board
+// query ask for without a second round trip.
+const issueRelationFields = `
+  parent { number title url }
+  subIssues(first: 50) { nodes { number title url state } }
+  blockedBy(first: 50) { nodes { number title url state } }
+`
 
 const pullRequestFields = `
   number
@@ -124,6 +142,7 @@ export const boardQuery = `
           updatedAt
           closedAt
           labels(first: 10) { nodes { name color } }
+          ${issueRelationFields}
           closedByPullRequestsReferences(first: 5, includeClosedPrs: false) { nodes { number } }
         }
       }
@@ -135,6 +154,7 @@ export const boardQuery = `
           updatedAt
           closedAt
           labels(first: 10) { nodes { name color } }
+          ${issueRelationFields}
           closedByPullRequestsReferences(first: 5, includeClosedPrs: true) { nodes { ${pullRequestFields} merged } }
         }
       }

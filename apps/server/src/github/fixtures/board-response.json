@@ -19,7 +19,31 @@
             "closedByPullRequestsReferences": {
               "nodes": []
             },
-            "closedAt": null
+            "closedAt": null,
+            "parent": {
+              "number": 10,
+              "title": "Epic: camera presets",
+              "url": "https://github.com/cnotv/generative-art/issues/10"
+            },
+            "subIssues": {
+              "nodes": []
+            },
+            "blockedBy": {
+              "nodes": [
+                {
+                  "number": 7,
+                  "title": "Fix marble stickiness",
+                  "url": "https://github.com/cnotv/generative-art/issues/7",
+                  "state": "OPEN"
+                },
+                {
+                  "number": 4,
+                  "title": "Show the frame rate",
+                  "url": "https://github.com/cnotv/generative-art/issues/4",
+                  "state": "CLOSED"
+                }
+              ]
+            }
           },
           {
             "number": 7,
@@ -36,7 +60,64 @@
                 }
               ]
             },
-            "closedAt": null
+            "closedAt": null,
+            "parent": {
+              "number": 10,
+              "title": "Epic: camera presets",
+              "url": "https://github.com/cnotv/generative-art/issues/10"
+            },
+            "subIssues": {
+              "nodes": []
+            },
+            "blockedBy": {
+              "nodes": [
+                {
+                  "number": 4,
+                  "title": "Show the frame rate",
+                  "url": "https://github.com/cnotv/generative-art/issues/4",
+                  "state": "CLOSED"
+                }
+              ]
+            }
+          },
+          {
+            "number": 10,
+            "title": "Epic: camera presets",
+            "url": "https://github.com/cnotv/generative-art/issues/10",
+            "updatedAt": "2026-09-25T10:00:00Z",
+            "closedAt": null,
+            "labels": {
+              "nodes": []
+            },
+            "closedByPullRequestsReferences": {
+              "nodes": []
+            },
+            "parent": null,
+            "subIssues": {
+              "nodes": [
+                {
+                  "number": 12,
+                  "title": "Add a camera preset",
+                  "url": "https://github.com/cnotv/generative-art/issues/12",
+                  "state": "OPEN"
+                },
+                {
+                  "number": 7,
+                  "title": "Fix marble stickiness",
+                  "url": "https://github.com/cnotv/generative-art/issues/7",
+                  "state": "OPEN"
+                },
+                {
+                  "number": 4,
+                  "title": "Show the frame rate",
+                  "url": "https://github.com/cnotv/generative-art/issues/4",
+                  "state": "CLOSED"
+                }
+              ]
+            },
+            "blockedBy": {
+              "nodes": []
+            }
           }
         ]
       },
@@ -120,6 +201,13 @@
                   "merged": true
                 }
               ]
+            },
+            "parent": null,
+            "subIssues": {
+              "nodes": []
+            },
+            "blockedBy": {
+              "nodes": []
             }
           }
         ]

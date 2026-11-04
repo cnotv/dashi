@@ -1,4 +1,4 @@
-import type { Board, CheckGate, IssueSummary, PullRequestSummary, RepositoryReference } from '@dashi/contracts'
+import type { Board, CheckGate, IssueReference, IssueSummary, PullRequestSummary, RepositoryReference } from '@dashi/contracts'
 import { deployPreviewUrlFromGates, previewPageUrl } from '../netlify/deploy-preview.ts'
 import { mediaPresenceFromMarkdown } from './media.ts'
 import { boardQuery, boardResponseSchema, graphqlErrorsSchema, pullRequestBodyHtmlQuery, pullRequestBodyHtmlResponseSchema } from './schema.ts'
@@ -45,6 +45,13 @@ export const mapPullRequestNode = (node: PullRequestNode): PullRequestSummary =>
   }
 }
 
+const mapIssueReferenceNode = (node: IssueNode['blockedBy']['nodes'][number]): IssueReference => ({
+  number: node.number,
+  title: node.title,
+  url: node.url,
+  state: node.state === 'OPEN' ? 'open' : 'closed',
+})
+
 /**
  * Turns an issue from the board query into the summary the board shows.
  * @param node The issue from GitHub.
@@ -58,6 +65,9 @@ export const mapIssueNode = (node: IssueNode): IssueSummary => ({
   closedAt: node.closedAt,
   labels: node.labels.nodes,
   linkedPullRequestNumbers: node.closedByPullRequestsReferences.nodes.map((reference) => reference.number),
+  parent: node.parent,
+  subIssues: node.subIssues.nodes.map(mapIssueReferenceNode),
+  blockedBy: node.blockedBy.nodes.map(mapIssueReferenceNode),
 })
 
 /**

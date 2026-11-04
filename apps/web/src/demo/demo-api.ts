@@ -224,6 +224,9 @@ export const createDemoApi = (): DashboardApi => {
         closedAt: null,
         labels: [],
         linkedPullRequestNumbers: [],
+        parent: null,
+        subIssues: [],
+        blockedBy: [],
       }
       demoMemory.createdIssues = new Map([...demoMemory.createdIssues, [repositoryKey(repository), [issue, ...createdIssues]]])
       return { number: issueNumber, url }

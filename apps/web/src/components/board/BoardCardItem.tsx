@@ -1,6 +1,7 @@
 import { FileTextIcon, GlobeIcon, Link2Icon } from '@radix-ui/react-icons'
 import { Badge, Card, Flex, IconButton, Link, Separator, Text, Tooltip } from '@radix-ui/themes'
 import type { BoardCard, IssueSummary, RepositoryReference } from '@dashi/contracts'
+import { isReadyTicket, openBlockers } from '@/lib/issue-relations'
 import { GateIndicator } from './GateIndicator'
 import { PullRequestActions } from './PullRequestActions'
 import { PullRequestFilesDrawer } from './PullRequestFilesDrawer'
@@ -14,11 +15,51 @@ interface BoardCardItemProps {
   onPullRequestChanged: () => void
 }
 
+const EpicLine = ({ issue }: { issue: IssueSummary }) =>
+  issue.parent === null ? null : (
+    <Text size="1" color="gray">
+      Epic{' '}
+      <Link href={issue.parent.url} target="_blank" rel="noopener noreferrer" color="gray" underline="hover">
+        #{issue.parent.number} {issue.parent.title}
+      </Link>
+    </Text>
+  )
+
+const SubIssueProgress = ({ issue }: { issue: IssueSummary }) =>
+  issue.subIssues.length === 0 ? null : (
+    <Text size="1" color="gray">
+      {issue.subIssues.filter((subIssue) => subIssue.state === 'closed').length} of {issue.subIssues.length} sub-issues closed
+    </Text>
+  )
+
+const RelationBadges = ({ issue }: { issue: IssueSummary }) => {
+  const blockers = openBlockers(issue)
+  return (
+    <Flex gap="1" wrap="wrap">
+      {blockers.map((blocker) => (
+        <Badge key={blocker.number} color="orange" variant="soft" radius="full" asChild>
+          <a href={blocker.url} target="_blank" rel="noopener noreferrer" title={blocker.title}>
+            blocked by #{blocker.number}
+          </a>
+        </Badge>
+      ))}
+      {isReadyTicket(issue) && (
+        <Badge color="green" variant="soft" radius="full">
+          ready
+        </Badge>
+      )}
+    </Flex>
+  )
+}
+
 const IssueHeading = ({ issue }: { issue: IssueSummary }) => (
   <Flex direction="column" gap="1">
+    <EpicLine issue={issue} />
     <Link href={issue.url} target="_blank" rel="noopener noreferrer" size="2" weight="medium" highContrast underline="hover">
       #{issue.number} {issue.title}
     </Link>
+    <SubIssueProgress issue={issue} />
+    <RelationBadges issue={issue} />
     {issue.labels.length > 0 && (
       <Flex gap="1" wrap="wrap">
         {issue.labels.map((label) => (
