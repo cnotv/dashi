@@ -355,6 +355,12 @@ export interface OpenCodeModel {
   name: string
 }
 
+// A model Claude Code starts can name, as the start dialog offers it.
+export interface ClaudeModel {
+  id: string
+  name: string
+}
+
 export type SessionStartState = 'queued' | 'claimed' | 'started' | 'failed'
 
 export interface SessionStartRequest {
@@ -370,8 +376,10 @@ export interface SessionStartRequest {
   // key; null runs it on the laptop's Claude login.
   openRouterModel: string | null
   // An OpenCode provider model slug for an unattended OpenCode start; null uses OpenCode's default.
-  // A start runs on at most one of the two.
   opencodeModel: string | null
+  // A claude --model alias or id for a Claude Code start on a laptop; null uses the login's default.
+  // A start runs on at most one of the Claude, OpenRouter and OpenCode models.
+  claudeModel: string | null
   note: string
 }
 

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { claudeModelPattern } from '@dashi/contracts/claude-models'
 import { openRouterModelPattern } from '@dashi/contracts/open-router'
 import { opencodeModelPattern } from '@dashi/contracts/opencode-models'
 
@@ -19,6 +20,7 @@ export const sessionStartRequestSchema = z.object({
   permissionMode: z.enum(['auto', 'acceptEdits', 'dontAsk']).default('auto'),
   openRouterModel: z.string().regex(openRouterModelPattern).nullable().default(null),
   opencodeModel: z.string().regex(opencodeModelPattern).nullable().default(null),
+  claudeModel: z.string().regex(claudeModelPattern).nullable().default(null),
   note: z.string().trim().max(20000).default(''),
 })
 

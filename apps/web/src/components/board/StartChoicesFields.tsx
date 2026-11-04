@@ -1,6 +1,7 @@
 import { Callout, Flex, Link, RadioCards, SegmentedControl, Select, Text } from '@radix-ui/themes'
 import { useOpenRouterModels } from '@/hooks/useSessionStarts'
 import type { StartOptions, StartTarget } from '@dashi/contracts'
+import { claudeModels } from '@dashi/contracts/claude-models'
 import { openCodeModels } from '@dashi/contracts/opencode-models'
 import {
   permissionModeLabels,
@@ -8,11 +9,10 @@ import {
   startAgentLabels,
   startAgentOrder,
   startModelSourceLabels,
-  startModelSourceOrders,
   startTargetLabels,
   startTargetOrder,
 } from '@/lib/presentation'
-import { choicesWithAgent, targetAvailabilityFor } from '@/lib/start-session'
+import { agentFor, choicesWithAgent, modelSourcesFor, targetAvailabilityFor } from '@/lib/start-session'
 import type { StartChoices, StartTargetAvailability } from '@/lib/types'
 
 interface StartChoicesFieldsProps {
@@ -83,6 +83,34 @@ const OpenRouterModelField = ({ choices, onChange, modelProblem }: UnattendedFie
   )
 }
 
+// A full id typed into an Agent line is not among the aliases offered, so it is listed as well, or the choice would show blank.
+const ClaudeModelField = ({ choices, onChange, modelProblem }: UnattendedFieldsProps) => {
+  const isListed = choices.claudeModel === '' || claudeModels.some((model) => model.id === choices.claudeModel)
+  const offered = isListed ? claudeModels : [...claudeModels, { id: choices.claudeModel, name: choices.claudeModel }]
+  return (
+    <>
+      <Select.Root value={choices.claudeModel} onValueChange={(value) => onChange({ ...choices, claudeModel: value })}>
+        <Select.Trigger aria-label="Claude model" placeholder="Pick a model" />
+        <Select.Content>
+          {offered.map((model) => (
+            <Select.Item key={model.id} value={model.id}>
+              {model.name}
+            </Select.Item>
+          ))}
+        </Select.Content>
+      </Select.Root>
+      <Text size="1" color="gray">
+        Passed to claude as --model. An alias follows the latest model of its family.
+      </Text>
+      {modelProblem && (
+        <Text size="1" color="red">
+          {modelProblem}
+        </Text>
+      )}
+    </>
+  )
+}
+
 const OpenCodeModelField = ({ choices, onChange, modelProblem }: UnattendedFieldsProps) => (
   <>
     <Select.Root
@@ -109,8 +137,8 @@ const OpenCodeModelField = ({ choices, onChange, modelProblem }: UnattendedField
   </>
 )
 
-// What only an unattended laptop session asks: the agent that runs it, what it may do on its own, and its model.
-const UnattendedFields = ({ choices, onChange, modelProblem }: UnattendedFieldsProps) => (
+// What only an unattended laptop session asks: the agent that runs it, and what it may do on its own.
+const UnattendedFields = ({ choices, onChange }: Pick<UnattendedFieldsProps, 'choices' | 'onChange'>) => (
   <>
     <Flex direction="column" gap="2">
       <Text size="2" weight="medium">
@@ -149,6 +177,22 @@ const UnattendedFields = ({ choices, onChange, modelProblem }: UnattendedFieldsP
         </Select.Content>
       </Select.Root>
     </label>
+  </>
+)
+
+// A cloud routine runs on the model its routine is set to, and the routines API takes no model, so it is not asked for there.
+const ModelFields = ({ choices, onChange, modelProblem, target }: UnattendedFieldsProps & { target: StartTarget }) => {
+  const sources = modelSourcesFor(agentFor(choices, target), target)
+  const source = sources.includes(choices.modelSource) ? choices.modelSource : 'default'
+  const labels = startModelSourceLabels[agentFor(choices, target)]
+  if (sources.length === 0) {
+    return (
+      <Text size="1" color="gray">
+        A cloud routine runs on the model its routine is set to. The routines API cannot change it per start, so set it in the routine itself.
+      </Text>
+    )
+  }
+  return (
     <Flex direction="column" gap="2">
       <Text size="2" weight="medium">
         Model
@@ -156,24 +200,25 @@ const UnattendedFields = ({ choices, onChange, modelProblem }: UnattendedFieldsP
       <SegmentedControl.Root
         aria-label="Model"
         size={segmentedControlSize}
-        value={choices.modelSource}
-        onValueChange={(value) => onChange({ ...choices, modelSource: startModelSourceOrders[choices.agent].find((source) => source === value) ?? 'default' })}
+        value={source}
+        onValueChange={(value) => onChange({ ...choices, modelSource: sources.find((candidate) => candidate === value) ?? 'default' })}
       >
-        {startModelSourceOrders[choices.agent].map((source) => (
-          <SegmentedControl.Item key={source} value={source}>
-            {startModelSourceLabels[choices.agent][source]}
+        {sources.map((candidate) => (
+          <SegmentedControl.Item key={candidate} value={candidate}>
+            {labels[candidate]}
           </SegmentedControl.Item>
         ))}
       </SegmentedControl.Root>
-      {choices.modelSource === 'openrouter' && <OpenRouterModelField choices={choices} onChange={onChange} modelProblem={modelProblem} />}
-      {choices.modelSource === 'opencode' && <OpenCodeModelField choices={choices} onChange={onChange} modelProblem={modelProblem} />}
+      {source === 'claude' && <ClaudeModelField choices={choices} onChange={onChange} modelProblem={modelProblem} />}
+      {source === 'openrouter' && <OpenRouterModelField choices={choices} onChange={onChange} modelProblem={modelProblem} />}
+      {source === 'opencode' && <OpenCodeModelField choices={choices} onChange={onChange} modelProblem={modelProblem} />}
     </Flex>
-  </>
-)
+  )
+}
 
 /**
- * The choices every start dialog asks for: where the session runs, and for an unattended laptop
- * session the agent, its permission mode and the model it runs on. The workflow is the session's
+ * The choices every start dialog asks for: where the session runs, for an unattended laptop session
+ * the agent and its permission mode, and the model a Claude Code session or an unattended one runs on. The workflow is the session's
  * own pick.
  */
 export const StartChoicesFields = ({
@@ -223,6 +268,7 @@ export const StartChoicesFields = ({
         </Text>
       )}
     </Flex>
-    {chosenTarget === 'laptop-headless' && <UnattendedFields choices={choices} onChange={onChange} modelProblem={modelProblem} />}
+    {chosenTarget === 'laptop-headless' && <UnattendedFields choices={choices} onChange={onChange} />}
+    {chosenTarget !== null && <ModelFields choices={choices} onChange={onChange} modelProblem={modelProblem} target={chosenTarget} />}
   </>
 )

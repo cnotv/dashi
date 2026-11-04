@@ -322,6 +322,46 @@ describe('laptop starts', () => {
     expect((await app.request(jsonRequest('POST', '/api/session-starts', startBody({ ...headless, openRouterModel: '--model x' })))).status).toBe(400)
   })
 
+  it('hands the runner a Claude model on every laptop target, and keeps it on a retry', async () => {
+    const { app, runnerTokens, startStore } = createTestApp()
+    const { token } = runnerTokens.createToken('Mac mini')
+    const startId = await startIdOf(await app.request(jsonRequest('POST', '/api/session-starts', startBody({ claudeModel: 'sonnet' }))))
+    expect(await (await app.request(runnerRequest('/claim', token))).json()).toMatchObject({ start: { startId, claudeModel: 'sonnet' } })
+    startStore.recordOutcome(startId, { state: 'failed', sessionUrl: null, message: 'Model unavailable' })
+    expect(await (await app.request(jsonRequest('POST', `/api/session-starts/${startId}/retry`, {}))).json()).toMatchObject({
+      state: 'queued',
+      claudeModel: 'sonnet',
+    })
+    const headless = await app.request(jsonRequest('POST', '/api/session-starts', startBody({ target: 'laptop-headless', claudeModel: 'claude-opus-4-1[1m]' })))
+    expect(await headless.json()).toMatchObject({ claudeModel: 'claude-opus-4-1[1m]' })
+  })
+
+  it('runs a start on the login default unless it names a Claude model, and takes only an alias or a claude id', async () => {
+    const { app } = createTestApp()
+    expect(await (await app.request(jsonRequest('POST', '/api/session-starts', startBody()))).json()).toMatchObject({ claudeModel: null })
+    const rejected = ['--dangerously-skip-permissions', 'sonnet --print', '$(whoami)', 'gpt-5', 'claude-', '']
+    const statuses = await Promise.all(rejected.map(async (claudeModel) => (await app.request(jsonRequest('POST', '/api/session-starts', startBody({ claudeModel })))).status))
+    expect(statuses).toEqual(rejected.map(() => 400))
+  })
+
+  it('says a cloud routine cannot take a Claude model, since the routine fixes its own', async () => {
+    const { app } = createTestApp()
+    const response = await app.request(jsonRequest('POST', '/api/session-starts', startBody({ target: 'cloud-routine', claudeModel: 'opus' })))
+    expect(response.status).toBe(422)
+    expect(await response.json()).toEqual({ error: "A cloud routine runs on the model its routine is set to, so it cannot take a Claude model" })
+  })
+
+  it('refuses a Claude model for OpenCode, and beside an OpenRouter or OpenCode model', async () => {
+    const { app } = createTestApp()
+    const headless = { target: 'laptop-headless', claudeModel: 'opus' }
+    const opencodeResponse = await app.request(jsonRequest('POST', '/api/session-starts', startBody({ ...headless, agent: 'opencode' })))
+    expect(opencodeResponse.status).toBe(422)
+    expect(await opencodeResponse.json()).toEqual({ error: 'Only a Claude Code session can run on a Claude model' })
+    const openRouterResponse = await app.request(jsonRequest('POST', '/api/session-starts', startBody({ ...headless, openRouterModel: 'openai/gpt-5-mini' })))
+    expect(openRouterResponse.status).toBe(422)
+    expect(await openRouterResponse.json()).toEqual({ error: 'A start runs on at most one of a Claude model, an OpenRouter model and an OpenCode model' })
+  })
+
   it('hands the runner an unattended start on an OpenCode model, and keeps the model on a retry', async () => {
     const { app, runnerTokens, startStore } = createTestApp()
     const { token } = runnerTokens.createToken('Mac mini')
@@ -366,7 +406,7 @@ describe('laptop starts', () => {
       ),
     )
     expect(bothResponse.status).toBe(422)
-    expect(await bothResponse.json()).toEqual({ error: 'A start runs on an OpenRouter model or an OpenCode model, not both' })
+    expect(await bothResponse.json()).toEqual({ error: 'A start runs on at most one of a Claude model, an OpenRouter model and an OpenCode model' })
   })
 
   it('hands the runner an unattended OpenCode start, and runs every other start on Claude Code', async () => {

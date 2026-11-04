@@ -34,6 +34,7 @@ interface ClaimedStart {
     permissionMode: PermissionMode
     openRouterModel: string | null
     opencodeModel: string | null
+    claudeModel: string | null
   }
   prompt: string
   sessionName: string
@@ -64,6 +65,7 @@ interface ChatWorkSession {
   start: ChatWorkStart | null
   cloudSessionId: string | null
   openRouterModel: string | null
+  claudeModel: string | null
 }
 
 interface ChatWorkDelivery extends ChatWorkSession {
@@ -204,6 +206,15 @@ const openRouterModelOf = (value: unknown): string | null | undefined => {
   return typeof value === 'string' && openRouterModelPattern.test(value) ? value : undefined
 }
 
+// A claude --model alias or id, or null for the login's default. The same pattern as
+// claudeModelPattern in packages/contracts, repeated because the runner is served as one file. It
+// starts with a letter, so it can never pass for a flag.
+const claudeModelPattern = /^(?:(?:opus|sonnet|haiku)(?:\[1m\])?|opusplan|claude-[a-z0-9][a-z0-9._-]{0,62}(?:\[1m\])?)$/
+const claudeModelOf = (value: unknown): string | null | undefined => {
+  if (value === null || value === undefined) return null
+  return typeof value === 'string' && claudeModelPattern.test(value) ? value : undefined
+}
+
 // An OpenCode provider model slug, or null for OpenCode's default. The same pattern as
 // opencodeModelPattern in packages/contracts, repeated because the runner is served as one file.
 const opencodeModelPattern = /^opencode\/[a-z0-9][a-z0-9._-]{0,63}$/
@@ -224,16 +235,19 @@ export const parseClaim = (claimBody: unknown): ClaimedStart | null => {
   const attachments = parseAttachments(claimBody.attachments)
   const openRouterModel = openRouterModelOf(start.openRouterModel)
   const opencodeModel = opencodeModelOf(start.opencodeModel)
+  const claudeModel = claudeModelOf(start.claudeModel)
   // A dashboard from before OpenCode sends no agent, which is Claude Code.
   const agent = start.agent ?? 'claude'
-  if (!isRecord(repositoryBody) || attachments === null || openRouterModel === undefined || opencodeModel === undefined || !isOneOf(startAgents, agent)) return null
+  if (!isRecord(repositoryBody) || attachments === null || openRouterModel === undefined || opencodeModel === undefined || claudeModel === undefined || !isOneOf(startAgents, agent)) return null
   const repository = { owner: String(repositoryBody.owner), name: String(repositoryBody.name) }
   if (typeof prompt !== 'string' || typeof sessionName !== 'string' || typeof startId !== 'string') return null
   if (!/^[0-9a-f-]{36}$/.test(startId) || !isSafeRepository(repository)) return null
   if (!isOneOf(laptopTargets, target) || !isOneOf(permissionModes, permissionMode)) return null
   if ((openRouterModel !== null || opencodeModel !== null || agent === 'opencode') && target !== 'laptop-headless') return null
   if (opencodeModel !== null && (agent !== 'opencode' || openRouterModel !== null)) return null
-  return { start: { startId, repository, target, agent, permissionMode, openRouterModel, opencodeModel }, prompt, sessionName, attachments }
+  // A Claude model belongs to Claude Code alone, and a start runs on at most one model choice.
+  if (claudeModel !== null && (agent !== 'claude' || openRouterModel !== null || opencodeModel !== null)) return null
+  return { start: { startId, repository, target, agent, permissionMode, openRouterModel, opencodeModel, claudeModel }, prompt, sessionName, attachments }
 }
 
 /**
@@ -377,6 +391,9 @@ const openCodePlanFor = (claimed: ClaimedStart, paths: RunnerPaths, runnerEnviro
   }
 }
 
+// Its own argument, never joined to a shell string; the pattern keeps the value from passing for a flag.
+const modelArgumentsFor = (claudeModel: string | null): string[] => (claudeModel === null ? [] : ['--model', claudeModel])
+
 /**
  * Decides the command that starts a claimed session, by where it should run.
  * @param claimed The claimed start.
@@ -387,14 +404,14 @@ const openCodePlanFor = (claimed: ClaimedStart, paths: RunnerPaths, runnerEnviro
 export const launchPlanFor = (claimed: ClaimedStart, paths: RunnerPaths, runnerEnvironment: NodeJS.ProcessEnv): LaunchPlan => {
   const environment = { DASHI_START_ID: claimed.start.startId }
   if (claimed.start.target === 'laptop-cloud') {
-    return { mode: 'capture', command: 'claude', args: ['--cloud', claimed.prompt], cwd: paths.clonePath, environment }
+    return { mode: 'capture', command: 'claude', args: ['--cloud', ...modelArgumentsFor(claimed.start.claudeModel), claimed.prompt], cwd: paths.clonePath, environment }
   }
   if (claimed.start.target === 'laptop-headless' && claimed.start.agent === 'opencode') return openCodePlanFor(claimed, paths, runnerEnvironment)
   if (claimed.start.target === 'laptop-headless') {
     return {
       mode: 'detached',
       command: 'claude',
-      args: ['-p', claimed.prompt, '--permission-mode', claimed.start.permissionMode, '--output-format', 'json'],
+      args: ['-p', claimed.prompt, '--permission-mode', claimed.start.permissionMode, '--output-format', 'json', ...modelArgumentsFor(claimed.start.claudeModel)],
       cwd: paths.worktreePath,
       environment: { ...environment, ...modelEnvironmentFor(claimed.start.openRouterModel, runnerEnvironment) },
     }
@@ -418,6 +435,7 @@ export const launchPlanFor = (claimed: ClaimedStart, paths: RunnerPaths, runnerE
       '--remote-control',
       '--name',
       claimed.sessionName,
+      ...modelArgumentsFor(claimed.start.claudeModel),
       claimed.prompt,
     ],
     cwd: paths.worktreePath,
@@ -452,8 +470,9 @@ const chatWorkSessionOf = (value: unknown): ChatWorkSession | null => {
   const start = chatWorkStartOf(value.start)
   const cloudSessionId = chatWorkCloudSessionOf(value.cloudSessionId)
   const openRouterModel = openRouterModelOf(value.openRouterModel)
-  if (sessionState === undefined || start === undefined || cloudSessionId === undefined || openRouterModel === undefined) return null
-  return { sessionId: value.sessionId, sessionState, start, cloudSessionId, openRouterModel }
+  const claudeModel = claudeModelOf(value.claudeModel)
+  if (sessionState === undefined || start === undefined || cloudSessionId === undefined || openRouterModel === undefined || claudeModel === undefined) return null
+  return { sessionId: value.sessionId, sessionState, start, cloudSessionId, openRouterModel, claudeModel }
 }
 
 const chatWorkDeliveryOf = (value: unknown): ChatWorkDelivery | null => {
@@ -650,9 +669,10 @@ export const cloudSendOutcomeOf = (standardOutput: string, standardError: string
  * The command line that continues an ended session with one message, unattended.
  * @param sessionId The session to resume.
  * @param text The message.
+ * @param claudeModel The Claude model the start named, so the resumed session stays on it, or null for the login's default.
  * @returns The arguments for claude.
  */
-export const resumeArgumentsFor = (sessionId: string, text: string): string[] => [
+export const resumeArgumentsFor = (sessionId: string, text: string, claudeModel: string | null): string[] => [
   '--resume',
   sessionId,
   '-p',
@@ -661,6 +681,7 @@ export const resumeArgumentsFor = (sessionId: string, text: string): string[] =>
   'auto',
   '--output-format',
   'json',
+  ...modelArgumentsFor(claudeModel),
 ]
 
 // A runner installed before the rename to Dashi has its settings under AGENT_DASHBOARD_* names,
@@ -884,7 +905,7 @@ const resumeWithMessage = (settings: RunnerSettings, claudeSessionId: string, de
   const logPath = join(settings.runnerHome, 'logs', `chat-${claudeSessionId.slice(0, 8)}.log`)
   mkdirSync(dirname(logPath), { recursive: true })
   const logDescriptor = openSync(logPath, 'a')
-  spawn('claude', resumeArgumentsFor(claudeSessionId, delivery.text), {
+  spawn('claude', resumeArgumentsFor(claudeSessionId, delivery.text, delivery.claudeModel), {
     cwd: directory,
     env: environment,
     detached: true,

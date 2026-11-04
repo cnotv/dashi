@@ -13,6 +13,7 @@ const startAt = (createdAt: string, overrides: Partial<SessionStart> = {}): Sess
   permissionMode: 'auto',
   openRouterModel: null,
   opencodeModel: null,
+  claudeModel: null,
   note: '',
   state: 'started',
   runnerLabel: null,

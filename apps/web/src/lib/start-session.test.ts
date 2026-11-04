@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { StartOptions } from '@dashi/contracts'
+import type { StartOptions, StartTarget } from '@dashi/contracts'
 import { runnerLaunchAgentCommands, runnerReviewCommands, runnerSystemdCommands, runnerTryCommands } from './runner-setup'
-import { agentFor, choicesWithAgent, defaultTargetFor, opencodeModelFor, openRouterModelFor, startModelProblemFor, targetAvailabilityFor } from './start-session'
+import { agentFor, choicesWithAgent, claudeModelFor, defaultTargetFor, modelSourcesFor, opencodeModelFor, openRouterModelFor, startModelProblemFor, targetAvailabilityFor } from './start-session'
 
 const onlineRunner = { label: 'Mac mini', lastSeenAt: '2026-09-30T10:00:00Z', isOnline: true }
 const optionsWith = (overrides: Partial<StartOptions>): StartOptions => ({
@@ -58,22 +58,22 @@ describe('agentFor', () => {
 
 describe('choicesWithAgent', () => {
   it("keeps the permission mode when the new agent has it, and falls back to auto when it does not", () => {
-    const choices = { target: null, agent: 'claude' as const, permissionMode: 'acceptEdits' as const, modelSource: 'default' as const, openRouterModel: '', opencodeModel: '' }
+    const choices = { target: null, agent: 'claude' as const, permissionMode: 'acceptEdits' as const, modelSource: 'default' as const, openRouterModel: '', opencodeModel: '', claudeModel: '' }
     expect(choicesWithAgent(choices, 'opencode')).toMatchObject({ agent: 'opencode', permissionMode: 'auto' })
     expect(choicesWithAgent({ ...choices, permissionMode: 'dontAsk' }, 'opencode')).toMatchObject({ permissionMode: 'dontAsk' })
     expect(choicesWithAgent({ ...choices, agent: 'opencode', permissionMode: 'dontAsk' }, 'claude')).toMatchObject({ agent: 'claude', permissionMode: 'dontAsk' })
   })
 
   it('keeps the model source when the new agent offers it, and falls back to the default when it does not', () => {
-    const choices = { target: null, agent: 'opencode' as const, permissionMode: 'auto' as const, modelSource: 'opencode' as const, openRouterModel: '', opencodeModel: 'opencode/big-pickle' }
+    const choices = { target: null, agent: 'opencode' as const, permissionMode: 'auto' as const, modelSource: 'opencode' as const, openRouterModel: '', opencodeModel: 'opencode/big-pickle', claudeModel: '' }
     expect(choicesWithAgent(choices, 'claude')).toMatchObject({ agent: 'claude', modelSource: 'default' })
     expect(choicesWithAgent({ ...choices, modelSource: 'openrouter' }, 'claude')).toMatchObject({ modelSource: 'openrouter' })
   })
 })
 
 describe('the model a start runs on', () => {
-  const onOpenRouter = { agent: 'claude' as const, modelSource: 'openrouter' as const, openRouterModel: 'meta-llama/llama-3.3-70b-instruct:free', opencodeModel: '' }
-  const onOpenCodeModel = { agent: 'opencode' as const, modelSource: 'opencode' as const, openRouterModel: '', opencodeModel: 'opencode/longcat-2.5-preview-free' }
+  const onOpenRouter = { agent: 'claude' as const, modelSource: 'openrouter' as const, openRouterModel: 'meta-llama/llama-3.3-70b-instruct:free', opencodeModel: '', claudeModel: '' }
+  const onOpenCodeModel = { agent: 'opencode' as const, modelSource: 'opencode' as const, openRouterModel: '', opencodeModel: 'opencode/longcat-2.5-preview-free', claudeModel: '' }
 
   it('sends an OpenRouter model only for an unattended laptop start that picked one', () => {
     expect(openRouterModelFor(onOpenRouter, 'laptop-headless')).toBe('meta-llama/llama-3.3-70b-instruct:free')
@@ -88,6 +88,36 @@ describe('the model a start runs on', () => {
     expect(opencodeModelFor(onOpenCodeModel, 'laptop-remote-control')).toBeNull()
     expect(opencodeModelFor(onOpenCodeModel, 'cloud-routine')).toBeNull()
     expect(opencodeModelFor({ ...onOpenCodeModel, modelSource: 'default' }, 'laptop-headless')).toBeNull()
+  })
+
+  it('sends a Claude model for a Claude Code start on any laptop target that picked one, never for a routine', () => {
+    const onClaudeModel = { agent: 'claude' as const, modelSource: 'claude' as const, openRouterModel: '', opencodeModel: '', claudeModel: 'sonnet' }
+    expect(['laptop-headless', 'laptop-remote-control', 'laptop-cloud'].map((target) => claudeModelFor(onClaudeModel, target as StartTarget))).toEqual([
+      'sonnet',
+      'sonnet',
+      'sonnet',
+    ])
+    expect(claudeModelFor(onClaudeModel, 'cloud-routine')).toBeNull()
+    expect(claudeModelFor({ ...onClaudeModel, modelSource: 'default' }, 'laptop-headless')).toBeNull()
+    expect(claudeModelFor({ ...onClaudeModel, agent: 'opencode' }, 'laptop-headless')).toBeNull()
+  })
+
+  it('offers the Claude model beside the login default on every laptop target, and nothing for a routine', () => {
+    expect(modelSourcesFor('claude', 'laptop-headless')).toEqual(['default', 'claude', 'openrouter'])
+    expect(modelSourcesFor('claude', 'laptop-remote-control')).toEqual(['default', 'claude'])
+    expect(modelSourcesFor('claude', 'laptop-cloud')).toEqual(['default', 'claude'])
+    expect(modelSourcesFor('claude', 'cloud-routine')).toEqual([])
+    expect(modelSourcesFor('opencode', 'laptop-headless')).toEqual(['default', 'openrouter', 'opencode'])
+  })
+
+  it('holds the start back until a Claude model reads as an alias or a claude id', () => {
+    const onClaudeModel = { agent: 'claude' as const, modelSource: 'claude' as const, openRouterModel: '', opencodeModel: '', claudeModel: 'opus' }
+    expect(startModelProblemFor(onClaudeModel, 'laptop-remote-control')).toBeNull()
+    expect(startModelProblemFor({ ...onClaudeModel, claudeModel: '' }, 'laptop-remote-control')).toBe('Pick a Claude model to run on')
+    expect(startModelProblemFor({ ...onClaudeModel, claudeModel: 'gpt-5' }, 'laptop-headless')).toBe(
+      'A Claude model is an alias such as opus, sonnet or haiku, or a full id such as claude-sonnet-4-5',
+    )
+    expect(startModelProblemFor({ ...onClaudeModel, claudeModel: '' }, 'cloud-routine')).toBeNull()
   })
 
   it('holds the start back until an OpenRouter model reads as a model slug', () => {

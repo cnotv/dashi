@@ -9,7 +9,7 @@ import { dashboardApi } from '@/lib/api'
 import { readAttachment } from '@/lib/attachments'
 import { issueBodyFor, issueTitleFrom } from '@/lib/new-issue'
 import { errorMessageOf, parseRepositoryKey, repositoryKey } from '@/lib/presentation'
-import { agentFor, opencodeModelFor, openRouterModelFor } from '@/lib/start-session'
+import { agentFor, claudeModelFor, opencodeModelFor, openRouterModelFor } from '@/lib/start-session'
 import type { PickedAttachment } from '@/lib/types'
 import { StartChoicesFields } from './StartChoicesFields'
 import { StartedSummary } from './StartedSummary'
@@ -126,6 +126,7 @@ export const NewIssueDialog = ({ defaultRepository }: NewIssueDialogProps) => {
         permissionMode: choices.permissionMode,
         openRouterModel: openRouterModelFor(choices, chosenTarget),
         opencodeModel: opencodeModelFor(choices, chosenTarget),
+        claudeModel: claudeModelFor(choices, chosenTarget),
         note: text.trim(),
         attachments: pickedAttachments.map((picked) => picked.attachment),
       })

@@ -306,8 +306,8 @@ here. A laptop session's conversation lives on the laptop, so it needs the lapto
 - A message goes into a session running in tmux (every steerable start from Dashi does), pasted
   into its pane and sent. An unattended start takes one once its transcript has been quiet for a
   minute, by being resumed. An ended session is resumed unattended with
-  `claude --resume <id> -p <message>`, its output going to `~/dashi/logs`, on the OpenRouter model
-  of the start it came from, if any. A session
+  `claude --resume <id> -p <message>`, its output going to `~/dashi/logs`, on the Claude or OpenRouter
+  model of the start it came from, if any. A session
   waiting on a permission, or running in a plain terminal, can't take one, and the drawer says
   why.
 
@@ -401,6 +401,20 @@ row's details icon opens the start in full: where it ran, its links, the first m
 was sent, and for a failed one what the error means and a **Retry**, which starts it again as a new
 start with the same request (without attachments, which are never kept).
 
+### Choose a Claude model
+
+A Claude Code start on any laptop target can name its model: pick **Claude** under **Model** in the
+Start dialog, then **Opus**, **Sonnet** or **Haiku**. The runner passes it as `--model <alias>` in
+the argument list, never through a shell, and a resumed chat keeps it. The server accepts an alias
+(`opus`, `sonnet`, `haiku`, `opusplan`, each with an optional `[1m]`) or a full id such as
+`claude-sonnet-4-5`, and refuses anything else before it reaches the runner. Left on **Login
+default**, the session uses the model the laptop's Claude login picks. A start names at most one of
+a Claude, an OpenRouter and an OpenCode model.
+
+A cloud routine cannot take one: the [routines API](https://platform.claude.com/docs/en/api/claude-code/routines-fire)
+fires a routine with only its `text`, so the routine runs on the model it is set to, and the dialog
+says so instead of offering the choice.
+
 ### Run on an OpenRouter model
 
 An unattended laptop start can run on any [OpenRouter model](https://openrouter.ai/models) instead
@@ -429,7 +443,7 @@ unattended laptop start can run on OpenCode instead: pick **OpenCode** under **A
 dialog. Its model is OpenCode's own default; one of the free models on OpenCode's own provider,
 picked under **Model** as **OpenCode** (`--model=opencode/<slug>`, no key needed); or an OpenRouter
 model (`--model=openrouter/<slug>`) on the laptop's `OPENROUTER_API_KEY`, as above. Claude Code
-starts are not offered OpenCode's models, and a start names at most one of the two. OpenCode's
+starts are not offered OpenCode's models, and a start names at most one model of a kind. OpenCode's
 permission settings decide what it may do; **Auto** adds `--auto`, which approves what those
 settings do not deny. OpenCode has no
 Remote Control and Dashi cannot read its conversation, so it is not offered for steerable or cloud

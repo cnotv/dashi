@@ -90,6 +90,26 @@ describe('parseClaim', () => {
   })
 })
 
+describe('parseClaim and the Claude model', () => {
+  it('reads a Claude model on every laptop target, and only as an alias or a claude id', () => {
+    expect(claimOf().start.claudeModel).toBeNull()
+    const targets = ['laptop-remote-control', 'laptop-headless', 'laptop-cloud']
+    expect(targets.map((target) => claimOf({ target, claudeModel: 'sonnet' }).start.claudeModel)).toEqual(['sonnet', 'sonnet', 'sonnet'])
+    expect(claimOf({ claudeModel: 'claude-opus-4-1[1m]' }).start.claudeModel).toBe('claude-opus-4-1[1m]')
+    expect(parseClaim(claimBody({ claudeModel: '--dangerously-skip-permissions' }))).toBeNull()
+    expect(parseClaim(claimBody({ claudeModel: 'sonnet\n--print' }))).toBeNull()
+    expect(parseClaim(claimBody({ claudeModel: 'gpt-5' }))).toBeNull()
+    expect(parseClaim(claimBody({ claudeModel: 7 }))).toBeNull()
+  })
+
+  it('refuses a Claude model beside an OpenRouter or OpenCode model, or for OpenCode', () => {
+    const headless = { target: 'laptop-headless', claudeModel: 'opus' }
+    expect(parseClaim(claimBody({ ...headless, openRouterModel: 'openai/gpt-5-mini' }))).toBeNull()
+    expect(parseClaim(claimBody({ ...headless, agent: 'opencode' }))).toBeNull()
+    expect(parseClaim(claimBody({ ...headless, agent: 'opencode', opencodeModel: 'opencode/big-pickle' }))).toBeNull()
+  })
+})
+
 describe('attachments', () => {
   const screenshot = { name: 'ramp.png', mediaType: 'image/png', base64: 'aGVsbG8=' }
 
@@ -140,6 +160,20 @@ describe('launchPlanFor', () => {
     const plan = launchPlanFor(claimOf({ target: 'laptop-headless', permissionMode: 'acceptEdits' }), paths, {})
     expect(plan).toMatchObject({ mode: 'detached', command: 'claude', cwd: paths.worktreePath, environment: { DASHI_START_ID: claimOf().start.startId } })
     expect(plan.args).toEqual(['-p', claimOf().prompt, '--permission-mode', 'acceptEdits', '--output-format', 'json'])
+  })
+
+  it('passes a Claude model to claude as its own argument on every laptop target', () => {
+    const headless = launchPlanFor(claimOf({ target: 'laptop-headless', claudeModel: 'sonnet' }), paths, {})
+    expect(headless.args).toEqual(['-p', claimOf().prompt, '--permission-mode', 'auto', '--output-format', 'json', '--model', 'sonnet'])
+    const steerable = launchPlanFor(claimOf({ claudeModel: 'claude-opus-4-1' }), paths, {})
+    expect(steerable.args.slice(-5)).toEqual(['--name', 'generative-art #42', '--model', 'claude-opus-4-1', claimOf().prompt])
+    expect(launchPlanFor(claimOf({ target: 'laptop-cloud', claudeModel: 'haiku' }), paths, {}).args).toEqual([
+      '--cloud',
+      '--model',
+      'haiku',
+      claimOf().prompt,
+    ])
+    expect(launchPlanFor(claimOf({ target: 'laptop-headless' }), paths, {}).args).not.toContain('--model')
   })
 
   it('runs an unattended session on an OpenRouter model with the laptop key in its environment only', () => {
@@ -278,8 +312,8 @@ describe('parseChatWork', () => {
       ],
     })
     expect(work).toEqual({
-      sessions: [{ sessionId, sessionState: 'working', start: null, cloudSessionId: null, openRouterModel: null }],
-      deliveries: [{ deliveryId, sessionId, text: 'Also the docs', sessionState: null, start: null, cloudSessionId: null, openRouterModel: null }],
+      sessions: [{ sessionId, sessionState: 'working', start: null, cloudSessionId: null, openRouterModel: null, claudeModel: null }],
+      deliveries: [{ deliveryId, sessionId, text: 'Also the docs', sessionState: null, start: null, cloudSessionId: null, openRouterModel: null, claudeModel: null }],
     })
     expect(parseChatWork(null)).toEqual({ sessions: [], deliveries: [] })
   })
@@ -288,7 +322,7 @@ describe('parseChatWork', () => {
     const start = { repositoryName: 'generative-art', startId, target: 'laptop-headless' }
     const startChatId = `start-${startId}`
     expect(parseChatWork({ sessions: [{ sessionId: startChatId, sessionState: null, start }], deliveries: [] }).sessions).toEqual([
-      { sessionId: startChatId, sessionState: null, start, cloudSessionId: null, openRouterModel: null },
+      { sessionId: startChatId, sessionState: null, start, cloudSessionId: null, openRouterModel: null, claudeModel: null },
     ])
     const escaping = { sessionId: startChatId, sessionState: null, start: { ...start, repositoryName: '..' } }
     const cloud = { sessionId: startChatId, sessionState: null, start: { ...start, target: 'laptop-cloud' } }
@@ -297,14 +331,22 @@ describe('parseChatWork', () => {
 
   it('keeps the OpenRouter model a session resumes on, and drops one that is not a model slug', () => {
     const onModel = { sessionId, sessionState: 'ended', openRouterModel: 'openai/gpt-5-mini' }
-    expect(parseChatWork({ sessions: [onModel], deliveries: [] }).sessions).toEqual([{ ...onModel, start: null, cloudSessionId: null }])
+    expect(parseChatWork({ sessions: [onModel], deliveries: [] }).sessions).toEqual([{ ...onModel, start: null, cloudSessionId: null, claudeModel: null }])
     expect(parseChatWork({ sessions: [{ ...onModel, openRouterModel: '-p x' }], deliveries: [] }).sessions).toEqual([])
+  })
+
+  it('keeps the Claude model a session resumes on, and drops one that is not an alias or a claude id', () => {
+    const onModel = { sessionId, sessionState: 'ended', claudeModel: 'sonnet' }
+    expect(parseChatWork({ sessions: [onModel], deliveries: [] }).sessions).toEqual([
+      { ...onModel, start: null, cloudSessionId: null, openRouterModel: null },
+    ])
+    expect(parseChatWork({ sessions: [{ ...onModel, claudeModel: '-p x' }], deliveries: [] }).sessions).toEqual([])
   })
 
   it('keeps the cloud session a message goes to, and drops one that is not a cloud session id', () => {
     const cloudSessionId = 'session_01AbCdEfGh'
     const delivery = { deliveryId, sessionId: cloudSessionId, text: 'Also the docs', sessionState: null, start: null }
-    expect(parseChatWork({ sessions: [], deliveries: [{ ...delivery, cloudSessionId }] }).deliveries).toEqual([{ ...delivery, cloudSessionId, openRouterModel: null }])
+    expect(parseChatWork({ sessions: [], deliveries: [{ ...delivery, cloudSessionId }] }).deliveries).toEqual([{ ...delivery, cloudSessionId, openRouterModel: null, claudeModel: null }])
     expect(parseChatWork({ sessions: [], deliveries: [{ ...delivery, cloudSessionId: '--help' }] }).deliveries).toEqual([])
   })
 })
@@ -360,6 +402,7 @@ describe('chatDeliveryPlanFor', () => {
     start: { repositoryName: 'generative-art', startId, target: 'laptop-headless' as const },
     cloudSessionId: null,
     openRouterModel: null,
+    claudeModel: null,
   }
 
   it('waits for an unattended start to go quiet, then resumes it', () => {
@@ -457,7 +500,7 @@ describe('deliveryPlanFor', () => {
   })
 
   it('passes the message to a resumed session as one argument', () => {
-    expect(resumeArgumentsFor(sessionId, 'a; $(rm -rf ~)')).toEqual([
+    expect(resumeArgumentsFor(sessionId, 'a; $(rm -rf ~)', null)).toEqual([
       '--resume',
       sessionId,
       '-p',
@@ -467,5 +510,9 @@ describe('deliveryPlanFor', () => {
       '--output-format',
       'json',
     ])
+  })
+
+  it('keeps the Claude model a start named when its session is resumed', () => {
+    expect(resumeArgumentsFor(sessionId, 'more', 'opus').slice(-2)).toEqual(['--model', 'opus'])
   })
 })

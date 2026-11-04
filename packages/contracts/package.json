@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/types.ts",
+    "./claude-models": "./src/claude-models.ts",
     "./first-message": "./src/first-message.ts",
     "./open-router": "./src/open-router.ts",
     "./opencode-models": "./src/opencode-models.ts"

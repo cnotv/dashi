@@ -18,6 +18,7 @@ import { addServedScriptRoutes } from '../app/served-script.ts'
 import type { DashboardSession } from '../auth/types.ts'
 import { findRepository } from '../repos/load-repositories.ts'
 import { sessionNameFor, sessionPromptFor } from '@dashi/contracts/first-message'
+import { takesClaudeModel } from '@dashi/contracts/claude-models'
 import { takesOpenCode, takesOpenRouterModel } from '@dashi/contracts/open-router'
 import { attachmentDeliveryFor, attachmentLimitProblem, attachmentLimits } from './attachments.ts'
 import { createOpenRouterModelCache } from './open-router-models.ts'
@@ -129,8 +130,14 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
     if (request.opencodeModel !== null && request.agent !== 'opencode') {
       return { ok: false, status: 422, error: 'Only an OpenCode session can run on an OpenCode model' }
     }
-    if (request.openRouterModel !== null && request.opencodeModel !== null) {
-      return { ok: false, status: 422, error: 'A start runs on an OpenRouter model or an OpenCode model, not both' }
+    if (request.claudeModel !== null && !takesClaudeModel(request.target)) {
+      return { ok: false, status: 422, error: 'A cloud routine runs on the model its routine is set to, so it cannot take a Claude model' }
+    }
+    if (request.claudeModel !== null && request.agent !== 'claude') {
+      return { ok: false, status: 422, error: 'Only a Claude Code session can run on a Claude model' }
+    }
+    if ([request.claudeModel, request.openRouterModel, request.opencodeModel].filter((model) => model !== null).length > 1) {
+      return { ok: false, status: 422, error: 'A start runs on at most one of a Claude model, an OpenRouter model and an OpenCode model' }
     }
     const limitProblem = attachmentLimitProblem(attachments, request.target)
     if (limitProblem !== null) return { ok: false, status: 413, error: limitProblem }
@@ -179,11 +186,11 @@ export const createSessionStartRoutes = (dependencies: SessionStartDependencies)
     const failedStart = startStore.readStart(context.req.param('startId'))
     if (failedStart === null) return context.json({ error: 'Unknown start' }, 404)
     if (failedStart.state !== 'failed') return context.json({ error: 'Only a failed start can be retried' }, 409)
-    const { repository, issueNumber, pullRequestNumber, workflow, target, agent, permissionMode, openRouterModel, opencodeModel, note } = failedStart
+    const { repository, issueNumber, pullRequestNumber, workflow, target, agent, permissionMode, openRouterModel, opencodeModel, claudeModel, note } = failedStart
     return answerLaunch(
       context,
       await launchStart(
-        { repository, issueNumber, pullRequestNumber, workflow, target, agent, permissionMode, openRouterModel, opencodeModel, note },
+        { repository, issueNumber, pullRequestNumber, workflow, target, agent, permissionMode, openRouterModel, opencodeModel, claudeModel, note },
         [],
         context.get('session'),
       ),
