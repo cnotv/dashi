@@ -2,6 +2,7 @@ import type {
   Board,
   BoardCard,
   CheckGate,
+  EpicTicket,
   GateState,
   GateSummary,
   IssueStatus,
@@ -97,28 +98,40 @@ export const pullRequestClosesIssue = (pullRequest: PullRequestSummary, issue: I
 
 const newestFirst = (first: { updatedAt: string }, second: { updatedAt: string }): number => second.updatedAt.localeCompare(first.updatedAt)
 
+type IssuePairing = { issue: IssueSummary; pullRequest: PullRequestSummary | null }
+
+const ticketsOfEpic = (epic: IssueSummary, pairings: IssuePairing[]): EpicTicket[] =>
+  pairings.filter(({ issue }) => issue.parent?.number === epic.number)
+
 /**
  * Gives each pull request one card listing every issue it works on, gives each issue without a
  * pull request a card of its own, and keeps pull requests without an issue as cards too.
- * An issue with several pull requests goes with the most recently updated one.
+ * An issue with several pull requests goes with the most recently updated one. The card of an
+ * epic also lists its open tickets; a ticket without a pull request has no card of its own, and
+ * one with a pull request keeps the card of that pull request as well.
  * @param issues The open issues.
  * @param pullRequests The open pull requests.
  * @returns One card per pull request and per issue that has none.
  */
 export const buildBoardCards = (issues: IssueSummary[], pullRequests: PullRequestSummary[]): BoardCard[] => {
   const pullRequestsNewestFirst = [...pullRequests].sort(newestFirst)
-  const issuesWithPullRequest = issues.map((issue) => ({
+  const pairings: IssuePairing[] = issues.map((issue) => ({
     issue,
     pullRequest: pullRequestsNewestFirst.find((pullRequest) => pullRequestClosesIssue(pullRequest, issue)) ?? null,
   }))
-  const pullRequestCards = pullRequestsNewestFirst.map((pullRequest) => ({
-    issues: issuesWithPullRequest.filter((pairing) => pairing.pullRequest === pullRequest).map((pairing) => pairing.issue),
-    pullRequest,
-    status: deriveIssueStatus(pullRequest),
-  }))
-  const issueOnlyCards = issuesWithPullRequest
-    .filter((pairing) => pairing.pullRequest === null)
-    .map((pairing) => ({ issues: [pairing.issue], pullRequest: null, status: deriveIssueStatus(null) }))
+  const isTicketOfOpenEpic = (issue: IssueSummary): boolean => issues.some((other) => other.number === issue.parent?.number)
+  const pullRequestCards = pullRequestsNewestFirst.map((pullRequest) => {
+    const cardIssues = pairings.filter((pairing) => pairing.pullRequest === pullRequest).map((pairing) => pairing.issue)
+    return {
+      issues: cardIssues,
+      pullRequest,
+      status: deriveIssueStatus(pullRequest),
+      tickets: cardIssues.flatMap((issue) => ticketsOfEpic(issue, pairings)),
+    }
+  })
+  const issueOnlyCards = pairings
+    .filter(({ issue, pullRequest }) => pullRequest === null && !isTicketOfOpenEpic(issue))
+    .map(({ issue }) => ({ issues: [issue], pullRequest: null, status: deriveIssueStatus(null), tickets: ticketsOfEpic(issue, pairings) }))
   return [...pullRequestCards, ...issueOnlyCards]
 }
 
@@ -137,7 +150,7 @@ export const buildBoard = (
   pullRequests: PullRequestSummary[],
   fetchedAt: string,
 ): Board => {
-  const closedCards: BoardCard[] = issues.closed.map(({ issue, pullRequest }) => ({ issues: [issue], pullRequest, status: 'closed' }))
+  const closedCards: BoardCard[] = issues.closed.map(({ issue, pullRequest }) => ({ issues: [issue], pullRequest, status: 'closed', tickets: [] }))
   const boardCards = [...buildBoardCards(issues.open, pullRequests), ...closedCards]
   return {
     repository,

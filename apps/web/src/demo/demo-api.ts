@@ -38,7 +38,7 @@ const demoCopiedSkillFileCount = 12
 const withCreatedIssues = (columns: BoardColumn[], createdIssues: IssueSummary[]): BoardColumn[] =>
   columns.map((column) =>
     column.status === 'no-pull-request'
-      ? { ...column, cards: [...createdIssues.map((issue) => ({ issues: [issue], pullRequest: null, status: column.status })), ...column.cards] }
+      ? { ...column, cards: [...createdIssues.map((issue) => ({ issues: [issue], pullRequest: null, status: column.status, tickets: [] })), ...column.cards] }
       : column,
   )
 

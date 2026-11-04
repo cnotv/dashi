@@ -6,6 +6,8 @@ import type {
   Board,
   BoardCard,
   CreatedMachineToken,
+  EpicTicket,
+  IssueReference,
   IssueStatus,
   MachineTokenSummary,
   MachineTokenKind,
@@ -111,6 +113,26 @@ export interface RepositoryWorkflowSkills {
 export interface RepositoryBoardCard {
   card: BoardCard
   repository: RepositoryReference
+}
+
+export type EpicTicketState = 'blocked' | 'ready' | 'in-progress' | 'closed'
+
+export interface TicketRow {
+  ticket: EpicTicket
+  // How many tickets it waits beneath; 0 for a ticket nothing in the epic blocks.
+  depth: number
+}
+
+export interface EpicViewRow {
+  number: number
+  title: string
+  url: string
+  depth: number
+  state: EpicTicketState
+  // The tickets still holding it back; empty once it is closed.
+  blockers: IssueReference[]
+  pullRequestNumber: number | null
+  pullRequestUrl: string | null
 }
 
 export interface RepositoryBoardColumn {

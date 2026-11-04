@@ -1,7 +1,10 @@
 import { FileTextIcon, GlobeIcon, Link2Icon } from '@radix-ui/react-icons'
 import { Badge, Card, Flex, IconButton, Link, Separator, Text, Tooltip } from '@radix-ui/themes'
+import { Link as RouterLink } from 'react-router'
 import type { BoardCard, IssueSummary, RepositoryReference } from '@dashi/contracts'
-import { isReadyTicket, openBlockers } from '@/lib/issue-relations'
+import { epicViewPath } from '@/lib/epic-tickets'
+import { isReadyTicket } from '@/lib/issue-relations'
+import { EpicTickets } from './EpicTickets'
 import { GateIndicator } from './GateIndicator'
 import { PullRequestActions } from './PullRequestActions'
 import { PullRequestFilesDrawer } from './PullRequestFilesDrawer'
@@ -32,34 +35,24 @@ const SubIssueProgress = ({ issue }: { issue: IssueSummary }) =>
     </Text>
   )
 
-const RelationBadges = ({ issue }: { issue: IssueSummary }) => {
-  const blockers = openBlockers(issue)
-  return (
-    <Flex gap="1" wrap="wrap">
-      {blockers.map((blocker) => (
-        <Badge key={blocker.number} color="orange" variant="soft" radius="full" asChild>
-          <a href={blocker.url} target="_blank" rel="noopener noreferrer" title={blocker.title}>
-            blocked by #{blocker.number}
-          </a>
-        </Badge>
-      ))}
-      {isReadyTicket(issue) && (
-        <Badge color="green" variant="soft" radius="full">
-          ready
-        </Badge>
-      )}
+// A ticket on a card of its own says when it can be started; in an epic card, the Start button on its row does.
+const ReadyBadge = ({ issue, hasPullRequest }: { issue: IssueSummary; hasPullRequest: boolean }) =>
+  !hasPullRequest && isReadyTicket(issue) ? (
+    <Flex>
+      <Badge color="green" variant="soft" radius="full">
+        ready
+      </Badge>
     </Flex>
-  )
-}
+  ) : null
 
-const IssueHeading = ({ issue }: { issue: IssueSummary }) => (
+const IssueHeading = ({ issue, hasPullRequest }: { issue: IssueSummary; hasPullRequest: boolean }) => (
   <Flex direction="column" gap="1">
     <EpicLine issue={issue} />
     <Link href={issue.url} target="_blank" rel="noopener noreferrer" size="2" weight="medium" highContrast underline="hover">
       #{issue.number} {issue.title}
     </Link>
     <SubIssueProgress issue={issue} />
-    <RelationBadges issue={issue} />
+    <ReadyBadge issue={issue} hasPullRequest={hasPullRequest} />
     {issue.labels.length > 0 && (
       <Flex gap="1" wrap="wrap">
         {issue.labels.map((label) => (
@@ -127,12 +120,25 @@ export const BoardCardItem = ({ card, repository, showRepository, onPullRequestC
               No linked issue
             </Text>
           ) : (
-            card.issues.map((issue) => <IssueHeading key={issue.number} issue={issue} />)
+            card.issues.map((issue) => <IssueHeading key={issue.number} issue={issue} hasPullRequest={card.pullRequest !== null} />)
           )}
           {card.status === 'closed' && card.issues[0] && <ClosedNote issue={card.issues[0]} />}
+          {card.tickets.length > 0 && card.issues[0] && (
+            <Text size="1">
+              <Link asChild>
+                <RouterLink to={epicViewPath(repository, card.issues[0].number)}>Open the epic view</RouterLink>
+              </Link>
+            </Text>
+          )}
         </Flex>
         {card.pullRequest && <GateIndicator gates={card.pullRequest.gates} summary={card.pullRequest.gateSummary} />}
       </Flex>
+      {card.tickets.length > 0 && (
+        <>
+          <Separator size="4" />
+          <EpicTickets tickets={card.tickets} repository={repository} />
+        </>
+      )}
       {card.pullRequest && (
         <>
           <Separator size="4" />

@@ -108,10 +108,19 @@ export type IssueStatus =
   | 'approved'
   | 'closed'
 
+// A ticket of an epic shown inside the epic's card, with the pull request working on it if any.
+export interface EpicTicket {
+  issue: IssueSummary
+  pullRequest: PullRequestSummary | null
+}
+
 export interface BoardCard {
   issues: IssueSummary[]
   pullRequest: PullRequestSummary | null
   status: IssueStatus
+  // The open tickets of the epic this card shows, empty on every other card. A ticket without a
+  // pull request has no card of its own and lives only here.
+  tickets: EpicTicket[]
 }
 
 export interface BoardColumn {

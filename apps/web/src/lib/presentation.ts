@@ -10,7 +10,7 @@ import type {
   StartAgent,
   StartTarget,
 } from '@dashi/contracts'
-import type { GateRingGroup, RadixColor, StartModelSource } from './types'
+import type { EpicTicketState, GateRingGroup, RadixColor, StartModelSource } from './types'
 
 export const issueStatusLabels: Record<IssueStatus, string> = {
   'no-pull-request': 'No pull request',
@@ -29,6 +29,20 @@ export const issueStatusColors: Record<IssueStatus, RadixColor> = {
   'checks-failing': 'red',
   'ready-for-review': 'indigo',
   approved: 'green',
+  closed: 'purple',
+}
+
+export const epicTicketStateLabels: Record<EpicTicketState, string> = {
+  blocked: 'Blocked',
+  ready: 'Ready',
+  'in-progress': 'In progress',
+  closed: 'Closed',
+}
+
+export const epicTicketStateColors: Record<EpicTicketState, RadixColor> = {
+  blocked: 'orange',
+  ready: 'green',
+  'in-progress': 'sky',
   closed: 'purple',
 }
 

@@ -130,7 +130,7 @@ describe('createDemoApi', () => {
     await demoApi.closePullRequest(repository, multiIssueCard!.pullRequest!)
     const issueOnlyCards = (await cardsOf()).filter((card) => card.pullRequest === null)
     multiIssueCard!.issues.forEach((issue) =>
-      expect(issueOnlyCards).toContainEqual({ issues: [issue], pullRequest: null, status: 'no-pull-request' }),
+      expect(issueOnlyCards).toContainEqual({ issues: [issue], pullRequest: null, status: 'no-pull-request', tickets: [] }),
     )
     await demoApi.mergePullRequest(repository, pullRequestOnlyCard!.pullRequest!)
     expect((await cardsOf()).some((card) => card.pullRequest?.number === pullRequestOnlyCard!.pullRequest!.number)).toBe(false)

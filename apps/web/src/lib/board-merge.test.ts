@@ -15,7 +15,7 @@ const issueUpdatedAt = (issueNumber: number, updatedAt: string): IssueSummary =>
   blockedBy: [],
 })
 
-const issueCard = (issue: IssueSummary): BoardCard => ({ issues: [issue], pullRequest: null, status: 'no-pull-request' })
+const issueCard = (issue: IssueSummary): BoardCard => ({ issues: [issue], pullRequest: null, status: 'no-pull-request', tickets: [] })
 
 const boardOf = (name: string, cards: BoardCard[]): Board => ({
   repository: { owner: 'cnotv', name },

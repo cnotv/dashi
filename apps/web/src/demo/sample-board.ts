@@ -95,7 +95,42 @@ const closedIssueOf = (issueNumber: number, title: string, closedAt: string, pul
   issues: [{ ...issueOf(issueNumber, title, pullRequest === null ? [] : [pullRequest.number]), updatedAt: closedAt, closedAt }],
   pullRequest,
   status: 'closed',
+  tickets: [],
 })
+
+const rampEditorTicket = issueOf(21, 'Add the ramp editor', [], [], {
+  parent: demoEpic,
+  blockedBy: [referenceOf(18, 'Add the arena floor', 'closed')],
+})
+const rampAngleTicket = issueOf(22, 'Show the ramp angle on screen', [], [], {
+  parent: demoEpic,
+  blockedBy: [referenceOf(21, 'Add the ramp editor', 'open')],
+})
+const saveRampsTicket = issueOf(23, 'Save ramps between rounds', [], [], {
+  parent: demoEpic,
+  blockedBy: [referenceOf(21, 'Add the ramp editor', 'open')],
+})
+const shareRampsTicket = issueOf(25, 'Share a ramp as a link', [], [], {
+  parent: demoEpic,
+  blockedBy: [referenceOf(22, 'Show the ramp angle on screen', 'open')],
+})
+const rampPresetsTicket = issueOf(24, 'Add the ramp presets', [32], [], { parent: demoEpic })
+const rampPresetsPullRequest: PullRequestSummary = {
+  number: 32,
+  title: 'feat: ramp presets (#24)',
+  url: 'https://github.com/cnotv/example/pull/32',
+  isDraft: true,
+  headRefName: 'feat/24-ramp-presets',
+  headSha: '89ab4567',
+  reviewDecision: null,
+  mergeable: 'UNKNOWN',
+  body: 'Closes #24',
+  updatedAt: '2026-09-27T09:00:00Z',
+  gates: [],
+  gateSummary: { passed: 0, failed: 0, pending: 0, total: 0, overallState: 'none' },
+  media: { hasImage: false, hasVideo: false },
+  previewUrl: null,
+}
 
 export const sampleBoardColumns: BoardColumn[] = [
   {
@@ -105,6 +140,7 @@ export const sampleBoardColumns: BoardColumn[] = [
         issues: [issueOf(12, 'Add a camera preset', [], [{ name: 'enhancement', color: 'a2eeef' }])],
         pullRequest: null,
         status: 'no-pull-request',
+        tickets: [],
       },
       {
         issues: [
@@ -113,37 +149,28 @@ export const sampleBoardColumns: BoardColumn[] = [
               referenceOf(18, 'Add the arena floor', 'closed'),
               referenceOf(21, 'Add the ramp editor', 'open'),
               referenceOf(22, 'Show the ramp angle on screen', 'open'),
+              referenceOf(23, 'Save ramps between rounds', 'open'),
+              referenceOf(24, 'Add the ramp presets', 'open'),
+              referenceOf(25, 'Share a ramp as a link', 'open'),
             ],
           }),
         ],
         pullRequest: null,
         status: 'no-pull-request',
-      },
-      {
-        issues: [
-          issueOf(21, 'Add the ramp editor', [], [], {
-            parent: demoEpic,
-            blockedBy: [referenceOf(18, 'Add the arena floor', 'closed')],
-          }),
+        tickets: [
+          { issue: rampEditorTicket, pullRequest: null },
+          { issue: rampAngleTicket, pullRequest: null },
+          { issue: saveRampsTicket, pullRequest: null },
+          { issue: shareRampsTicket, pullRequest: null },
+          { issue: rampPresetsTicket, pullRequest: rampPresetsPullRequest },
         ],
-        pullRequest: null,
-        status: 'no-pull-request',
-      },
-      {
-        issues: [
-          issueOf(22, 'Show the ramp angle on screen', [], [], {
-            parent: demoEpic,
-            blockedBy: [referenceOf(21, 'Add the ramp editor', 'open')],
-          }),
-        ],
-        pullRequest: null,
-        status: 'no-pull-request',
       },
     ],
   },
   {
     status: 'draft',
     cards: [
+      { issues: [rampPresetsTicket], pullRequest: rampPresetsPullRequest, status: 'draft', tickets: [] },
       {
         issues: [],
         pullRequest: {
@@ -163,6 +190,7 @@ export const sampleBoardColumns: BoardColumn[] = [
           previewUrl: null,
         },
         status: 'draft',
+        tickets: [],
       },
     ],
   },
@@ -192,6 +220,7 @@ export const sampleBoardColumns: BoardColumn[] = [
           previewUrl: 'https://deploy-preview-30--cnotv-example.netlify.app/games/MarbleMadness',
         },
         status: 'checks-failing',
+        tickets: [],
       },
     ],
   },
@@ -217,6 +246,7 @@ export const sampleBoardColumns: BoardColumn[] = [
           previewUrl: 'https://deploy-preview-29--cnotv-example.netlify.app',
         },
         status: 'ready-for-review',
+        tickets: [],
       },
     ],
   },
@@ -259,9 +289,10 @@ export const applyDemoPullRequestOutcomes = (
           issues: [{ ...issue, closedAt: now, updatedAt: now }],
           pullRequest: card.pullRequest,
           status: 'closed',
+          tickets: [],
         }))
       }
-      return card.issues.map((issue) => ({ issues: [issue], pullRequest: null, status: 'no-pull-request' }))
+      return card.issues.map((issue) => ({ issues: [issue], pullRequest: null, status: 'no-pull-request', tickets: [] }))
     })
   return columns.map((column) => ({ ...column, cards: cards.filter((card) => card.status === column.status) }))
 }

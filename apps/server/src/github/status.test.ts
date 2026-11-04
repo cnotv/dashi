@@ -151,6 +151,45 @@ describe('buildBoardCards', () => {
   })
 })
 
+describe('buildBoardCards with an epic', () => {
+  const epicReference = { number: 20, title: 'Epic', url: 'https://github.com/o/r/issues/20' }
+  const makeTicket = (number: number, linkedPullRequestNumbers: number[] = []): IssueSummary => ({
+    ...makeIssue(number, linkedPullRequestNumbers),
+    parent: epicReference,
+  })
+  const epic = { ...makeIssue(20), subIssues: [] }
+
+  it('keeps a ticket without a pull request only as a row of its epic card', () => {
+    const cards = buildBoardCards([epic, makeTicket(21), makeTicket(22)], [])
+    expect(cards).toHaveLength(1)
+    expect(cards[0]?.issues.map((issue) => issue.number)).toEqual([20])
+    expect(cards[0]?.tickets.map((ticket) => [ticket.issue.number, ticket.pullRequest])).toEqual([
+      [21, null],
+      [22, null],
+    ])
+  })
+
+  it('gives a ticket with a pull request its normal card as well as a row', () => {
+    const cards = buildBoardCards([epic, makeTicket(21), makeTicket(22)], [makePullRequest({ headRefName: 'feat/22-thing' })])
+    const epicCard = cards.find((card) => card.issues.some((issue) => issue.number === 20))
+    expect(epicCard?.tickets.map((ticket) => [ticket.issue.number, ticket.pullRequest?.number ?? null])).toEqual([
+      [21, null],
+      [22, 10],
+    ])
+    expect(cards.find((card) => card.pullRequest?.number === 10)?.issues.map((issue) => issue.number)).toEqual([22])
+  })
+
+  it('keeps a ticket whose epic is not on the board as a card of its own', () => {
+    const cards = buildBoardCards([makeTicket(21)], [])
+    expect(cards.map((card) => card.issues.map((issue) => issue.number))).toEqual([[21]])
+    expect(cards[0]?.tickets).toEqual([])
+  })
+
+  it('leaves tickets empty on cards that are not an epic', () => {
+    expect(buildBoardCards([makeIssue(1)], [makePullRequest({ headRefName: 'claude/other' })]).map((card) => card.tickets)).toEqual([[], []])
+  })
+})
+
 describe('buildBoard', () => {
   it('always returns every column in order', () => {
     const board = buildBoard({ owner: 'o', name: 'r' }, { open: [makeIssue(1)], closed: [] }, [], '2026-09-28T00:00:00Z')
@@ -185,8 +224,8 @@ describe('buildBoard', () => {
     expect(board.columns.at(-1)).toEqual({
       status: 'closed',
       cards: [
-        { issues: [closedIssue], pullRequest: mergedPullRequest, status: 'closed' },
-        { issues: [closedByHand], pullRequest: null, status: 'closed' },
+        { issues: [closedIssue], pullRequest: mergedPullRequest, status: 'closed', tickets: [] },
+        { issues: [closedByHand], pullRequest: null, status: 'closed', tickets: [] },
       ],
     })
   })
