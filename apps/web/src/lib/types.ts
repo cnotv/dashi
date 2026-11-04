@@ -46,9 +46,9 @@ import type {
   VaultState,
 } from '@dashi/contracts'
 
-// What an unattended laptop start runs on: the agent's own default (the laptop's Claude login, or OpenCode's
-// configured model), an OpenRouter model on the laptop's own key, or an OpenCode provider model.
-export type StartModelSource = 'default' | 'openrouter' | 'opencode'
+// What a start runs on: the agent's own default (the laptop's Claude login, or OpenCode's
+// configured model), a Claude model alias or id, an OpenRouter model on the laptop's own key, or an OpenCode provider model.
+export type StartModelSource = 'default' | 'claude' | 'openrouter' | 'opencode'
 
 export interface StartChoices {
   target: StartTarget | null
@@ -60,6 +60,8 @@ export interface StartChoices {
   openRouterModel: string
   // As picked; read through opencodeModelFor before it is sent.
   opencodeModel: string
+  // As picked; read through claudeModelFor before it is sent.
+  claudeModel: string
 }
 
 export interface PickedAttachment {

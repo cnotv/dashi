@@ -112,11 +112,13 @@ export const StartDetailsDrawer = ({ start, onClose, onRetried }: StartDetailsDr
             <DataList.Item>
               <DataList.Label>Model</DataList.Label>
               <DataList.Value>
-                {start.openRouterModel !== null
-                  ? `OpenRouter: ${start.openRouterModel}`
-                  : start.opencodeModel !== null
-                    ? `OpenCode: ${start.opencodeModel}`
-                    : startModelSourceLabels[start.agent].default}
+                {start.claudeModel !== null
+                  ? `Claude: ${start.claudeModel}`
+                  : start.openRouterModel !== null
+                    ? `OpenRouter: ${start.openRouterModel}`
+                    : start.opencodeModel !== null
+                      ? `OpenCode: ${start.opencodeModel}`
+                      : startModelSourceLabels[start.agent].default}
               </DataList.Value>
             </DataList.Item>
             <DataList.Item>

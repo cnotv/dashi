@@ -1,10 +1,11 @@
 import type { StartAgent, StartOptions, StartTarget } from '@dashi/contracts'
+import { claudeModelPattern, takesClaudeModel } from '@dashi/contracts/claude-models'
 import { openRouterModelPattern, takesOpenCode, takesOpenRouterModel } from '@dashi/contracts/open-router'
 import { opencodeModelPattern } from '@dashi/contracts/opencode-models'
 import { permissionModeOrders, startModelSourceOrders } from './presentation'
-import type { StartChoices, StartTargetAvailability } from './types'
+import type { StartChoices, StartModelSource, StartTargetAvailability } from './types'
 
-type ModelChoices = Pick<StartChoices, 'agent' | 'modelSource' | 'openRouterModel' | 'opencodeModel'>
+type ModelChoices = Pick<StartChoices, 'agent' | 'modelSource' | 'openRouterModel' | 'opencodeModel' | 'claudeModel'>
 
 /**
  * Tells whether a session takes attachments as files on the laptop, or only as text in its prompt.
@@ -54,6 +55,28 @@ const isOnOpenCodeModel = (choices: ModelChoices, target: StartTarget): boolean 
   choices.modelSource === 'opencode' && choices.agent === 'opencode' && takesOpenCode(target)
 
 /**
+ * The model sources a start can run on at a place: Claude Code on any laptop can run a Claude model,
+ * an unattended start can also run on OpenRouter (and OpenCode its own provider), and a cloud routine
+ * runs on whatever its routine is set to.
+ * @param agent The agent picked.
+ * @param target Where the session would run.
+ * @returns The sources to offer, none for a cloud routine.
+ */
+export const modelSourcesFor = (agent: StartAgent, target: StartTarget): StartModelSource[] => {
+  if (target === 'laptop-headless') return startModelSourceOrders[agent]
+  return takesClaudeModel(target) ? ['default', 'claude'] : []
+}
+
+/**
+ * The Claude model a start sends, when it runs on one.
+ * @param choices What the dialog's model fields hold.
+ * @param target Where the session would run; a cloud routine cannot take a model.
+ * @returns The alias or id, or null for the login's default.
+ */
+export const claudeModelFor = (choices: ModelChoices, target: StartTarget): string | null =>
+  choices.modelSource === 'claude' && agentFor(choices, target) === 'claude' && takesClaudeModel(target) ? choices.claudeModel : null
+
+/**
  * The OpenRouter model a start sends, when it runs on one.
  * @param choices What the dialog's model fields hold.
  * @param target Where the session would run; only an unattended laptop start can use OpenRouter.
@@ -78,6 +101,11 @@ export const opencodeModelFor = (choices: ModelChoices, target: StartTarget): st
  * @returns What to fix, or null when the start can go.
  */
 export const startModelProblemFor = (choices: ModelChoices, target: StartTarget): string | null => {
+  const claudeModel = claudeModelFor(choices, target)
+  if (claudeModel !== null) {
+    if (claudeModel === '') return 'Pick a Claude model to run on'
+    return claudeModelPattern.test(claudeModel) ? null : 'A Claude model is an alias such as opus, sonnet or haiku, or a full id such as claude-sonnet-4-5'
+  }
   const openRouterModel = openRouterModelFor(choices, target)
   if (openRouterModel !== null) {
     if (openRouterModel === '') return 'Pick an OpenRouter model to run on'

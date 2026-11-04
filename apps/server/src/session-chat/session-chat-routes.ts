@@ -131,21 +131,23 @@ export const createRunnerChatRoutes = ({
   const routes = new Hono<AppEnvironment & { Variables: { runnerLabel: string } }>()
   const requireRunnerToken = createRunnerTokenGuard(runnerTokens)
 
-  const openRouterModelOfStart = (startId: string | null): string | null =>
-    startId === null ? null : (findRecentStart(startStore, startId)?.openRouterModel ?? null)
+  const startModelsOf = (startId: string | null): Pick<ChatWorkContext, 'openRouterModel' | 'claudeModel'> => {
+    const start = startId === null ? undefined : findRecentStart(startStore, startId)
+    return { openRouterModel: start?.openRouterModel ?? null, claudeModel: start?.claudeModel ?? null }
+  }
 
   const contextOf = (chatId: string): ChatWorkContext => {
-    if (isCloudChatId(chatId)) return { sessionState: null, start: null, cloudSessionId: chatId, openRouterModel: null }
+    if (isCloudChatId(chatId)) return { sessionState: null, start: null, cloudSessionId: chatId, openRouterModel: null, claudeModel: null }
     if (chatId.startsWith(startChatIdPrefix)) {
       const startId = chatId.slice(startChatIdPrefix.length)
-      return { sessionState: null, start: findLaptopStart(startStore, startId), cloudSessionId: null, openRouterModel: openRouterModelOfStart(startId) }
+      return { sessionState: null, start: findLaptopStart(startStore, startId), cloudSessionId: null, ...startModelsOf(startId) }
     }
     const storedSession = activityStore.readSessions().find((session) => session.sessionId === chatId)
     return {
       sessionState: storedSession === undefined ? null : effectiveState(storedSession, now()),
       start: null,
       cloudSessionId: null,
-      openRouterModel: openRouterModelOfStart(storedSession?.origin.startId ?? null),
+      ...startModelsOf(storedSession?.origin.startId ?? null),
     }
   }
 

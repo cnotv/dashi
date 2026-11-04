@@ -23,7 +23,7 @@ const workStartSchema = z.object({ repositoryName: z.string(), startId: z.string
 
 const chatWorkSchema = z.object({
   sessions: z.array(
-    z.object({ sessionId: z.string(), sessionState: z.string().nullable(), start: workStartSchema, openRouterModel: z.string().nullable() }),
+    z.object({ sessionId: z.string(), sessionState: z.string().nullable(), start: workStartSchema, openRouterModel: z.string().nullable(), claudeModel: z.string().nullable() }),
   ),
   deliveries: z.array(
     z.object({
@@ -33,6 +33,7 @@ const chatWorkSchema = z.object({
       sessionState: z.string().nullable(),
       start: workStartSchema,
       openRouterModel: z.string().nullable(),
+      claudeModel: z.string().nullable(),
     }),
   ),
 })
@@ -77,7 +78,7 @@ describe('session chat', () => {
       occurredAt: new Date(clock.now).toISOString(),
     })
     await readChat()
-    expect((await takeWork()).sessions).toEqual([{ sessionId, sessionState: 'working', start: null, openRouterModel: null }])
+    expect((await takeWork()).sessions).toEqual([{ sessionId, sessionState: 'working', start: null, openRouterModel: null, claudeModel: null }])
 
     const report = transcriptReport(`Pushed with ${githubToken}`)
     expect((await app.request(runnerRequest(`/chat/${sessionId}`, token, report))).status).toBe(204)
@@ -104,7 +105,7 @@ describe('session chat', () => {
     const { deliveryId } = z.object({ deliveryId: z.string() }).parse(await queued.json())
 
     expect((await takeWork()).deliveries).toEqual([
-      { deliveryId, sessionId, text: 'Also update the docs', sessionState: null, start: null, openRouterModel: null },
+      { deliveryId, sessionId, text: 'Also update the docs', sessionState: null, start: null, openRouterModel: null, claudeModel: null },
     ])
     expect((await takeWork()).deliveries).toEqual([])
     expect((await readChat()).deliveries).toMatchObject([{ deliveryId, state: 'sent' }])
@@ -143,9 +144,28 @@ describe('session chat', () => {
     const work = await takeWork()
     const start = { repositoryName: 'generative-art', startId, target: 'laptop-headless' }
     const openRouterModel = 'openai/gpt-5-mini'
-    expect(work.sessions).toEqual([{ sessionId: `start-${startId}`, sessionState: null, start, openRouterModel }])
+    expect(work.sessions).toEqual([{ sessionId: `start-${startId}`, sessionState: null, start, openRouterModel, claudeModel: null }])
     expect(work.deliveries).toMatchObject([{ sessionId: `start-${startId}`, text: 'Carry on', start, openRouterModel }])
     expect((await readChat()).messages).toEqual([])
+  })
+
+  it('resumes the chat of a laptop start on the Claude model it named', async () => {
+    const { app, takeWork } = setUp()
+    const startResponse = await app.request(
+      jsonRequest('POST', '/api/session-starts', {
+        repository: { owner: 'cnotv', name: 'generative-art' },
+        issueNumber: 42,
+        target: 'laptop-headless',
+        claudeModel: 'sonnet',
+      }),
+    )
+    const { startId } = z.object({ startId: z.string() }).parse(await startResponse.json())
+    const startChatPath = `/api/session-starts/${startId}/chat`
+    await app.request(getRequest(startChatPath))
+    expect((await app.request(jsonRequest('POST', startChatPath, { text: 'Carry on' }))).status).toBe(201)
+    const work = await takeWork()
+    expect(work.sessions).toMatchObject([{ sessionId: `start-${startId}`, claudeModel: 'sonnet', openRouterModel: null }])
+    expect(work.deliveries).toMatchObject([{ text: 'Carry on', claudeModel: 'sonnet' }])
   })
 
   it("resumes a session opened from its row on the OpenRouter model of the board start it reported", async () => {
