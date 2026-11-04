@@ -363,13 +363,12 @@ Agent: <agent> <target> [model]
 - `<agent>` is `claude` or `opencode`.
 - `<target>` is one of `laptop-remote-control`, `laptop-headless`, `laptop-cloud` or `cloud-routine`.
   OpenCode runs only as `laptop-headless`.
-- `[model]` is optional. A Claude model name such as `opus` or `sonnet`, an OpenCode model such as
-  `opencode/big-pickle`, or an OpenRouter slug such as `anthropic/claude-sonnet-4.5` (only as
-  `laptop-headless`). Left out, the agent's own default applies.
+- `[model]` is optional. A Claude model name such as `opus` or `sonnet` (not for `cloud-routine`, which
+  runs on its own model), an OpenCode model such as `opencode/big-pickle`, or an OpenRouter slug such as
+  `anthropic/claude-sonnet-4.5` (only as `laptop-headless`). Left out, the agent's own default applies.
 
 For example `Agent: claude laptop-headless sonnet`. The first such line of the body counts. The Start
-dialog opens with that agent, target and model chosen, and all of it can still be changed. A Claude
-model is read and kept but not yet passed on to `claude`. A line Dashi cannot use, such as an unknown
+dialog opens with that agent, target and model chosen, and all of it can still be changed. A line Dashi cannot use, such as an unknown
 agent or target or a model the agent cannot run, is shown in red on the ticket's card and in the epic
 view, and the Start dialog ignores it.
 
