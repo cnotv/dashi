@@ -6,6 +6,7 @@ import { SortableTable } from '@/components/tables/SortableTable'
 import type { sortableTableFeatures } from '@/components/tables/sortable-table-features'
 import {
   formatCompactCount,
+  formatCost,
   formatFullCount,
   formatPercent,
   gitHubIssueUrl,
@@ -104,6 +105,12 @@ const workColumns = (grandTotal: number) =>
       sortFn: 'basic',
       cell: ({ getValue }) => <span title={`${formatFullCount(getValue())} tokens`}>{formatCompactCount(getValue())}</span>,
     }),
+    columnHelper.accessor((work) => work.cost.usd, {
+      id: 'cost',
+      header: 'Cost',
+      sortFn: 'basic',
+      cell: ({ row }) => formatCost(row.original.cost),
+    }),
     columnHelper.accessor((work) => shareOf(work.tokens.total, grandTotal), {
       id: 'share',
       header: 'Share',
@@ -126,7 +133,7 @@ export const UsageByWorkTable = ({ rows, grandTotal }: { rows: UsageByWork[]; gr
         columns={workColumns(grandTotal)}
         rows={rows}
         rowKeyOf={workRowKey}
-        numericColumnIds={['sessionCount', 'output', 'tokens', 'share']}
+        numericColumnIds={['sessionCount', 'output', 'tokens', 'cost', 'share']}
       />
     </Flex>
   </Card>

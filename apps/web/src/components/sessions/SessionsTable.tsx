@@ -9,6 +9,7 @@ import { SortableTable } from '@/components/tables/SortableTable'
 import type { sortableTableFeatures } from '@/components/tables/sortable-table-features'
 import {
   formatCompactCount,
+  formatCost,
   formatFullCount,
   formatTimeAgo,
   gitHubIssueUrl,
@@ -103,6 +104,16 @@ const sessionColumns = (now: number, onOpenChat: (session: AgentSessionSummary) 
           <span title={`${formatFullCount(getValue())} tokens`}>{formatCompactCount(getValue())}</span>
         ),
     }),
+    columnHelper.accessor((session) => session.cost.usd, {
+      id: 'cost',
+      header: 'Cost',
+      sortFn: 'basic',
+      cell: ({ row }) => (
+        <span title={row.original.cost.unpricedTokens > 0 ? `${formatFullCount(row.original.cost.unpricedTokens)} tokens have no price` : undefined}>
+          {formatCost(row.original.cost)}
+        </span>
+      ),
+    }),
   ])
 
 interface SessionsTableProps {
@@ -146,7 +157,7 @@ export const SessionsTable = ({ overview, isStale, onOpenChat }: SessionsTablePr
             columns={sessionColumns(Date.parse(overview.generatedAt), onOpenChat)}
             rows={overview.sessions}
             rowKeyOf={(session) => session.sessionId}
-            numericColumnIds={['tokens']}
+            numericColumnIds={['tokens', 'cost']}
             headerDetail={lanes.length === 0 ? undefined : <SessionTimelineAxis ticks={ticks} />}
             rowDetailOf={(session) => {
               const lane = laneBySessionId.get(session.sessionId)

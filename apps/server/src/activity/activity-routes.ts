@@ -27,7 +27,7 @@ const clampedNumber = (value: string | undefined, fallback: number, minimum: num
  * @param recordCloudHook Takes a cloud session's hooks, which make up its chat.
  * @returns The routes, mounted under /api.
  */
-export const createIngestRoutes = ({ activityStore, ingestTokens, now, modelPrices }: ActivityDependencies, recordCloudHook: CloudHookRecorder) => {
+export const createIngestRoutes = ({ activityStore, ingestTokens, now }: ActivityDependencies, recordCloudHook: CloudHookRecorder) => {
   const routes = new Hono<AppEnvironment & { Variables: { ingestTokenId: string } }>()
   // The token's id is kept so usage can be told apart by the machine that reported it.
   const requireIngestToken = createMiddleware<{ Variables: { ingestTokenId: string } }>(async (context, next) => {
