@@ -819,7 +819,8 @@ body {
 }
 
 /* An epic's tickets: a ticket waiting on another is indented beneath it behind an L shaped connector. */
-.epic-tickets {
+.epic-tickets,
+.start-ready-list {
   list-style: none;
   margin: 0;
   padding: 0;

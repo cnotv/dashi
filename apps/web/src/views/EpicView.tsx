@@ -3,8 +3,10 @@ import { Callout, Card, Flex, Heading, Link, Skeleton, Text } from '@radix-ui/th
 import { useMemo, useState } from 'react'
 import { Link as RouterLink, useParams } from 'react-router'
 import { EpicTicketsTable } from '@/components/board/EpicTicketsTable'
+import { StartReadyTicketsDialog } from '@/components/board/StartReadyTicketsDialog'
 import type { StartAgent } from '@dashi/contracts'
 import { useBoards } from '@/hooks/useBoard'
+import { useSessionStarts } from '@/hooks/useSessionStarts'
 import { useToast } from '@/hooks/useToast'
 import { dashboardApi } from '@/lib/api'
 import { buildEpicViewRows } from '@/lib/epic-tickets'
@@ -21,6 +23,8 @@ export const EpicView = () => {
   const repositories = useMemo(() => (owner && name ? [{ owner, name }] : []), [owner, name])
   const toast = useToast()
   const [savingNumber, setSavingNumber] = useState<number | null>(null)
+  const [startsRevision, setStartsRevision] = useState(0)
+  const { resource: starts } = useSessionStarts(startsRevision)
   const { boards, isLoading, errorMessage, refresh } = useBoards(repositories)
   const epicCard = boards
     .flatMap((board) => board.columns.flatMap((column) => column.cards))
@@ -66,15 +70,28 @@ export const EpicView = () => {
       {epic && (
         <Card size="2">
           <Flex direction="column" gap="3">
-            <Flex direction="column" gap="1">
-              <Heading size="4">
-                <Link href={epic.url} target="_blank" rel="noopener noreferrer" highContrast underline="hover">
-                  #{epic.number} {epic.title}
-                </Link>
-              </Heading>
-              <Text size="1" color="gray">
-                {closedCount} of {epic.subIssues.length} sub-issues closed
-              </Text>
+            <Flex align="start" justify="between" gap="3" wrap="wrap">
+              <Flex direction="column" gap="1">
+                <Heading size="4">
+                  <Link href={epic.url} target="_blank" rel="noopener noreferrer" highContrast underline="hover">
+                    #{epic.number} {epic.title}
+                  </Link>
+                </Heading>
+                <Text size="1" color="gray">
+                  {closedCount} of {epic.subIssues.length} sub-issues closed
+                </Text>
+              </Flex>
+              {owner && name && epicCard && (
+                <StartReadyTicketsDialog
+                  repository={{ owner, name }}
+                  tickets={epicCard.tickets}
+                  starts={starts ?? []}
+                  onStarted={() => {
+                    setStartsRevision((revision) => revision + 1)
+                    refresh()
+                  }}
+                />
+              )}
             </Flex>
             {rows.length === 0 ? <Text color="gray">This epic has no tickets yet.</Text> : <EpicTicketsTable rows={rows} savingNumber={savingNumber} onAgentChange={(ticket, agent) => void changeAgent(ticket, agent)} />}
           </Flex>

@@ -5,7 +5,7 @@ import type { IssueSummary, PullRequestSummary, RepositoryReference, SessionStar
 import { useStartChoices } from '@/hooks/useSessionStarts'
 import { useToast } from '@/hooks/useToast'
 import { dashboardApi } from '@/lib/api'
-import { agentFor, choicesFromTicketAgent, claudeModelFor, opencodeModelFor, openRouterModelFor, ticketAgentOf } from '@/lib/start-session'
+import { choicesFromTicketAgent, issueStartSubmissionFor, ticketAgentOf } from '@/lib/start-session'
 import { StartChoicesFields } from './StartChoicesFields'
 import { StartedSummary } from './StartedSummary'
 
@@ -50,18 +50,9 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
     setIsStarting(true)
     try {
       const sessionStart = await dashboardApi.startSession({
-        repository,
-        issueNumber: issue?.number ?? null,
+        ...issueStartSubmissionFor(repository, issue?.number ?? null, choices, chosenTarget, note),
         pullRequestNumber: conflictingPullRequest?.number ?? null,
         workflow: conflictingPullRequest ? 'conflicts' : null,
-        target: chosenTarget,
-        agent: agentFor(choices, chosenTarget),
-        permissionMode: choices.permissionMode,
-        openRouterModel: openRouterModelFor(choices, chosenTarget),
-        opencodeModel: opencodeModelFor(choices, chosenTarget),
-        claudeModel: claudeModelFor(choices, chosenTarget),
-        note,
-        attachments: [],
       })
       if (sessionStart.state === 'failed') toast.notifyError(sessionStart.message ?? 'The session did not start')
       setStarted(sessionStart)

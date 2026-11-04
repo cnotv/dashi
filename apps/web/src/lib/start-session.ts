@@ -1,4 +1,4 @@
-import type { StartAgent, StartOptions, StartTarget, TicketAgent, TicketAgentLine } from '@dashi/contracts'
+import type { RepositoryReference, SessionStartSubmission, StartAgent, StartOptions, StartTarget, TicketAgent, TicketAgentLine } from '@dashi/contracts'
 import { claudeModelPattern, takesClaudeModel } from '@dashi/contracts/claude-models'
 import { openRouterModelPattern, takesOpenCode, takesOpenRouterModel } from '@dashi/contracts/open-router'
 import { opencodeModelPattern } from '@dashi/contracts/opencode-models'
@@ -193,3 +193,27 @@ export const ticketAgentAfterAgentChange = (line: TicketAgentLine, agent: StartA
   const currentModel = current?.model ?? null
   return { agent, target, model: currentModel !== null && ticketModelKindOf(agent, currentModel) !== null ? currentModel : null }
 }
+
+/**
+ * The start to send for an issue from what a Start dialog holds.
+ * @param repository The repository the session works on.
+ * @param issueNumber The issue the session is for, if any.
+ * @param choices What the dialog's fields hold.
+ * @param target Where the session runs.
+ * @param note The note for the session.
+ * @returns The submission for the start API, with no attachments and the agent picks the workflow.
+ */
+export const issueStartSubmissionFor = (repository: RepositoryReference, issueNumber: number | null, choices: StartChoices, target: StartTarget, note: string): SessionStartSubmission => ({
+  repository,
+  issueNumber,
+  pullRequestNumber: null,
+  workflow: null,
+  target,
+  agent: agentFor(choices, target),
+  permissionMode: choices.permissionMode,
+  openRouterModel: openRouterModelFor(choices, target),
+  opencodeModel: opencodeModelFor(choices, target),
+  claudeModel: claudeModelFor(choices, target),
+  note,
+  attachments: [],
+})
