@@ -112,6 +112,13 @@ export const StartSessionDialog = ({ repository, issue, conflictingPullRequest }
                   </Callout.Text>
                 </Callout.Root>
               )}
+              {agentLine.state === 'proposed' && (
+                <Callout.Root color="amber" size="1">
+                  <Callout.Text>
+                    The ticket has no <Code>Agent:</Code> line, so this agent is proposed from the routing file. {agentLine.reason}.
+                  </Callout.Text>
+                </Callout.Root>
+              )}
               <StartChoicesFields
                 choices={choices}
                 onChange={setChoices}

@@ -144,11 +144,11 @@ export const choicesWithAgent = (choices: StartChoices, agent: StartAgent): Star
 })
 
 /**
- * The choice a ticket's Agent: line makes, when it makes one.
+ * The choice a ticket's Agent: line makes, or the routing file proposes when it has none.
  * @param line What the ticket's body says.
- * @returns The agent, target and model, or null for a missing or wrong line.
+ * @returns The agent, target and model, or null for a wrong line or a ticket nothing proposes for.
  */
-export const ticketAgentOf = (line: TicketAgentLine): TicketAgent | null => (line.state === 'set' ? line.choice : null)
+export const ticketAgentOf = (line: TicketAgentLine): TicketAgent | null => (line.state === 'set' || line.state === 'proposed' ? line.choice : null)
 
 /**
  * What a Start dialog holds when it opens: the ticket's agent, target and model when its line

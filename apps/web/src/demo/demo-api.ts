@@ -27,7 +27,7 @@ import {
   sampleSessionsOverview,
   sampleUsageReport,
 } from './sample-activity'
-import { applyDemoPullRequestOutcomes, applyDemoTicketAgents, demoMediaUrls, sampleBoardColumns, samplePullRequestFiles } from './sample-board'
+import { applyDemoPullRequestOutcomes, applyDemoTicketAgents, demoMediaUrls, demoProposedAgentLine, sampleBoardColumns, samplePullRequestFiles } from './sample-board'
 import { demoUser, sampleOpenRouterModels, sampleRepositories, sampleSecrets } from './sample-data'
 
 // The same limits the server answers with, so the dialog behaves as it would against one.
@@ -233,7 +233,7 @@ export const createDemoApi = (): DashboardApi => {
         parent: null,
         subIssues: [],
         blockedBy: [],
-        agentLine: { state: 'missing' },
+        agentLine: demoProposedAgentLine,
       }
       demoMemory.createdIssues = new Map([...demoMemory.createdIssues, [repositoryKey(repository), [issue, ...createdIssues]]])
       return { number: issueNumber, url }
