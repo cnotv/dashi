@@ -1,10 +1,15 @@
 import { ArrowLeftIcon } from '@radix-ui/react-icons'
 import { Callout, Card, Flex, Heading, Link, Skeleton, Text } from '@radix-ui/themes'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link as RouterLink, useParams } from 'react-router'
 import { EpicTicketsTable } from '@/components/board/EpicTicketsTable'
+import type { StartAgent } from '@dashi/contracts'
 import { useBoards } from '@/hooks/useBoard'
+import { useToast } from '@/hooks/useToast'
+import { dashboardApi } from '@/lib/api'
 import { buildEpicViewRows } from '@/lib/epic-tickets'
+import { ticketAgentAfterAgentChange } from '@/lib/start-session'
+import type { EpicViewRow } from '@/lib/types'
 
 /**
  * One epic: every ticket in dependency order with its state, blockers, agent and pull request.
@@ -14,12 +19,26 @@ export const EpicView = () => {
   const { owner, name, number } = useParams()
   const epicNumber = Number(number)
   const repositories = useMemo(() => (owner && name ? [{ owner, name }] : []), [owner, name])
-  const { boards, isLoading, errorMessage } = useBoards(repositories)
+  const toast = useToast()
+  const [savingNumber, setSavingNumber] = useState<number | null>(null)
+  const { boards, isLoading, errorMessage, refresh } = useBoards(repositories)
   const epicCard = boards
     .flatMap((board) => board.columns.flatMap((column) => column.cards))
     .find((card) => card.issues.some((issue) => issue.number === epicNumber))
   const epic = epicCard?.issues.find((issue) => issue.number === epicNumber)
   const rows = useMemo(() => (epic && epicCard ? buildEpicViewRows(epic, epicCard.tickets) : []), [epic, epicCard])
+  const changeAgent = async (ticket: EpicViewRow, agent: StartAgent): Promise<void> => {
+    if (!owner || !name) return
+    setSavingNumber(ticket.number)
+    try {
+      await dashboardApi.setTicketAgent({ owner, name }, ticket.number, ticketAgentAfterAgentChange(ticket.agentLine, agent))
+      refresh()
+    } catch (saveError) {
+      toast.notifyError(saveError)
+    } finally {
+      setSavingNumber(null)
+    }
+  }
   const closedCount = rows.filter((row) => row.state === 'closed').length
 
   return (
@@ -57,7 +76,7 @@ export const EpicView = () => {
                 {closedCount} of {epic.subIssues.length} sub-issues closed
               </Text>
             </Flex>
-            {rows.length === 0 ? <Text color="gray">This epic has no tickets yet.</Text> : <EpicTicketsTable rows={rows} />}
+            {rows.length === 0 ? <Text color="gray">This epic has no tickets yet.</Text> : <EpicTicketsTable rows={rows} savingNumber={savingNumber} onAgentChange={(ticket, agent) => void changeAgent(ticket, agent)} />}
           </Flex>
         </Card>
       )}

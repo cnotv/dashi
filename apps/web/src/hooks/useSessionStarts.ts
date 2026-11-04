@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { OpenRouterModel, RepositoryReference, StartOptions } from '@dashi/contracts'
 import { dashboardApi } from '@/lib/api'
 import { errorMessageOf } from '@/lib/presentation'
-import { defaultTargetFor, startModelProblemFor, targetAvailabilityFor } from '@/lib/start-session'
+import { choicesFromTicketAgent, defaultTargetFor, startModelProblemFor, targetAvailabilityFor } from '@/lib/start-session'
 import type { StartChoices } from '@/lib/types'
 import { usePolledResource } from './usePolledResource'
 
@@ -72,15 +72,7 @@ export const useOpenRouterModels = () => {
  * @returns The choices, their setter, the options, the chosen place and its availability, and what keeps the chosen model from being sent.
  */
 export const useStartChoices = (repository: RepositoryReference, isOpen: boolean, attachmentBytes: number) => {
-  const [choices, setChoices] = useState<StartChoices>({
-    target: null,
-    agent: 'claude',
-    permissionMode: 'auto',
-    modelSource: 'default',
-    openRouterModel: '',
-    opencodeModel: '',
-    claudeModel: '',
-  })
+  const [choices, setChoices] = useState<StartChoices>(choicesFromTicketAgent(null))
   const { options, errorMessage } = useStartOptions(repository, isOpen)
   const chosenTarget = choices.target ?? (options ? defaultTargetFor(options) : null)
   const chosenAvailability = chosenTarget && options ? targetAvailabilityFor(chosenTarget, options, attachmentBytes) : null

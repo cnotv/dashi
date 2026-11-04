@@ -3,6 +3,21 @@ import { createDemoApi } from './demo-api'
 import { sampleBoardColumns } from './sample-board'
 import { sampleSecrets } from './sample-data'
 
+describe('setTicketAgent in demo mode', () => {
+  it('shows the chosen agent on the ticket the next time the board is read', async () => {
+    const demoApi = createDemoApi()
+    const [firstRepository] = await demoApi.listRepositories()
+    const lineOf = async (issueNumber: number) => {
+      const board = await demoApi.readBoard(firstRepository!, false)
+      const tickets = board.columns.flatMap((column) => column.cards.flatMap((card) => card.tickets))
+      return tickets.find((ticket) => ticket.issue.number === issueNumber)?.issue.agentLine
+    }
+    expect(await lineOf(23)).toEqual({ state: 'missing' })
+    await demoApi.setTicketAgent(firstRepository!, 23, { agent: 'opencode', target: 'laptop-headless', model: 'opencode/big-pickle' })
+    expect(await lineOf(23)).toEqual({ state: 'set', choice: { agent: 'opencode', target: 'laptop-headless', model: 'opencode/big-pickle' } })
+  })
+})
+
 describe('createDemoApi', () => {
   it('serves a board for whichever repository is asked for', async () => {
     const demoApi = createDemoApi()

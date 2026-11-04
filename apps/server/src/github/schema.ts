@@ -50,6 +50,7 @@ export const issueNodeSchema = z.object({
   number: z.number(),
   title: z.string(),
   url: z.string(),
+  body: z.string(),
   updatedAt: z.string(),
   closedAt: z.string().nullable(),
   labels: z.object({ nodes: z.array(z.object({ name: z.string(), color: z.string() })) }),
@@ -139,6 +140,7 @@ export const boardQuery = `
           number
           title
           url
+          body
           updatedAt
           closedAt
           labels(first: 10) { nodes { name color } }
@@ -151,6 +153,7 @@ export const boardQuery = `
           number
           title
           url
+          body
           updatedAt
           closedAt
           labels(first: 10) { nodes { name color } }
@@ -166,6 +169,8 @@ export const boardQuery = `
 `
 
 export const githubErrorSchema = z.object({ message: z.string() })
+
+export const issueBodySchema = z.object({ body: z.string().nullable() })
 
 export const createdIssueSchema = z.object({ number: z.number().int().positive(), html_url: z.string().url() })
 

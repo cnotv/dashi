@@ -14,6 +14,24 @@ describe('pullRequestMediaUrl', () => {
   })
 })
 
+describe('setTicketAgent', () => {
+  it('puts the choice to the ticket route', async () => {
+    const sentRequests: { url: string; init: RequestInit | undefined }[] = []
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      sentRequests.push({ url, init })
+      return new Response(null, { status: 204 })
+    })
+    await createHttpApi('').setTicketAgent({ owner: 'cnotv', name: 'dashi' }, 133, { agent: 'opencode', target: 'laptop-headless', model: null })
+    vi.unstubAllGlobals()
+    expect(sentRequests).toEqual([
+      expect.objectContaining({
+        url: '/api/repositories/cnotv/dashi/issues/133/agent',
+        init: expect.objectContaining({ method: 'PUT', body: JSON.stringify({ agent: 'opencode', target: 'laptop-headless', model: null }) }),
+      }),
+    ])
+  })
+})
+
 describe('mergePullRequest', () => {
   it('sends the title and the head commit the card showed', async () => {
     const sentRequests: { url: string; init: RequestInit | undefined }[] = []

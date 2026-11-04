@@ -38,6 +38,7 @@ const ticket = (number: number, blockedBy: IssueReference[] = [], hasPullRequest
     parent: { number: 1, title: 'Epic', url: 'https://github.com/o/r/issues/1' },
     subIssues: [],
     blockedBy,
+    agentLine: { state: 'missing' },
   },
   pullRequest: hasPullRequest ? pullRequestOf(90 + number) : null,
 })
@@ -112,6 +113,26 @@ describe('buildEpicViewRows', () => {
       [3, 1, 'blocked', [2], null],
       [4, 0, 'in-progress', [], 94],
       [5, 0, 'closed', [], null],
+    ])
+  })
+})
+
+describe('buildEpicViewRows agent lines', () => {
+  it("carries each ticket's Agent: line, and none for a closed ticket", () => {
+    const withLine: EpicTicket = {
+      ...ticket(2),
+      issue: { ...ticket(2).issue, agentLine: { state: 'set', choice: { agent: 'claude', target: 'laptop-headless', model: 'sonnet' } } },
+    }
+    const wrongLine: EpicTicket = {
+      ...ticket(3),
+      issue: { ...ticket(3).issue, agentLine: { state: 'invalid', text: 'Agent: gemini', problem: 'Unknown agent "gemini"' } },
+    }
+    const epic: IssueSummary = { ...ticket(1).issue, subIssues: [reference(2, 'open'), reference(3, 'open'), reference(4, 'open'), reference(5, 'closed')] }
+    expect(buildEpicViewRows(epic, [withLine, wrongLine, ticket(4)]).map((row) => [row.number, row.agentLine.state])).toEqual([
+      [2, 'set'],
+      [3, 'invalid'],
+      [4, 'missing'],
+      [5, 'missing'],
     ])
   })
 })

@@ -45,6 +45,11 @@ export const EpicTickets = ({ tickets, repository }: EpicTicketsProps) => (
             </Text>
             <TicketAction ticket={ticket} repository={repository} />
           </Flex>
+          {ticket.issue.agentLine.state === 'invalid' && (
+            <Text as="div" size="1" color="red">
+              Agent line: {ticket.issue.agentLine.problem}
+            </Text>
+          )}
         </li>
       ))}
     </ul>

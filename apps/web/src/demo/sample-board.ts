@@ -9,6 +9,7 @@ import type {
   PreviewMediaKind,
   PullRequestFiles,
   PullRequestSummary,
+  TicketAgent,
 } from '@dashi/contracts'
 import type { DemoPullRequestOutcome } from '@/lib/types'
 
@@ -33,7 +34,7 @@ const issueOf = (
   title: string,
   linkedPullRequestNumbers: number[],
   labels: IssueLabel[] = [],
-  relations: Pick<Partial<IssueSummary>, 'parent' | 'subIssues' | 'blockedBy'> = {},
+  relations: Pick<Partial<IssueSummary>, 'parent' | 'subIssues' | 'blockedBy' | 'agentLine'> = {},
 ): IssueSummary => ({
   number: issueNumber,
   title,
@@ -45,6 +46,7 @@ const issueOf = (
   parent: null,
   subIssues: [],
   blockedBy: [],
+  agentLine: { state: 'missing' },
   ...relations,
 })
 
@@ -101,10 +103,12 @@ const closedIssueOf = (issueNumber: number, title: string, closedAt: string, pul
 const rampEditorTicket = issueOf(21, 'Add the ramp editor', [], [], {
   parent: demoEpic,
   blockedBy: [referenceOf(18, 'Add the arena floor', 'closed')],
+  agentLine: { state: 'set', choice: { agent: 'claude', target: 'laptop-headless', model: 'sonnet' } },
 })
 const rampAngleTicket = issueOf(22, 'Show the ramp angle on screen', [], [], {
   parent: demoEpic,
   blockedBy: [referenceOf(21, 'Add the ramp editor', 'open')],
+  agentLine: { state: 'set', choice: { agent: 'opencode', target: 'laptop-headless', model: 'opencode/big-pickle' } },
 })
 const saveRampsTicket = issueOf(23, 'Save ramps between rounds', [], [], {
   parent: demoEpic,
@@ -113,6 +117,7 @@ const saveRampsTicket = issueOf(23, 'Save ramps between rounds', [], [], {
 const shareRampsTicket = issueOf(25, 'Share a ramp as a link', [], [], {
   parent: demoEpic,
   blockedBy: [referenceOf(22, 'Show the ramp angle on screen', 'open')],
+  agentLine: { state: 'invalid', text: 'Agent: gemini laptop-headless', problem: 'Unknown agent "gemini"; use claude or opencode' },
 })
 const rampPresetsTicket = issueOf(24, 'Add the ramp presets', [32], [], { parent: demoEpic })
 const rampPresetsPullRequest: PullRequestSummary = {
@@ -344,4 +349,26 @@ export const samplePullRequestFiles: PullRequestFiles = {
       blobUrl: 'https://github.com/cnotv/example/blob/0123abcd/public/marble.png',
     },
   ],
+}
+
+/**
+ * Shows the board with the agents picked in demo mode written onto their tickets, as the Agent:
+ * line written back to the issue would show them after a reload.
+ * @param columns The sample board's columns.
+ * @param agentsByIssueNumber The choice made for each changed ticket.
+ * @returns The columns with those tickets' lines replaced.
+ */
+export const applyDemoTicketAgents = (columns: BoardColumn[], agentsByIssueNumber: Map<number, TicketAgent>): BoardColumn[] => {
+  const withChoice = (issue: IssueSummary): IssueSummary => {
+    const choice = agentsByIssueNumber.get(issue.number)
+    return choice === undefined ? issue : { ...issue, agentLine: { state: 'set', choice } }
+  }
+  return columns.map((column) => ({
+    ...column,
+    cards: column.cards.map((card) => ({
+      ...card,
+      issues: card.issues.map(withChoice),
+      tickets: card.tickets.map((ticket) => ({ ...ticket, issue: withChoice(ticket.issue) })),
+    })),
+  }))
 }

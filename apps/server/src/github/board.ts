@@ -1,5 +1,6 @@
 import type { Board, CheckGate, IssueReference, IssueSummary, PullRequestSummary, RepositoryReference } from '@dashi/contracts'
 import { deployPreviewUrlFromGates, previewPageUrl } from '../netlify/deploy-preview.ts'
+import { parseAgentLine } from './agent-line.ts'
 import { mediaPresenceFromMarkdown } from './media.ts'
 import { boardQuery, boardResponseSchema, graphqlErrorsSchema, pullRequestBodyHtmlQuery, pullRequestBodyHtmlResponseSchema } from './schema.ts'
 import { buildBoard, gateStateFromCheckRun, gateStateFromStatusContext, summariseGates } from './status.ts'
@@ -68,6 +69,7 @@ export const mapIssueNode = (node: IssueNode): IssueSummary => ({
   parent: node.parent,
   subIssues: node.subIssues.nodes.map(mapIssueReferenceNode),
   blockedBy: node.blockedBy.nodes.map(mapIssueReferenceNode),
+  agentLine: parseAgentLine(node.body),
 })
 
 /**

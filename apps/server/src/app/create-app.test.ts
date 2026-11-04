@@ -377,6 +377,68 @@ describe('new issues', () => {
   })
 })
 
+describe('ticket agent lines', () => {
+  const issuePath = '/repos/cnotv/generative-art/issues/12'
+  const agentRequest = (body: unknown = { agent: 'opencode', target: 'laptop-headless', model: 'opencode/big-pickle' }) =>
+    jsonRequest('PUT', '/api/repositories/cnotv/generative-art/issues/12/agent', body)
+  const issueAnswer = (body: string | null) => Response.json({ number: 12, body })
+
+  it('writes the line into the issue body and leaves the rest of the body alone', async () => {
+    const { app, vault, receivedRestRequests } = createTestApp({}, {}, { now: 0 }, {
+      [issuePath]: issueAnswer('## What\n\nBuild it.\n\nAgent: claude laptop-headless sonnet\n\n- [ ] one\n'),
+    })
+    vault.saveSecret('github-token', sampleToken)
+    const response = await app.request(agentRequest())
+    expect(response.status).toBe(204)
+    expect(receivedRestRequests).toContainEqual({
+      path: issuePath,
+      method: 'PATCH',
+      body: { body: '## What\n\nBuild it.\n\nAgent: opencode laptop-headless opencode/big-pickle\n\n- [ ] one\n' },
+    })
+  })
+
+  it('adds the line to a body that has none, or to an empty one', async () => {
+    const { app, vault, receivedRestRequests } = createTestApp({}, {}, { now: 0 }, { [issuePath]: issueAnswer(null) })
+    vault.saveSecret('github-token', sampleToken)
+    expect((await app.request(agentRequest({ agent: 'claude', target: 'cloud-routine', model: null }))).status).toBe(204)
+    expect(receivedRestRequests).toContainEqual({ path: issuePath, method: 'PATCH', body: { body: 'Agent: claude cloud-routine\n' } })
+  })
+
+  it('refuses an agent line a start would not accept, without touching the issue', async () => {
+    const { app, vault, receivedRestRequests } = createTestApp({}, {}, { now: 0 }, { [issuePath]: issueAnswer('x') })
+    vault.saveSecret('github-token', sampleToken)
+    expect((await app.request(agentRequest({ agent: 'gemini', target: 'laptop-headless', model: null }))).status).toBe(400)
+    expect((await app.request(agentRequest({ agent: 'opencode', target: 'cloud-routine', model: null }))).status).toBe(400)
+    expect((await app.request(agentRequest({ agent: 'claude', target: 'laptop-headless', model: 'not a model' }))).status).toBe(400)
+    expect(receivedRestRequests).toEqual([])
+  })
+
+  it('refuses an unknown repository and a cross-origin request', async () => {
+    const { app, vault } = createTestApp()
+    vault.saveSecret('github-token', sampleToken)
+    expect((await app.request(jsonRequest('PUT', '/api/repositories/someone/else/issues/12/agent', { agent: 'claude', target: 'laptop-headless', model: null }))).status).toBe(404)
+    const crossOrigin = jsonRequest('PUT', '/api/repositories/cnotv/generative-art/issues/12/agent', { agent: 'claude', target: 'laptop-headless', model: null }, {
+      origin: 'https://attacker.example',
+    })
+    expect((await app.request(crossOrigin)).status).toBe(403)
+  })
+
+  it('says the App needs write access to issues when GitHub forbids the edit', async () => {
+    const { app, vault } = createTestApp({}, {}, { now: 0 }, {
+      [issuePath]: Response.json({ message: 'Resource not accessible by integration' }, { status: 403 }),
+    })
+    vault.saveSecret('github-token', sampleToken)
+    const response = await app.request(agentRequest())
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ error: expect.stringContaining('write access to issues') })
+  })
+
+  it('needs a signed-in session in cloud mode', async () => {
+    const { app } = createTestApp({}, { signInRequired: true })
+    expect((await app.request(agentRequest())).status).toBe(401)
+  })
+})
+
 describe('pull request files', () => {
   const filesPath = '/api/repositories/cnotv/generative-art/pulls/7/files'
   const githubFilesPath = '/repos/cnotv/generative-art/pulls/7/files?per_page=100&page=1'

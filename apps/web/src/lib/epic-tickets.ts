@@ -64,6 +64,7 @@ export const buildEpicViewRows = (epic: IssueSummary, tickets: EpicTicket[]): Ep
     blockers: openBlockers(ticket.issue),
     pullRequestNumber: ticket.pullRequest?.number ?? null,
     pullRequestUrl: ticket.pullRequest?.url ?? null,
+    agentLine: ticket.issue.agentLine,
   })),
   ...closedTicketsOf(epic).map((closed) => ({
     number: closed.number,
@@ -74,5 +75,6 @@ export const buildEpicViewRows = (epic: IssueSummary, tickets: EpicTicket[]): Ep
     blockers: [],
     pullRequestNumber: null,
     pullRequestUrl: null,
+    agentLine: { state: 'missing' as const },
   })),
 ]

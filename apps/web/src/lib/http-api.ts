@@ -69,6 +69,7 @@ export const createHttpApi = (apiBaseUrl: string): DashboardApi => {
     listSessionStarts: () => requestJson('/api/session-starts'),
     startSession: (submission) => sendJson('POST', '/api/session-starts', submission),
     createIssue: (repository, newIssue) => sendJson('POST', `${repositoryPath(repository)}/issues`, newIssue),
+    setTicketAgent: (repository, issueNumber, choice) => sendJson('PUT', `${repositoryPath(repository)}/issues/${issueNumber}/agent`, choice),
     readSessionStart: (startId) => requestJson(`/api/session-starts/${encodeURIComponent(startId)}`),
     retrySessionStart: (startId) => sendJson('POST', `/api/session-starts/${encodeURIComponent(startId)}/retry`),
     testRoutine: (repository) => sendJson('POST', `${repositoryPath(repository)}/routine/test`),
