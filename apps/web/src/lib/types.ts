@@ -66,6 +66,24 @@ export interface StartChoices {
   claudeModel: string
 }
 
+// One ready ticket of an epic as the start-all confirmation shows it, with the start it would send.
+export interface EpicStartPlan {
+  number: number
+  title: string
+  request: SessionStartSubmission
+  // Why this start cannot go as planned (the place is not set up, the model is wrong), or null.
+  problem: string | null
+  // Why the ticket's Agent: line was not used, or null when it was or there is none.
+  lineProblem: string | null
+}
+
+// What became of one ticket's start; a failed one carries why.
+export interface EpicStartOutcome {
+  number: number
+  state: SessionStart['state']
+  message: string | null
+}
+
 export interface PickedAttachment {
   attachment: StartAttachment
   byteSize: number
