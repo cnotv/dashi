@@ -12,10 +12,12 @@ import { generateKeyMaterial } from '../secrets/crypto.ts'
 import { secretDefinitions } from '../secrets/definitions.ts'
 import { createVault } from '../secrets/vault.ts'
 import { createRoutineStore, createSessionStartStore } from '../session-starts/start-store.ts'
+import { loadModelPrices } from '../activity/model-prices.ts'
 import { loadAgentRouting } from '../github/agent-routing.ts'
 import { createApp } from './create-app.ts'
 import type { AppDependencies, ReceivedRestRequest } from './types.ts'
 
+const testModelPrices = loadModelPrices(fileURLToPath(new URL('../../../../config/model-prices.json', import.meta.url)))
 const testAgentRouting = loadAgentRouting(fileURLToPath(new URL('../../../../config/agent-routing.json', import.meta.url)))
 
 export const testHost = 'localhost:4317'
@@ -69,7 +71,7 @@ export const createTestApp = (
       now: () => 0,
       ...authOverrides,
     },
-    activity: { activityStore, ingestTokens, now: () => clock.now },
+    activity: { activityStore, ingestTokens, now: () => clock.now, modelPrices: testModelPrices },
     sessionStarts: {
       startStore,
       routineStore: createRoutineStore(database),

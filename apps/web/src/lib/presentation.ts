@@ -1,4 +1,5 @@
 import type {
+  CostTotals,
   AgentProvider,
   AgentSessionState,
   GateOverallState,
@@ -271,3 +272,17 @@ export const gitHubIssueUrl = (repository: RepositoryReference, issueNumber: num
  */
 export const gitHubPullRequestUrl = (repository: RepositoryReference, pullRequestNumber: number): string =>
   `https://github.com/${repository.owner}/${repository.name}/pull/${pullRequestNumber}`
+
+const dollarFormat = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
+
+/**
+ * Writes what tokens cost. Tokens of a model with no price are never guessed at: a cost made only
+ * of them reads n/a, and a cost with some of them reads as a lower bound with a plus.
+ * @param cost The cost and the count of tokens that had no price.
+ * @returns The text to show, such as $12.40, $12.40+ or n/a.
+ */
+export const formatCost = (cost: CostTotals): string => {
+  if (cost.usd === 0 && cost.unpricedTokens > 0) return 'n/a'
+  const text = cost.usd > 0 && cost.usd < 0.01 ? '<$0.01' : dollarFormat.format(cost.usd)
+  return cost.unpricedTokens > 0 ? `${text}+` : text
+}

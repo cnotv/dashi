@@ -195,6 +195,23 @@ sends.
 
 Codex sends no token metrics, so Codex sessions show n/a for tokens, and Usage lists them under By agent with no tokens. OpenCode's reporter sends each answer's tokens, so OpenCode sessions count like Claude Code's.
 
+### What the tokens cost
+
+`config/model-prices.json` lists US dollars per million tokens for each model and token type
+(`input`, `output`, `cacheRead`, `cacheCreation`). The server reads it once at startup and checks it
+with zod; a broken file stops the server and names the field. Usage shows the cost per branch,
+repository and day, and Sessions shows it per session.
+
+- A model id also matches its dated snapshots, such as `claude-opus-5-5-20261001`.
+- A model that is not listed keeps its tokens and gets no cost. A total that includes such tokens
+  reads `$12.40+`; one made only of them reads `n/a`. Nothing is estimated.
+- Subscription sessions are priced at API rates, so their cost is what the same tokens would cost
+  through the API, not what the plan charges.
+- `cacheCreation` uses the 5 minute cache write price. Add the model to the file to price others.
+- Prices come from https://platform.claude.com/docs/en/about-claude/pricing, read on 2026-11-04
+  (the file records the same source and date). Only models with a single flat price are listed;
+  Fable, Mythos, Haiku 5.5 (tiered by prompt size) and retired models are left out.
+
 ### Where the tokens were spent
 
 Usage says what spent the tokens four ways. The table by pull request and branch, and each session

@@ -3,12 +3,14 @@ import { fillMissingDays, niceAxisTicks, shareOf } from './usage-chart'
 
 const tokens = (total: number) => ({ input: 0, output: total, cacheRead: 0, cacheCreation: 0, total })
 
+const noCost = { usd: 0, unpricedTokens: 0 }
+
 describe('fillMissingDays', () => {
   it('adds the quiet days as zero, in order', () => {
     const filled = fillMissingDays(
       [
-        { day: '2026-09-27', tokens: tokens(5) },
-        { day: '2026-09-25', tokens: tokens(2) },
+        { day: '2026-09-27', tokens: tokens(5), cost: noCost },
+        { day: '2026-09-25', tokens: tokens(2), cost: noCost },
       ],
       '2026-09-25T13:00:00.000Z',
       '2026-09-28T09:00:00.000Z',

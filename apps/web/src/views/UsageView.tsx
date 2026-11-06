@@ -5,9 +5,10 @@ import { SourceTags } from '@/components/charts/SourceTags'
 import { StatTile } from '@/components/charts/StatTile'
 import { UsageBarList, type UsageBarRow } from '@/components/usage/UsageBarList'
 import { UsageByDayChart } from '@/components/usage/UsageByDayChart'
+import { UsageCostByDayTable } from '@/components/usage/UsageCostByDayTable'
 import { UsageByWorkTable } from '@/components/usage/UsageByWorkTable'
 import { useUsageReport } from '@/hooks/useActivity'
-import { formatCompactCount, formatFullCount, repositoryKey } from '@/lib/presentation'
+import { formatCompactCount, formatCost, formatFullCount, repositoryKey } from '@/lib/presentation'
 import { fillMissingDays } from '@/lib/usage-chart'
 
 const periodChoices = [
@@ -25,7 +26,7 @@ const repositoryRows = (report: UsageReport): UsageBarRow[] =>
   report.byRepository.map((usage) => ({
     rowKey: usage.repository ? repositoryKey(usage.repository) : 'none',
     label: usage.repository ? repositoryKey(usage.repository) : 'Outside a repository',
-    detail: sessionsLabel(usage.sessionCount),
+    detail: `${sessionsLabel(usage.sessionCount)} · ${formatCost(usage.cost)}`,
     total: usage.tokens.total,
   }))
 
@@ -33,7 +34,7 @@ const modelRows = (report: UsageReport): UsageBarRow[] =>
   report.byModel.map((usage) => ({
     rowKey: usage.model,
     label: usage.model,
-    detail: `${formatCompactCount(usage.tokens.output)} output`,
+    detail: `${formatCompactCount(usage.tokens.output)} output · ${formatCost(usage.cost)}`,
     total: usage.tokens.total,
   }))
 
@@ -79,12 +80,17 @@ export const UsageView = () => {
 
       {report && (
         <>
-          <Grid columns={{ initial: '2', md: '5' }} gap="4">
+          <Grid columns={{ initial: '2', md: '3', lg: '6' }} gap="4">
             <StatTile
               label="Tokens, all repositories"
               value={formatCompactCount(report.totals.total)}
               detail={`${formatFullCount(report.totals.total)} in ${sessionsLabel(report.sessionCount)}`}
               isHero
+            />
+            <StatTile
+              label="Cost, all repositories"
+              value={formatCost(report.totalCost)}
+              detail={report.totalCost.unpricedTokens > 0 ? `${formatFullCount(report.totalCost.unpricedTokens)} tokens have no price` : undefined}
             />
             <StatTile label="Input" value={formatCompactCount(report.totals.input)} />
             <StatTile label="Output" value={formatCompactCount(report.totals.output)} />
@@ -92,6 +98,7 @@ export const UsageView = () => {
             <StatTile label="Cache write" value={formatCompactCount(report.totals.cacheCreation)} />
           </Grid>
           <UsageByDayChart days={fillMissingDays(report.byDay, report.windowStartedAt, report.generatedAt)} isStale={isStale} />
+          <UsageCostByDayTable days={report.byDay} />
           <Grid columns={{ initial: '1', md: '2' }} gap="4">
             <UsageBarList
               title="Triggered by"

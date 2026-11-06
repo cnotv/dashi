@@ -7,11 +7,12 @@ import type {
 } from '@dashi/contracts'
 import type { MachineTokenStore } from '../machine-tokens/types.ts'
 import type { CloudHookMessage } from '../session-chat/types.ts'
-import type { hookPayloadSchema, keyValueSchema, otlpMetricsSchema } from './schema.ts'
+import type { hookPayloadSchema, keyValueSchema, modelPriceTableSchema, otlpMetricsSchema } from './schema.ts'
 
 export type HookPayload = z.infer<typeof hookPayloadSchema>
 export type OtlpMetricsRequest = z.infer<typeof otlpMetricsSchema>
 export type OtlpKeyValue = z.infer<typeof keyValueSchema>
+export type ModelPriceTable = z.infer<typeof modelPriceTableSchema>
 
 export type TokenType = 'input' | 'output' | 'cacheRead' | 'cacheCreation'
 
@@ -113,6 +114,8 @@ export interface ActivityDependencies {
   activityStore: ActivityStore
   ingestTokens: MachineTokenStore
   now: () => number
+  // What a million tokens of each model cost; a model missing from it shows tokens and no cost.
+  modelPrices: ModelPriceTable
 }
 
 // Hands a cloud session's hook to its chat: the session id in the payload, the cloud session it
@@ -122,6 +125,7 @@ export type CloudHookRecorder = (hookSessionId: string, cloudSessionId: string, 
 export type UsageStart = Pick<SessionStart, 'startId' | 'repository' | 'target' | 'sessionUrl'>
 
 export interface UsageSourceLookups {
+  modelPrices: ModelPriceTable
   // The label of a machine token, or null once it has been revoked.
   machineLabelOf: (tokenId: string) => string | null
   starts: UsageStart[]

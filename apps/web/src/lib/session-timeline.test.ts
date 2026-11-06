@@ -16,6 +16,7 @@ const sessionWith = (overrides: Partial<AgentSessionSummary>): AgentSessionSumma
   startedAt: '2026-09-29T00:00:00.000Z',
   lastEventAt: '2026-09-29T09:00:00.000Z',
   tokens: zeroTokens,
+  cost: { usd: 0, unpricedTokens: 0 },
   triggeredBy: 'Not reported',
   billedThrough: 'Not reported',
   ...overrides,

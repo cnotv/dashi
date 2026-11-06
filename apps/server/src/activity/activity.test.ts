@@ -361,7 +361,8 @@ describe('usage by source', () => {
     { startId: laptopStartId, repository: { owner: 'cnotv', name: 'dashi' }, target: 'laptop-headless' as const, sessionUrl: null },
     { startId: cloudStartId, repository: { owner: 'cnotv', name: 'dashi' }, target: 'cloud-routine' as const, sessionUrl: 'https://claude.ai/code/session_01Routine' },
   ]
-  const lookups = { machineLabelOf: (tokenId: string) => (tokenId === 'laptop-token' ? 'Laptop' : null), starts }
+  const modelPrices = { models: { 'claude-opus-5-5': { input: 4, output: 20, cacheRead: 0.2, cacheCreation: 5 } } }
+  const lookups = { machineLabelOf: (tokenId: string) => (tokenId === 'laptop-token' ? 'Laptop' : null), starts, modelPrices }
   const reportOf = (sessions: StoredSession[], samples: StoredTokenSample[]) =>
     buildUsageReport(sessions, samples, () => null, at(0), atMilliseconds(30), lookups)
   const rowsOf = (rows: Array<{ label: string; sessionCount: number; tokens: { total: number }; note: string | null }>) =>
@@ -463,6 +464,32 @@ describe('usage by source', () => {
     expect(overview.sessions.map((summary) => [summary.sessionId, summary.triggeredBy, summary.billedThrough])).toEqual([
       ['a', 'CodePilot', 'Anthropic API key'],
       ['b', 'Dashi board (laptop runner)', 'Claude login · me@example.com'],
+    ])
+  })
+
+  it('prices each session, repository and day, and leaves an unknown model with tokens and no cost', () => {
+    const otherRepository = { owner: 'cnotv', name: 'agent-base' }
+    const sessions = [session('a'), session('b', { repository: otherRepository, branch: 'feat/2-x' })]
+    const samples = [
+      sample('a', 1_000_000, { recordedAt: '2026-11-01T10:00:00.000Z' }),
+      sample('a', 500_000, { tokenType: 'input', recordedAt: '2026-11-02T10:00:00.000Z' }),
+      sample('b', 40, { model: 'mystery-model', recordedAt: '2026-11-02T11:00:00.000Z' }),
+    ]
+    const report = reportOf(sessions, samples)
+    expect(report.totalCost).toEqual({ usd: 22, unpricedTokens: 40 })
+    expect(report.byRepository.map((row) => [row.repository?.name, row.cost])).toEqual([
+      ['dashi', { usd: 22, unpricedTokens: 0 }],
+      ['agent-base', { usd: 0, unpricedTokens: 40 }],
+    ])
+    expect(report.byDay.map((row) => [row.day, row.cost])).toEqual([
+      ['2026-11-01', { usd: 20, unpricedTokens: 0 }],
+      ['2026-11-02', { usd: 2, unpricedTokens: 40 }],
+    ])
+    expect(report.byWork.map((row) => row.cost.usd).sort()).toEqual([0, 22])
+    const overview = buildSessionsOverview(sessions, [], samples, at(0), atMilliseconds(30), lookups)
+    expect(overview.sessions.map((summary) => [summary.sessionId, summary.cost.usd]).sort()).toEqual([
+      ['a', 22],
+      ['b', 0],
     ])
   })
 

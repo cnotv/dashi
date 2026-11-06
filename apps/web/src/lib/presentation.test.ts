@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatCompactCount, formatDuration, formatTimeAgo, parseRepositoryKey, repositoryKey } from './presentation'
+import { formatCompactCount, formatCost, formatDuration, formatTimeAgo, parseRepositoryKey, repositoryKey } from './presentation'
 
 describe('repository keys', () => {
   it('round-trips an owner and name', () => {
@@ -33,5 +33,18 @@ describe('number and time formats', () => {
     const now = Date.parse('2026-09-29T10:00:00Z')
     expect(formatTimeAgo('2026-09-29T09:59:30Z', now)).toBe('just now')
     expect(formatTimeAgo('2026-09-29T09:15:00Z', now)).toBe('45 min ago')
+  })
+})
+
+describe('cost format', () => {
+  it('writes dollars and cents, and small amounts as under a cent', () => {
+    expect(formatCost({ usd: 12.4, unpricedTokens: 0 })).toBe('$12.40')
+    expect(formatCost({ usd: 0.002, unpricedTokens: 0 })).toBe('<$0.01')
+    expect(formatCost({ usd: 0, unpricedTokens: 0 })).toBe('$0.00')
+  })
+
+  it('never invents a cost for tokens without a price', () => {
+    expect(formatCost({ usd: 0, unpricedTokens: 900 })).toBe('n/a')
+    expect(formatCost({ usd: 3, unpricedTokens: 900 })).toBe('$3.00+')
   })
 })

@@ -4,6 +4,7 @@ import type {
   SessionStart,
   AgentSessionState,
   AgentSessionSummary,
+  CostTotals,
   MachineTokenSummary,
   SessionTimelineSegment,
   SessionsOverview,
@@ -33,6 +34,30 @@ const addTokens = (first: TokenTotals, second: TokenTotals): TokenTotals =>
     first.cacheRead + second.cacheRead,
     first.cacheCreation + second.cacheCreation,
   )
+
+// Demo prices per million tokens, in the shape of a large model's: input, output, cache read, cache write.
+const demoDollarsPerMillionTokens = { input: 4, output: 20, cacheRead: 0.2, cacheCreation: 5 }
+
+const demoCostOf = (tokens: TokenTotals): CostTotals => ({
+  usd:
+    (tokens.input * demoDollarsPerMillionTokens.input +
+      tokens.output * demoDollarsPerMillionTokens.output +
+      tokens.cacheRead * demoDollarsPerMillionTokens.cacheRead +
+      tokens.cacheCreation * demoDollarsPerMillionTokens.cacheCreation) /
+    1_000_000,
+  unpricedTokens: 0,
+})
+
+// The share of demo tokens spent on claude-haiku-demo, a model with no price; every aggregate over
+// several models therefore carries unpriced tokens, as a real report with an unlisted model does.
+const demoUnpricedShare = 0.28
+
+const mixedCostOf = (tokens: TokenTotals): CostTotals => ({
+  usd: demoCostOf(tokens).usd * (1 - demoUnpricedShare),
+  unpricedTokens: Math.round(tokens.total * demoUnpricedShare),
+})
+
+const withCost = <Row extends { tokens: TokenTotals }>(row: Row): Row & { cost: CostTotals } => ({ ...row, cost: mixedCostOf(row.tokens) })
 
 // Each sample session is a list of [minutes ago, state] changes, newest last.
 interface SampleSession {
@@ -174,6 +199,7 @@ const summaryOf = (sample: SampleSession, now: number): AgentSessionSummary => {
     startedAt: isoMinutesAgo(now, firstChange?.[0] ?? 0),
     lastEventAt: isoMinutesAgo(now, lastChange?.[0] ?? 0),
     tokens: sample.tokens,
+    cost: demoCostOf(sample.tokens),
     triggeredBy: sample.triggeredBy,
     billedThrough: sample.billedThrough,
   }
@@ -218,7 +244,9 @@ export const sampleUsageReport = (days: number, now: number): UsageReport => {
       day: new Date(now - (days - 1 - dayIndex) * dayMilliseconds).toISOString().slice(0, 10),
       tokens: tokensOf(Math.round(12_000 * scale), Math.round(35_000 * scale), Math.round(910_000 * scale), Math.round(52_000 * scale)),
     }
-  }).filter((usage) => usage.tokens.total > 0)
+  })
+    .filter((usage) => usage.tokens.total > 0)
+    .map(withCost)
   const totals = byDay.reduce((sum, usage) => addTokens(sum, usage.tokens), tokensOf(0, 0, 0, 0))
   const scaled = (share: number): TokenTotals =>
     tokensOf(
@@ -231,12 +259,13 @@ export const sampleUsageReport = (days: number, now: number): UsageReport => {
     windowStartedAt,
     generatedAt: new Date(now).toISOString(),
     totals,
+    totalCost: mixedCostOf(totals),
     sessionCount: 23,
     byRepository: [
       { repository: firstRepository ?? null, tokens: scaled(0.64), sessionCount: 15 },
       { repository: secondRepository ?? null, tokens: scaled(0.31), sessionCount: 6 },
       { repository: null, tokens: scaled(0.05), sessionCount: 2 },
-    ],
+    ].map(withCost),
     byWork: [
       { repository: firstRepository ?? null, branch: 'feat/12-sessions-and-usage', issueNumber: 12, pullRequestNumber: 14, triggeredBy: ['Dashi board (laptop runner)', 'Terminal (iTerm)'], billedThrough: ['Claude login · me@example.com'], tokens: scaled(0.38), sessionCount: 6 },
       { repository: secondRepository ?? null, branch: 'fix/31-retry-webhooks', issueNumber: 31, pullRequestNumber: 33, triggeredBy: ['CodePilot'], billedThrough: ['Anthropic API key'], tokens: scaled(0.21), sessionCount: 4 },
@@ -244,11 +273,12 @@ export const sampleUsageReport = (days: number, now: number): UsageReport => {
       { repository: secondRepository ?? null, branch: 'main', issueNumber: null, pullRequestNumber: null, triggeredBy: ['VS Code'], billedThrough: ['OpenRouter'], tokens: scaled(0.1), sessionCount: 2 },
       { repository: firstRepository ?? null, branch: 'chore/7-bump-dependencies', issueNumber: 7, pullRequestNumber: 8, triggeredBy: ['Dashi board (Claude cloud)'], billedThrough: ['Claude login · me@example.com'], tokens: scaled(0.09), sessionCount: 4 },
       { repository: null, branch: null, issueNumber: null, pullRequestNumber: null, triggeredBy: ['Not reported'], billedThrough: ['Not reported'], tokens: scaled(0.05), sessionCount: 2 },
-    ],
+    ].map(withCost),
     byDay,
     byModel: [
-      { model: 'claude-opus-demo', tokens: scaled(0.72) },
-      { model: 'claude-haiku-demo', tokens: scaled(0.28) },
+      { model: 'claude-opus-demo', tokens: scaled(1 - demoUnpricedShare), cost: demoCostOf(scaled(1 - demoUnpricedShare)) },
+      // A model with no price: tokens and no cost, as for any model missing from config/model-prices.json.
+      { model: 'claude-haiku-demo', tokens: scaled(demoUnpricedShare), cost: { usd: 0, unpricedTokens: scaled(demoUnpricedShare).total } },
     ],
     byTrigger: [
       { sourceKey: 'Dashi board (laptop runner)', label: 'Dashi board (laptop runner)', note: null, sessionCount: 6, tokens: scaled(0.34) },

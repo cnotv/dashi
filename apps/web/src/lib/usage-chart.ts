@@ -16,11 +16,11 @@ const emptyTotals = (): TokenTotals => ({ input: 0, output: 0, cacheRead: 0, cac
 export const fillMissingDays = (byDay: UsageByDay[], windowStartedAt: string, generatedAt: string): UsageByDay[] => {
   const firstDay = Date.parse(`${windowStartedAt.slice(0, 10)}T00:00:00Z`)
   const lastDay = Date.parse(`${generatedAt.slice(0, 10)}T00:00:00Z`)
-  const usageByDayKey = new Map(byDay.map((usage) => [usage.day, usage.tokens]))
+  const usageByDayKey = new Map(byDay.map((usage) => [usage.day, usage]))
   const dayCount = Math.max(0, Math.round((lastDay - firstDay) / dayMilliseconds) + 1)
   return Array.from({ length: dayCount }, (_, dayIndex) => {
     const day = new Date(firstDay + dayIndex * dayMilliseconds).toISOString().slice(0, 10)
-    return { day, tokens: usageByDayKey.get(day) ?? emptyTotals() }
+    return usageByDayKey.get(day) ?? { day, tokens: emptyTotals(), cost: { usd: 0, unpricedTokens: 0 } }
   })
 }
 

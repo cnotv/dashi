@@ -85,7 +85,7 @@ export const createIngestRoutes = ({ activityStore, ingestTokens, now }: Activit
  * @returns The routes, mounted under /api.
  */
 export const createActivityRoutes = (
-  { activityStore, ingestTokens, now }: ActivityDependencies,
+  { activityStore, ingestTokens, now, modelPrices }: ActivityDependencies,
   findPullRequest: PullRequestFinder,
   listStartsSince: (since: string) => UsageStart[],
 ) => {
@@ -101,7 +101,7 @@ export const createActivityRoutes = (
         activityStore.readTokenSamplesSince(windowStartedAt),
         windowStartedAt,
         now(),
-        { starts: listStartsSince(windowStartedAt) },
+        { starts: listStartsSince(windowStartedAt), modelPrices },
       ),
     )
   })
@@ -118,6 +118,7 @@ export const createActivityRoutes = (
         {
           machineLabelOf: (tokenId) => ingestTokens.listTokens().find((ingestToken) => ingestToken.tokenId === tokenId)?.label ?? null,
           starts: listStartsSince(windowStartedAt),
+          modelPrices,
         },
       ),
     )

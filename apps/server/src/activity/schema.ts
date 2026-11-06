@@ -54,3 +54,22 @@ export const otlpMetricsSchema = z.object({
     )
     .default([]),
 })
+
+const pricePerMillionTokens = z.number().nonnegative()
+
+// Dollars per million tokens, for each kind of token a session is billed for. `source`, `retrievedOn`
+// and `unit` record where the numbers came from and are not used in the sum.
+export const modelPriceTableSchema = z.strictObject({
+  source: z.string().optional(),
+  retrievedOn: z.string().optional(),
+  unit: z.string().optional(),
+  models: z.record(
+    z.string().min(1),
+    z.strictObject({
+      input: pricePerMillionTokens,
+      output: pricePerMillionTokens,
+      cacheRead: pricePerMillionTokens,
+      cacheCreation: pricePerMillionTokens,
+    }),
+  ),
+})
